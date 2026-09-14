@@ -8,8 +8,8 @@ import csv
 # NB @1 always refers to warp yarns and @2 refer to weft yarns
 
 # Setting yarns density, expressed in [picks/cm]
-D1_values = np.array([22, 29.3])
-D2_values = np.array([15, 20])
+D1_values = np.array([22])
+D2_values = np.array([15])
 
 #[cm]
 d1 = 0.0263
@@ -19,7 +19,7 @@ d2 = 0.0282
 v_values = np.linspace(0.4, 0.4, 1)  # Poisson's Ratio variabile
 r_f_values = np.linspace(0.5, 0.5, 1)  # Riduzione fattore variabile
 #weave_type = ["PW", "BW", "TW", "FR"]
-weave_type = ["BW"]
+weave_type = ["PW"]
 
 # Directory di output per salvare i file generati
 output_dir = "Textiles"
