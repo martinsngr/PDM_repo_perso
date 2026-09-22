@@ -1,0 +1,86 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  10
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+application     simpleFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         2000; // numero di iterate
+
+deltaT          1;
+
+writeControl    timeStep;
+
+writeInterval   100;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable true;
+
+functions
+{
+    inletAverage
+    {
+        type surfaceFieldValue;
+        functionObjectLibs ("libfieldFunctionObjects.so");
+        enabled true;
+
+        writeControl outputTime;
+        log true;
+        writeFields false;
+
+        regionType patch;
+        name inlet;
+
+        operation areaAverage;
+        fields (U);
+    }
+
+    outletAverage
+    {
+        type surfaceFieldValue;
+        functionObjectLibs ("libfieldFunctionObjects.so");
+        enabled true;
+
+        writeControl outputTime;
+        log true;
+        writeFields false;
+
+        regionType patch;
+        name outlet;
+
+        operation areaAverage;
+        fields (U);
+    }
+}
+
+
+
+
+/*************************************************************************/
