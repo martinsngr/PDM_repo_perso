@@ -47,7 +47,7 @@ boundaryField
     {
         type            symmetry;
     }
-    $fabricName
+    PW-22-15-0.4-0.5
     {
         type            zeroGradient;
     }
