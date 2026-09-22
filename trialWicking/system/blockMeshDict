@@ -39,14 +39,14 @@ edges
 
 patches         
 (
-    patch inlet 
-    (
-        (3 7 6 2)
-    )
-
-    patch outlet 
+    patch inlet
     (
         (1 5 4 0)
+    )
+
+    patch outlet
+    (
+        (3 7 6 2)
     )
 
     empty frontAndBack 

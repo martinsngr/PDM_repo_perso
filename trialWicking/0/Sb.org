@@ -23,12 +23,12 @@ boundaryField
 {
     inlet
     {
-        type            fixedValue;
-        value           uniform 1e-3;
+        type            zeroGradient;
     }
     outlet
     {
-        type            zeroGradient;
+        type            fixedValue;
+        value           uniform 1e-3;
     }
     frontAndBack
     {
