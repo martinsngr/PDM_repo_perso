@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "../caseSetup"
+
+xResEnd #calc "$xmin + $xRes";
+
+// Saturated reservoir at the bottom (x-min) end of the yarn, clamped by fixedSb
+actions
+(
+    {
+        name    bottomReservoirCells;
+        type    cellSet;
+        action  new;
+        source  boxToCell;
+        sourceInfo
+        {
+            box ($xmin $ymin $zmin) ($xResEnd $ymax $zmax);
+        }
+    }
+    {
+        name    bottomReservoir;
+        type    cellZoneSet;
+        action  new;
+        source  setToCellZone;
+        sourceInfo
+        {
+            set bottomReservoirCells;
+        }
+    }
+);
+
+// ************************************************************************* //
