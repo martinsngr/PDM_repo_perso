@@ -23,7 +23,7 @@ startTime       0.0;
 
 stopAt          endTime;
 
-endTime         0.5;
+endTime         0.1;
 
 deltaT          1e-9;
 
@@ -47,13 +47,13 @@ timePrecision   9;
 
 runTimeModifiable yes;
 
-CFL             Todd;
+CFL             Coats;
 
-maxCo           1;
+maxCo           0.5;
 
-prefactor       0.5;
+prefactor       0.1666;
 
-dSmax           0.001;
+dSmax           0.01;
 
 maxDeltaT       1e-3;
 
