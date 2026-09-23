@@ -14,6 +14,11 @@ log.*
 log[0-9]*.*
 AllRun.log
 **/constant/polyMesh/
+**/constant/*/polyMesh/
+**/constant/polyMesh_full/
+**/cellToRegion
+**/0/fluid/
+**/0/yarn/
 
 # OpenFOAM time-step result directories (numeric names), initial conditions in 0/ are kept
 [1-9]*/

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+cd "${0%/*}" || exit 1
+
+echo "Cleaning case..."
+
+# Results
+rm -rf -- -[0-9]* [1-9]* [0-9].*
+
+# Post-processing
+rm -rf postProcessing
+rm -rf VTK
+
+# Parallel
+rm -rf processor*
+
+# Meshes
+rm -rf constant/polyMesh
+rm -rf constant/polyMesh_full
+rm -rf constant/fluid
+rm -rf constant/yarn
+
+# Generated fields
+rm -f 0/Sb
+rm -f 0/cellToRegion
+
+# Logs
+rm -f log*
+rm -f *.log
+
+echo "Case cleaned."

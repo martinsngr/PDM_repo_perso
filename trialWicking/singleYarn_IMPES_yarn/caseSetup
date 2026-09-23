@@ -1,0 +1,34 @@
+dDarcy  2e11;
+nu      1.5e-5;
+
+//dimensions of computational domain
+xmin	 0.000400;
+xmax	 0.003600;
+ymin	 -0.000550;
+ymax	 0.000550;
+zmin	 -0.000580;
+zmax	 0.000580;
+
+//coordinates of the locationInMesh poit
+xloc	 0.002000;
+yloc	 0.000000;
+zloc	 -0.000464;
+
+//coordinates of a point inside the solid
+xcat	 0.002000;
+ycat	 0.000000;
+zcat	 0.000000;
+
+//cells per average diameter
+CpD     10;
+dg      0.0001;
+
+zWater	 -0.000290;
+
+//refinement levels
+refLev	 0;
+
+
+N 4; 
+
+

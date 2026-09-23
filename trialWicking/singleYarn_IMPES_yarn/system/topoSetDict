@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "../caseSetup"
+actions
+(
+
+	{
+		name fluid;
+		type cellZoneSet;
+		action new;
+		source surfaceToCell;
+		sourceInfo
+		{
+			file "constant/triSurface/yarn-c.stl";
+			outsidePoints (($xloc $yloc $zloc));
+			includeCut true;
+			includeInside true;
+			includeOutside false;
+			useSurfaceOrientation false;
+			nearDistance -1;
+			curvature -100;
+		}
+	}
+
+	{
+		name yarn;
+		type cellZoneSet;
+		action new;
+		source surfaceToCell;
+		sourceInfo
+		{
+			file "constant/triSurface/yarn-c.stl";
+			outsidePoints (($xloc $yloc $zloc));
+			includeCut true;
+			includeInside true;
+			includeOutside false;
+			useSurfaceOrientation false;
+			nearDistance -1;
+			curvature -100;
+		}
+	}
+	{
+		name    fluid;
+		type    cellZoneSet;
+		action  invert;
+	}
+);

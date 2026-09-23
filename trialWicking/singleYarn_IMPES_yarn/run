@@ -1,0 +1,118 @@
+#!/bin/bash
+
+cd "${0%/*}" || exit 1
+
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+N=4
+
+# Clean
+rm -rf constant/polyMesh constant/polyMesh_full
+rm -rf constant/fluid constant/yarn
+rm -rf -- -[0-9]* [1-9]* [0-9].*
+rm -rf postProcessing VTK processor*
+rm -f 0/Sb 0/cellToRegion
+rm -f log*
+
+# Mesh generation
+runApplication blockMesh
+runApplication snappyHexMesh -overwrite
+runApplication topoSet
+
+# Avoid splitMeshRegions reading old fields
+rm -f 0/Sb 0/cellToRegion
+
+runApplication splitMeshRegions -cellZones -overwrite
+
+# Use only yarn mesh
+if [ ! -d constant/yarn/polyMesh ]; then
+    echo "ERROR: constant/yarn/polyMesh not found."
+    ls constant
+    exit 1
+fi
+
+mv constant/polyMesh constant/polyMesh_full
+cp -r constant/yarn/polyMesh constant/polyMesh
+
+# Create wetInlet patch
+topoSet -dict system/topoSetDict.wetInlet > log.topoSetWetInlet
+if [ "$?" -ne 0 ]; then
+    echo "ERROR: topoSet wetInlet failed."
+    exit 1
+fi
+
+runApplication createPatch -overwrite
+
+# Initial fields
+cp 0/Sb.org 0/Sb
+runApplication setFields
+
+rm -f 0/cellToRegion
+
+echo "Checking initial fields..."
+ls 0
+
+if [ ! -f 0/p ] || [ ! -f 0/Sb ] || [ ! -f 0/Ua ] || [ ! -f 0/Ub ]; then
+    echo "ERROR: missing initial fields in 0/"
+    exit 1
+fi
+
+if [ ! -f constant/K ]; then
+    echo "ERROR: missing constant/K"
+    exit 1
+fi
+
+# Run solver
+if [ "$N" -eq 1 ]; then
+
+    impesFoam -noFunctionObjects > log1.impesFoam
+    if [ "$?" -ne 0 ]; then
+        echo "ERROR: impesFoam failed."
+        exit 1
+    fi
+
+else
+
+    rm -rf processor*
+    rm -f log.decomposePar log.decomposeParFields
+
+    decomposePar -force > log.decomposePar
+    if [ "$?" -ne 0 ]; then
+        echo "ERROR: decomposePar -force failed."
+        exit 1
+    fi
+
+    decomposePar -fields > log.decomposeParFields
+
+    decomposePar -fields -time constant > log.decomposeParConstantFields
+
+    echo "Checking decomposed files..."
+    if [ ! -f processor0/0/p ]; then
+        echo "ERROR: processor0/0/p not found."
+        exit 1
+    fi
+
+    if [ ! -f processor0/constant/K ]; then
+        echo "ERROR: processor0/constant/K not found."
+        exit 1
+    fi
+
+    SOLVER="$(which impesFoam)"
+    if [ -z "$SOLVER" ]; then
+        echo "ERROR: impesFoam not found in PATH."
+        exit 1
+    fi
+
+    echo "Running impesFoam in parallel on $PWD using $N cores"
+    mpirun -np "$N" "$SOLVER" -parallel -noFunctionObjects > log1.impesFoam
+
+    if [ "$?" -ne 0 ]; then
+        echo "ERROR: impesFoam failed."
+        exit 1
+    fi
+
+    runApplication reconstructPar -latestTime
+
+fi
+
+impesFoam -postProcess -latestTime > log1.postProcess
