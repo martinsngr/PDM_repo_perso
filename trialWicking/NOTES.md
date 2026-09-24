@@ -6,7 +6,7 @@ Status and findings for the wicking cases. Last updated 2026-09-23.
 
 | Folder | What it is |
 |---|---|
-| `./` (1D) | 1 m column, 1×1000×1 cells, reservoir = bottom 2 cm cellZone held at Sb 0.99 via `fixedSb`, pc0 100 Pa. Reaches capillary equilibrium (~1 cm rise) — runs 1000 s in ~40 s. |
+| `./` (1D) | 1D equivalent of the yarn case: column length = yarn centreline unfolded along the crimp (3.446 mm for x 0.4–3.6 mm; straight 3.2 mm), section 0.55 mm (width) × 0.237 mm (mean thickness), both measured from slices of `yarn-c.stl`. 1×172×1 cells (20 µm), reservoir = bottom 0.2 mm cellZone held at Sb 0.99 via `fixedSb`, pc0 5000 Pa, K 1e-11, Coats CFL. Top is open to air (`outlet` p fixed 0, Ub fixed 0): with the old `darcyGradPressure` top the air could only leave counter-current back into the reservoir, which made the column fill much more slowly than the yarn (mean Sb 0.59 vs 0.91 at 0.06 s). The yarn vents air through `yarn_to_fluid` along its whole length. Open top: mean Sb 0.36 / 0.50 / 0.70 / 0.84 at 0.01 / 0.02 / 0.04 / 0.06 s (yarn 0.42 / 0.56 / 0.77 / 0.91), front at the top at ~0.035 s; 0.1 s runs in ~75 s. The real section is lens-shaped: its area (STL volume / unfolded length = 9.47e-8 m²) is 27 % smaller than the 1.30e-7 m² rectangle, so scale uptake volumes by 0.73 before comparing with the 3D case. (Before 2026-09-24: 1 m column, pc0 100 Pa, ~1 cm equilibrium rise.) |
 | `singleYarn_IMPES_yarn/` | Original 3D yarn case (`yarn-c.stl`): wetting from below in z through a `wetInlet` patch, fixed deltaT 1e-9. Kept as reference ("original set up" commit). Its mesh has 24 negative-volume cells (see below). |
 | `singleYarn_IMPES_vertical/` | The 1D vertical test moved onto the yarn geometry. **Current working case.** |
 
@@ -50,6 +50,10 @@ Mesh comparison (after the inside-point fix):
 - **Without `adjustTimeStep yes`, deltaT is never adapted.** This explains the fixed 1e-9 in the original yarn case.
 - **Todd bug, upstream code:** `ToddNo.H:61` divides `maxCo` by `Tpc`, which is a time in seconds, so the capillary limit never applies. The same line is in upstream master (6a8ecc3) and dev; not yet reported or patched. A consistent form would be `maxCo*Todd_factor_pc/runTime.deltaTValue()`. **Use `CFL Coats`**, whose CFL is correctly dimensionless.
 - **Any Sb above Sbmax crashes the solver.** Van Genuchten returns NaN and the run dies with SIGFPE.
+- **The 0.1 s yarn run crashed near full saturation** (t = 0.0678 s, min Sb 0.908, max Sb oscillating 0.991–0.998, then above Sbmax). Two likely causes, not fixed yet:
+  1. The Coats capillary term uses the mobility kra·krb/(μb·kra + μa·krb), which goes to 0 as kra → 0, but `phiPc` (`updateSbProperties.H:22`) uses the liquid mobility `Mbf` alone. With air supplied freely through the p = 0 side wall, the real explicit limit near Sb 0.99 (where dpc/dS → ∞) is much tighter than Coats says.
+  2. On `yarn_to_fluid`, fixed p lets both phases cross the wall in `pEqn`, but `SEqn.H` forces `phib` = 0 there (Ub fixed). Once the yarn is wet, most of the wall flux is liquid for `pEqn`, which leaves unbalanced liquid sources in the wall cells.
+  - Proposed fix: on patches with fixed `Ub`, use only the air mobility in `pEqn`. Alternatives: a stricter capillary CFL, Van Genuchten Sbmax > 1, or a clip (hides the mass error). The 1D case survived because Sb stayed ≤ 0.96, but the open-top 1D outlet has the same BC inconsistency.
 
 Tests on the current mesh (4 cores, about 7 min each):
 

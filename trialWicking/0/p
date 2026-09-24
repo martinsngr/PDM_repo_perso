@@ -28,7 +28,8 @@ boundaryField
 
     outlet
     {
-	type		darcyGradPressure;
+	// open top: air leaves freely (Ub fixed 0 keeps liquid in)
+	type		fixedValue;
 	value		uniform 0;
     }
 

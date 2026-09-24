@@ -56,7 +56,7 @@ capillarityModel	VanGenuchten;
 
 VanGenuchtenCoeffs
 {
-    pc0 100;
+    pc0 5000;
     m 0.5;	
     Sbmin 0;
     Sbmax 0.999;	

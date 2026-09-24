@@ -23,7 +23,7 @@ startTime       0.0;
 
 stopAt          endTime;
 
-endTime         1000;
+endTime         0.1;
 
 
 deltaT          1e-5;
@@ -32,7 +32,7 @@ adjustTimeStep  yes;
 
 writeControl    adjustableRunTime;
 
-writeInterval   1000;
+writeInterval   0.01;
 
 purgeWrite      0;
 
@@ -48,16 +48,17 @@ timePrecision   6;
 
 runTimeModifiable yes;
 
-CFL             Todd;
+CFL             Coats;
 
-maxCo		1;
+maxCo		0.5;
 
 prefactor       0.5;
 
-dSmax           0.001;
+dSmax           0.01;
 
 maxDeltaT	100000;
-minDeltaT	1e-6;
+
+minDeltaT	1e-12;
 
 convergence	1e-8;
 

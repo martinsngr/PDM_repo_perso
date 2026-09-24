@@ -22,3 +22,9 @@ AllRun.log
 
 # OpenFOAM time-step result directories (numeric names), initial conditions in 0/ are kept
 [1-9]*/
+0.*/
+
+# Run output and generated fields
+run.out
+*.OpenFOAM
+**/0/Sb
