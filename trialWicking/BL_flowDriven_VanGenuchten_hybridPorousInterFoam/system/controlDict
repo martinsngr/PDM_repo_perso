@@ -1,9 +1,9 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-  =========                |
-  \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \    /   O peration     | Website:  https://openfoam.org
-    \  /    A nd           | Version:  7
-     \/     M anipulation  |
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.1                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -15,24 +15,21 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     impesFoam;
+application     hybridPorousInterFoam;
 
 startFrom       latestTime;
 
-startTime       0.0;
+startTime       0;
 
 stopAt          endTime;
 
-endTime         0.1;
-
+endTime         130000;
 
 deltaT          1e-5;
 
-adjustTimeStep  yes;
+writeControl    adjustableRunTime; 
 
-writeControl    adjustableRunTime;
-
-writeInterval   0.01;
+writeInterval   1000;
 
 purgeWrite      0;
 
@@ -40,7 +37,7 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression no;
+writeCompression uncompressed;
 
 timeFormat      general;
 
@@ -48,18 +45,10 @@ timePrecision   6;
 
 runTimeModifiable yes;
 
-CFL             Coats;
+adjustTimeStep  yes;
 
-maxCo		0.5;
-
-prefactor       0.5;
-
-dSmax           0.01;
-
-maxDeltaT	100000;
-
-minDeltaT	1e-12;
-
-convergence	1e-8;
+maxCo           0.75;
+maxAlphaCo      1;
+maxDeltaT       50;
 
 // ************************************************************************* //
