@@ -1,7 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  4.1                                   |
+|  \\    /   O peration     | Version:  9                                     |
 |   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -17,21 +17,23 @@ FoamFile
 
 dimensions      [0 0 0 0 0 0 0];
 
+// porosity as in ../1D_vertical_impes; eps < 0.99 everywhere, so the whole
+// column is porous (Darcy model, Solid = 1)
 internalField   uniform 0.5;
 
 boundaryField
 {
+    inlet
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
     frontAndBack
     {
         type            empty;
-    }
-    leftWall
-    {
-        type            zeroGradient;
-    }
-    rightWall
-    {
-        type            zeroGradient;
     }
 }
 

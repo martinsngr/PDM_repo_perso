@@ -1,7 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  4.1                                   |
+|  \\    /   O peration     | Version:  9                                     |
 |   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -17,21 +17,27 @@ FoamFile
 
 dimensions      [0 0 0 0 0 0 0];
 
+// initial saturation as in ../1D_vertical_impes
 internalField   uniform 0.002;
 
 boundaryField
 {
+    // imposed saturation at the wetted face (replaces the impesFoam reservoir
+    // clamped at Sb 0.99)
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 0.99;
+    }
+    // as the impesFoam outlet (Sb fixed 1e-3)
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0.001;
+    }
     frontAndBack
     {
         type            empty;
-    }
-    leftWall
-    {
-        type            zeroGradient;
-    }
-    rightWall
-    {
-        type		zeroGradient;
     }
 }
 

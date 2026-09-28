@@ -3,5 +3,8 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-runApplication hybridPorousInterFoam 
+runApplication blockMesh
+runApplication hybridPorousInterFoam
 
+# saturation profile along the column axis at every write time
+runApplication postProcess -func "graphCell(start=(0.000275 0 0.0001185), end=(0.000275 0.003446 0.0001185), fields=(alpha.wetting))"

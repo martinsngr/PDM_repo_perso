@@ -1,7 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  5.x                                   |
+|  \\    /   O peration     | Version:  9                                     |
 |   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -10,37 +10,43 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volScalarField;
-    location    "86";
+    location    "0";
     object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// p is the saturation-weighted mixture pressure
+//     p = alpha*p_wetting + (1 - alpha)*p_nonWetting = p_nonWetting - alpha*pc(alpha)
+// (see updateDarcyVelocities.H / PcCoeff in the solver). To reproduce the
+// impesFoam BCs (air pressure 0 at inlet and outlet), set p = -alpha*pc(alpha)
+// with the Van Genuchten pc of constant/transportProperties
+// (pc0 5000, m 0.5, Smax 0.999):
+//     alpha 0.99  -> pc =     676 Pa -> p = -669 Pa
+//     alpha 0.002 -> pc = 2.50e6 Pa -> p = -4995 Pa
+//     alpha 0.001 -> pc = 5.00e6 Pa -> p = -4995 Pa
+// These values must be recomputed if pc0, m, the inlet/outlet alpha or
+// alpha.wettingmaxpc change.
+
 dimensions      [1 -1 -2 0 0 0 0];
 
-internalField   uniform 0;
+// air at rest at 0 Pa in the dry column (alpha 0.002)
+internalField   uniform -4995;
 
 boundaryField
 {
+    inlet
+    {
+        type            fixedValue;
+        value           uniform -669;
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform -4995;
+    }
     frontAndBack
     {
         type            empty;
-    }
-    top
-    {
-        type            zeroGradient;
-    }
-    bottom
-    {
-        type            zeroGradient;
-    }
-    leftWall
-    {
-        type            zeroGradient;
-    }
-    rightWall
-    {
-        type            fixedValue;
-        value           uniform 0;
     }
 }
 
