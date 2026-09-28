@@ -1,0 +1,37 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Minimal controlDict: enough for blockMesh, checkMesh and postProcess.
+  Solver settings (application, deltaT, endTime, ...) will be replaced later
+  by those of the solver tutorial you start from.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     interFoam;      // placeholder
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         1;
+deltaT          1;
+
+writeControl    timeStep;
+writeInterval   1;
+purgeWrite      0;
+
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+
+timeFormat      general;
+timePrecision   6;
+
+runTimeModifiable true;
+
+// ************************************************************************* //

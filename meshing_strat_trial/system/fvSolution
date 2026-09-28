@@ -1,0 +1,19 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Placeholder fvSolution: only so that checkMesh / postProcess find the file.
+  Replace with the solver tutorial's version before running a simulation.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+}
+
+// ************************************************************************* //
