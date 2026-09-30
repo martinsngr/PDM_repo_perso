@@ -2,6 +2,10 @@
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
+. ../runTools.sh
+
+# LOG_EVERY=N ./run keeps only every Nth time step of the solver log, plus
+# its last 400 lines in log.impesFoam.tail. Default: full log (~55 MB).
 
 runApplication blockMesh
 
@@ -9,8 +13,10 @@ runApplication blockMesh
 cp 0/Sb.org 0/Sb
 runApplication setFields
 
-# also writes liquidBalance.csv (impesFoam fork, updateLiquidContent.H)
-runApplication impesFoam
+# solver log written in /tmp during the run (see ../runTools.sh); also writes
+# liquidBalance.csv (impesFoam fork, updateLiquidContent.H)
+echo "Running impesFoam on $PWD"
+runTmpLog log.impesFoam impesFoam
 
 # Sb profile along the column at every write time
 runApplication postProcess -func sampleDict

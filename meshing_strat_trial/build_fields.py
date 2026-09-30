@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-03_build_fields.py  -  uniform hex mesh + porosity / permeability fields for a DBS
+build_fields.py  -  uniform hex mesh + porosity / permeability fields for a DBS
 (micro-continuum) solver such as hybridPorousInterFoam, from a TexGen STL.
 
 Run it from the OpenFOAM case directory (edit the CONFIGURATION block first):
-    python3 03_build_fields.py
+    python3 build_fields.py
     blockMesh
     checkMesh
 
@@ -25,6 +25,7 @@ What it does
 
 Requires: pip install numpy trimesh rtree      (optional, much faster: pip install embreex)
 """
+import json
 import math
 import os
 import time
@@ -34,9 +35,10 @@ import numpy as np
 # ================================ CONFIGURATION ================================
 CASE_DIR    = "."                                  # OpenFOAM case directory
 STL_FILE    = "constant/triSurface/PW-22-15-0.4-0.5.stl"
-STL_SCALE   = 1e-2          # STL units -> metres (TexGen model in mm -> 1e-3)
-DOMAIN_MIN  = (0.0,      0.0,      -0.00705)          # REV corner (x, y, z) in STL units; None = STL bounding box
-DOMAIN_MAX  = (0.181818, 0.266667,  0.02115)          #   -> MUST be set if you exported untrimmed yarns
+STL_SCALE   = 1e-2          # STL units -> metres (TexGen model in cm -> 1e-2)
+DOMAIN_FILE = "rev_domain.json"  # REV written by inspect_stl.py (in metres); used if the file exists
+DOMAIN_MIN  = None          # otherwise: REV corner (x, y, z) in STL units; None = STL bounding box
+DOMAIN_MAX  = None          #   -> MUST be set if you exported untrimmed yarns
 DX          = 20e-6         # target cell size [m]; rounded so an integer number of cells fits
 SUB         = 4             # sub-samples per direction in cut cells (4 -> 64 points per cell)
 
@@ -221,7 +223,16 @@ def main():
     print(f"{len(bodies)} yarn bodies loaded")
 
     # domain and grid
-    if DOMAIN_MIN is None:
+    domain_file = os.path.join(CASE_DIR, DOMAIN_FILE) if DOMAIN_FILE else None
+    if domain_file and os.path.isfile(domain_file):
+        with open(domain_file) as fh:
+            rev = json.load(fh)
+        if not math.isclose(rev["stl_scale"], STL_SCALE):
+            raise SystemExit(f"{DOMAIN_FILE} was made with scale {rev['stl_scale']}, "
+                             f"but STL_SCALE = {STL_SCALE}. Re-run inspect_stl.py.")
+        lo, hi = np.array(rev["min_m"]), np.array(rev["max_m"])
+        print(f"REV read from {DOMAIN_FILE} (made from {rev['stl_file']}, zgap {rev['zgap']})")
+    elif DOMAIN_MIN is None:
         lo = np.min([b.bounds[0] for b in bodies], axis=0)
         hi = np.max([b.bounds[1] for b in bodies], axis=0)
     else:

@@ -51,10 +51,17 @@ and in the solver's `tutorials/Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_Van
   air leaves. Inlet: neither fixed, so the face carries the total inward flux at alpha 0.99 (1 % air, 99 % water);
   no air escapes into the reservoir. impesFoam's inlet is water only (Ua fixed 0).
 - **Time step and loops:** `setDeltaT.H` only limits the Courant numbers of the total flux, not the explicit
-  capillary diffusion, so `maxDeltaT 3e-7` is set by hand. PIMPLE 1 outer / 2 pressure correctors,
-  `nAlphaSubCycles 1`: about 7× faster than 2/3/4, same front, uptake within 5 %. `nCorrectors 1` crashes.
-- **End time 0.1 s**, as the impesFoam cases (~18 min). Older setups (inlet alpha 1, fixed outlet p) crashed at
+  capillary diffusion. The coded function object `coatsTimeStep` in `controlDict` applies impesFoam's limits instead
+  (Coats CFL with `CoatsMaxCo 0.5`, `dSmax 0.01`): each step it recomputes them from alpha.wetting (Brooks–Corey /
+  Van Genuchten formulas) and overwrites `maxDeltaT` in memory; `setDeltaT.H` then grows dt by at most 1.2× per step.
+  dt follows impesFoam's (6.2e-7, dip to 4.2e-7 near 0.06 s, up to 1.9e-6). `minDeltaTCoats 1e-7` is required:
+  without a floor the dSmax rule drives dt to 1e-13 and the run blows up (this solver is less stable at very small
+  dt). PIMPLE 1 outer / 2 pressure correctors, `nAlphaSubCycles 1`; `nCorrectors 1` crashes.
+- **End time 0.1 s**, as the impesFoam cases (~9.5 min; ~18 min with a fixed `maxDeltaT 3e-7`, same uptake within 0.3 %). Older setups (inlet alpha 1, fixed outlet p) crashed at
   ~0.058 s; this one runs to 0.1 s.
+- **Solver log:** written in `/tmp` during the run by `runTmpLog` (`../runTools.sh`, rule in `../CLAUDE.md`);
+  `log.hybridPorousInterFoam` is a symlink until the solver ends. `LOG_EVERY=N ./run` keeps only every Nth step plus
+  the last 400 lines (`log.hybridPorousInterFoam.tail`).
 - **Output:** `liquidBalance.csv` (coded function object in `controlDict`, same format as the impesFoam fork)
   and `postProcessing/sampleDict/<t>/acrossFlow_alpha.wetting.csv` alpha profiles (same `sampleDict` as the impesFoam twin).
 - **Tested (scratchpad copy, 2026-09-30):** this setup ran to 0.1 s in 18 min, alpha within [0.002, 0.99].

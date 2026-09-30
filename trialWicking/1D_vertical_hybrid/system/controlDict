@@ -23,7 +23,7 @@ startTime       0;
 
 stopAt          endTime;
 
-// same end time as the impesFoam cases; ~18 min on one core
+// same end time as the impesFoam cases; ~9.5 min on one core
 endTime         0.1;
 
 deltaT          1e-8;
@@ -51,16 +51,166 @@ adjustTimeStep  yes;
 maxCo           0.75;
 maxAlphaCo      1;
 // setDeltaT.H only limits the Courant numbers of the total flux, not the
-// explicit capillary diffusion in alphaEqn, so cap dt by hand: with the
-// 1/2 PIMPLE loops of fvSolution, 3e-7 is stable to 0.1 s; 5e-7 crashed at
-// 0.035 s (with the older fixed-p, alpha 1 inlet setup).
+// explicit capillary diffusion in alphaEqn. The coatsTimeStep function object
+// below applies the impesFoam limits instead (Coats CFL and dSmax, as in
+// ../1D_vertical_impes_inletRes/system/controlDict): at every step it
+// overwrites maxDeltaT in memory, and setDeltaT.H then grows dt by at most
+// 1.2x per step up to that limit. dt follows impesFoam's (6.2e-7 for most of
+// the run, up to 1.9e-6 at the end); 0.1 s takes ~9.5 min instead of ~18 min
+// with a fixed maxDeltaT 3e-7, same uptake within 0.3 %.
+// The value here is only the first-step cap.
 maxDeltaT       3e-7;
 
-// Liquid uptake, written at every write time to liquidBalance.csv in the same
-// format as the impesFoam fork (updateLiquidContent.H): liquid volume
-// sum(eps*alpha.wetting*V) in mL and liquid mass in g.
+CoatsMaxCo      0.5;    // maxCo of impesFoam's CFL Coats
+dSmax           0.01;   // max saturation change per step
+maxDeltaTCoats  1e-3;   // upper bound on the limit
+// lower bound on the limit: needed with dSmax. This solver behaves worse at
+// very small dt, so without a floor the dSmax rule keeps cutting dt (down to
+// 1e-13) and the run blows up within 5e-5 s.
+minDeltaTCoats  1e-7;
+
+// Liquid uptake (liquidBalance), written at every write time to
+// liquidBalance.csv in the same format as the impesFoam fork
+// (updateLiquidContent.H): liquid volume sum(eps*alpha.wetting*V) in mL,
+// liquid mass in g, and the volume-weighted mean saturation
+// sum(alpha.wetting*V)/sum(V).
 functions
 {
+    // Adaptive time step as impesFoam (setDeltaT.H + CoatsNo.H of the fork).
+    // Valid for Brooks-Corey kr and Van Genuchten pc (formulas of the
+    // solver's porousModels, recomputed here from alpha.wetting).
+    coatsTimeStep
+    {
+        type            coded;
+        libs            ("libutilityFunctionObjects.so");
+        name            coatsTimeStep;
+        executeControl  timeStep;
+        writeControl    none;
+
+        codeInclude
+        #{
+            #include "fvc.H"
+            #include "uniformDimensionedFields.H"
+        #};
+
+        codeExecute
+        #{
+            const Time& runTime = mesh().time();
+            const dictionary& cd = runTime.controlDict();
+            const scalar coatsMax = cd.lookupOrDefault<scalar>("CoatsMaxCo", 0.5);
+            const scalar dSmax = cd.lookupOrDefault<scalar>("dSmax", 0.01);
+            const scalar dtMax = cd.lookupOrDefault<scalar>("maxDeltaTCoats", 1e-3);
+            const scalar dtMin = cd.lookupOrDefault<scalar>("minDeltaTCoats", 0);
+
+            const volScalarField& alpha =
+                mesh().lookupObject<volScalarField>("alpha.wetting");
+            const volScalarField& eps =
+                mesh().lookupObject<volScalarField>("eps");
+            const volScalarField& K =
+                mesh().lookupObject<volScalarField>("K");
+            const surfaceScalarField& phi =
+                mesh().lookupObject<surfaceScalarField>("phi");
+            const uniformDimensionedVectorField& g =
+                mesh().lookupObject<uniformDimensionedVectorField>("g");
+
+            const dictionary& tp =
+                mesh().lookupObject<IOdictionary>("transportProperties");
+            const dictionary& wet = tp.subDict("wetting");
+            const dictionary& non = tp.subDict("nonWetting");
+            const scalar rhob = dimensionedScalar("rho", dimDensity, wet).value();
+            const scalar rhoa = dimensionedScalar("rho", dimDensity, non).value();
+            const scalar mub =
+                rhob*dimensionedScalar("nu", dimViscosity, wet).value();
+            const scalar mua =
+                rhoa*dimensionedScalar("nu", dimViscosity, non).value();
+            const scalar Mmu = mub/mua;
+
+            const scalar act = readScalar(tp.lookup("activateCapillarity"));
+            const scalar Smin =
+                dimensionedScalar(tp.lookup("alpha.wettingmin")).value();
+            const scalar Smax =
+                dimensionedScalar(tp.lookup("alpha.wettingmax")).value();
+            const scalar nkr =
+                readScalar(tp.subDict("BrooksAndCoreyCoeffs").lookup("n"));
+            const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
+            const scalar pc0 = dimensionedScalar(vg.lookup("pc0")).value();
+            const scalar m = readScalar(vg.lookup("m"));
+            const scalar Sminpc =
+                dimensionedScalar(vg.lookup("alpha.wettingminpc")).value();
+            const scalar Smaxpc =
+                dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
+            const scalar nvg = 1/(1 - m);
+
+            const scalarField sumKA
+            (
+                fvc::surfaceSum
+                (
+                    fvc::interpolate(K)*mesh().magSf()/mag(mesh().delta())
+                )().primitiveField()
+            );
+            const scalarField sumPhi
+            (
+                fvc::surfaceSum(mag(phi))().primitiveField()
+            );
+            const scalarField sumSfg
+            (
+                fvc::surfaceSum(mag(mesh().Sf() & g))().primitiveField()
+            );
+
+            const scalar dt = runTime.deltaTValue();
+            const scalarField& V = mesh().V();
+
+            scalar CFLmax = 0;
+            scalar dSdtMax = 0;
+            forAll(V, i)
+            {
+                const scalar Se =
+                    min(max((alpha[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
+                const scalar kra = pow(1 - Se, nkr);
+                const scalar krb = pow(Se, nkr);
+                const scalar dkra = -nkr*pow(1 - Se, nkr - 1)/(Smax - Smin);
+                const scalar dkrb = nkr*pow(Se, nkr - 1)/(Smax - Smin);
+                const scalar den = Mmu*sqr(kra) + 2*kra*krb + sqr(krb)/Mmu;
+
+                const scalar Sepc =
+                    min
+                    (
+                        max((alpha[i] - Sminpc)/(Smaxpc - Sminpc), 1e-4),
+                        1 - 1e-4
+                    );
+                const scalar dpcdS =
+                    act*(1/(nvg*m))*(pc0/(Smaxpc - Sminpc))
+                   *pow(pow(Sepc, -1/m) - 1, 1/nvg - 1)*pow(Sepc, -(1 + m)/m);
+
+                // flow, gravity and capillary parts of the Coats CFL
+                const scalar CFL =
+                    (dt/eps[i])
+                   *(
+                        (dkrb*kra - dkra*krb)/den*sumPhi[i]
+                      - K[i]*(rhoa - rhob)*sumSfg[i]
+                       *(sqr(kra)*dkrb/mua + sqr(krb)*dkra/mub)/den
+                      + 2*dpcdS*sumKA[i]*kra*krb/(mub*kra + mua*krb)
+                    )/V[i];
+
+                CFLmax = max(CFLmax, CFL);
+                dSdtMax =
+                    max(dSdtMax, mag(alpha[i] - alpha.oldTime()[i])/dt);
+            }
+            reduce(CFLmax, maxOp<scalar>());
+            reduce(dSdtMax, maxOp<scalar>());
+
+            const scalar dtCoats = dt*coatsMax/(CFLmax + small);
+            const scalar dtForS = dSmax/(dSdtMax + small);
+            const scalar limit =
+                max(min(min(dtCoats, dtForS), dtMax), dtMin);
+
+            const_cast<dictionary&>(cd).set("maxDeltaT", limit);
+
+            Info<< "Coats CFL Number max: " << CFLmax
+                << "  maxDeltaT = " << limit << endl;
+        #};
+    }
+
     liquidBalance
     {
         type            coded;
@@ -87,6 +237,8 @@ functions
             // m3
             const scalar V =
                 gSum(eps.primitiveField()*alpha.primitiveField()*mesh().V());
+            const scalar meanSaturation =
+                gSum(alpha.primitiveField()*mesh().V())/gSum(mesh().V());
 
             if (Pstream::master())
             {
@@ -106,11 +258,13 @@ functions
                 std::ofstream os(file.c_str(), std::ios::app);
                 if (header)
                 {
-                    os << "time,totalLiquidVolume_mL,totalLiquidMass_g\n";
+                    os  << "time,totalLiquidVolume_mL,totalLiquidMass_g,"
+                        << "meanSaturation\n";
                 }
                 os  << mesh().time().timeName() << ","
                     << V*1e6 << ","
-                    << rho.value()*V*1e3 << "\n";
+                    << rho.value()*V*1e3 << ","
+                    << meanSaturation << "\n";
             }
         #};
     }

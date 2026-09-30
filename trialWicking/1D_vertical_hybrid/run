@@ -3,14 +3,22 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+. ../runTools.sh
+
+# LOG_EVERY=N ./run keeps only every Nth time step of the solver log, plus
+# its last 400 lines in log.<solver>.tail (for a crash). Default: full log
+# (~130 MB for 0.1 s).
+
 runApplication blockMesh
 
 # uniform dry column + prewetted ramp in the 10 bottom cells
 cp 0/alpha.wetting.orig 0/alpha.wetting
 runApplication setFields
 
-# also writes liquidBalance.csv (coded function object in system/controlDict)
-runApplication hybridPorousInterFoam
+# solver log written in /tmp during the run (see ../runTools.sh); also writes
+# liquidBalance.csv (coded function object in system/controlDict)
+echo "Running hybridPorousInterFoam on $PWD"
+runTmpLog log.hybridPorousInterFoam hybridPorousInterFoam
 
 # alpha profile along the column at every write time (same sampleDict as
 # ../1D_vertical_impes_inletRes)
