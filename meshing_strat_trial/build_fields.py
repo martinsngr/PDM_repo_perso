@@ -97,7 +97,7 @@ def load_yarns(stl_file, scale):
     bad = [i for i, b in enumerate(bodies) if not b.is_watertight]
     if bad:
         raise SystemExit(f"Bodies {bad} are not closed -> inside test unreliable. "
-                         "Run 01_inspect_stl.py and fix the STL first.")
+                         "Run inspect_stl.py and fix the STL first.")
     return bodies
 
 

@@ -1,12 +1,14 @@
 # trialWicking — working notes
 
-Status and findings for the wicking cases. Last updated 2026-09-23.
+Status and findings for the wicking cases. Last updated 2026-09-30.
 
 ## Cases
 
 | Folder | What it is |
 |---|---|
 | `1D_vertical_impes/` | 1D equivalent of the yarn case: column length = yarn centreline unfolded along the crimp (3.446 mm for x 0.4–3.6 mm; straight 3.2 mm), section 0.55 mm (width) × 0.237 mm (mean thickness), both measured from slices of `yarn-c.stl`. 1×172×1 cells (20 µm), reservoir = bottom 0.2 mm cellZone held at Sb 0.99 via `fixedSb`, pc0 5000 Pa, K 1e-11, Coats CFL. Top is open to air (`outlet` p fixed 0, Ub fixed 0): with the old `darcyGradPressure` top the air could only leave counter-current back into the reservoir, which made the column fill much more slowly than the yarn (mean Sb 0.59 vs 0.91 at 0.06 s). The yarn vents air through `yarn_to_fluid` along its whole length. Open top: mean Sb 0.36 / 0.50 / 0.70 / 0.84 at 0.01 / 0.02 / 0.04 / 0.06 s (yarn 0.42 / 0.56 / 0.77 / 0.91), front at the top at ~0.035 s; 0.1 s runs in ~75 s. The real section is lens-shaped: its area (STL volume / unfolded length = 9.47e-8 m²) is 27 % smaller than the 1.30e-7 m² rectangle, so scale uptake volumes by 0.73 before comparing with the 3D case. (Before 2026-09-24: 1 m column, pc0 100 Pa, ~1 cm equilibrium rise.) |
+| `1D_vertical_impes_inletRes/` | Copy of `1D_vertical_impes` with the reservoir as the inlet boundary instead of the clamped cellZone: Sb fixed 0.99 on `inlet` (infinite supply), no `fixedSb`/`topoSet`, outlet Sb zeroGradient. Initial Sb 0.002 with the 10 bottom cells ramped linearly 0.99 → 0.002 (`setFieldsDict`). Same start state and inlet as `1D_vertical_hybrid`, for a like-for-like comparison. Not run yet. |
+| `1D_vertical_hybrid/` | The same column in hybridPorousInterFoam (renamed from `BL_flowDriven_VanGenuchten_hybridPorousInterFoam` 2026-09-30). p is the mixture pressure p_air − α·pc(α); both ends compute it every step (`codedFixedValue`) so the air stays at 0 Pa as α at the face changes. Inlet α `inletOutlet` 0.99 (infinite reservoir, as the `Capillary_Rise` tutorial), outlet α zeroGradient (a fixed value draws water into the top cell and crashes), same ramp as above, `maxDeltaT 3e-7` (the solver has no capillary dt limit), PIMPLE 1/2, `nAlphaSubCycles 1`, endTime 0.1 s (~18 min; mean α 0.891 at 0.1 s vs 0.906 for `1D_vertical_impes`). `liquidBalance.csv` from a coded function object. Details in its `CLAUDE.md`. |
 | `singleYarn_IMPES_yarn/` | Original 3D yarn case (`yarn-c.stl`): wetting from below in z through a `wetInlet` patch, fixed deltaT 1e-9. Kept as reference ("original set up" commit). Its mesh has 24 negative-volume cells (see below). |
 | `singleYarn_IMPES_vertical/` | The 1D vertical test moved onto the yarn geometry. **Current working case.** |
 

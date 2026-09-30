@@ -9,31 +9,31 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
+    class       volVectorField;
     location    "0";
-    object      alpha.wetting;
+    object      UnonWetting;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 0 0 0 0];
+dimensions      [0 1 -1 0 0 0 0];
 
-// initial saturation as in ../1D_vertical_impes
-internalField   uniform 0.002;
+internalField   uniform (0 0 0);
 
+// zeroGradient on both patches (the tested setup). At the outlet it gives
+// the Darcy air velocity of the top cell, used with Uwetting fixed 0 so that
+// only air leaves. At the inlet neither phase velocity is fixed, so the
+// relative flux there is zero: the face carries the total (inward) flux at
+// alpha 0.99, 1 % air and 99 % water, and no air escapes into the reservoir
+// (impesFoam: Ua fixed 0, water only).
 boundaryField
 {
-    // imposed saturation at the wetted face (replaces the impesFoam reservoir
-    // clamped at Sb 0.99)
     inlet
     {
-        type            fixedValue;
-        value           uniform 0.99;
+        type            zeroGradient;
     }
-    // as the impesFoam outlet (Sb fixed 1e-3)
     outlet
     {
-        type            fixedValue;
-        value           uniform 0.001;
+        type            zeroGradient;
     }
     frontAndBack
     {

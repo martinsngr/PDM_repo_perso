@@ -20,7 +20,7 @@ solvers
     "alpha.wetting.*"
     {
         nAlphaCorr      1;
-        nAlphaSubCycles 4; 
+        nAlphaSubCycles 1;
         cAlpha          1;
 
         MULESCorr       no;
@@ -80,8 +80,10 @@ solvers
 PIMPLE
 {
     momentumPredictor   no;
-    nOuterCorrectors    2;
-    nCorrectors         3;
+    // 1 outer / 2 pressure corrections: 7x faster than 2/3 and same result
+    // (front, uptake within 5 %); nCorrectors 1 crashes
+    nOuterCorrectors    1;
+    nCorrectors         2;
     nNonOrthogonalCorrectors 0;
 
     pRefCell    0;

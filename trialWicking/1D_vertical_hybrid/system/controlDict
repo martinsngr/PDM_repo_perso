@@ -1,0 +1,119 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.1                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+// same end time as the impesFoam cases; ~18 min on one core
+endTime         0.1;
+
+deltaT          1e-8;
+
+writeControl    adjustableRunTime;
+
+writeInterval   0.005;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+
+maxCo           0.75;
+maxAlphaCo      1;
+// setDeltaT.H only limits the Courant numbers of the total flux, not the
+// explicit capillary diffusion in alphaEqn, so cap dt by hand: with the
+// 1/2 PIMPLE loops of fvSolution, 3e-7 is stable to 0.1 s; 5e-7 crashed at
+// 0.035 s (with the older fixed-p, alpha 1 inlet setup).
+maxDeltaT       3e-7;
+
+// Liquid uptake, written at every write time to liquidBalance.csv in the same
+// format as the impesFoam fork (updateLiquidContent.H): liquid volume
+// sum(eps*alpha.wetting*V) in mL and liquid mass in g.
+functions
+{
+    liquidBalance
+    {
+        type            coded;
+        libs            ("libutilityFunctionObjects.so");
+        name            liquidBalance;
+        writeControl    writeTime;
+
+        codeInclude
+        #{
+            #include <fstream>
+        #};
+
+        codeWrite
+        #{
+            const volScalarField& alpha =
+                mesh().lookupObject<volScalarField>("alpha.wetting");
+            const volScalarField& eps =
+                mesh().lookupObject<volScalarField>("eps");
+            const dictionary& wetting =
+                mesh().lookupObject<IOdictionary>("transportProperties")
+               .subDict("wetting");
+            const dimensionedScalar rho("rho", dimDensity, wetting);
+
+            // m3
+            const scalar V =
+                gSum(eps.primitiveField()*alpha.primitiveField()*mesh().V());
+
+            if (Pstream::master())
+            {
+                const fileName file(mesh().time().globalPath()/"liquidBalance.csv");
+                const bool header = !isFile(file);
+
+                // on a restart, the start time is already in the file
+                if
+                (
+                   !header
+                 && mesh().time().timeIndex() == mesh().time().startTimeIndex()
+                )
+                {
+                    return false;
+                }
+
+                std::ofstream os(file.c_str(), std::ios::app);
+                if (header)
+                {
+                    os << "time,totalLiquidVolume_mL,totalLiquidMass_g\n";
+                }
+                os  << mesh().time().timeName() << ","
+                    << V*1e6 << ","
+                    << rho.value()*V*1e3 << "\n";
+            }
+        #};
+    }
+}
+
+// ************************************************************************* //

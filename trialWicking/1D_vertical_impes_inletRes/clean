@@ -3,6 +3,6 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-rm -f  log.* 
+rm -f log.* liquidBalance.csv 0/Sb
 foamListTimes -rm
-rm -rf postProcessing
+rm -rf postProcessing constant/polyMesh

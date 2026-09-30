@@ -50,7 +50,7 @@ if open_bodies:
 # Monte Carlo estimate of yarn fraction and overlap inside the bounding box
 N = 100_000
 rng = np.random.default_rng(0)
-pts = lo + (hi - lo) * rng.random((N, 3))
+pts = rev_lo + (rev_hi - rev_lo) * rng.random((N, 3))
 count = np.zeros(N, dtype=int)
 for b in bodies:
     if b.is_watertight:

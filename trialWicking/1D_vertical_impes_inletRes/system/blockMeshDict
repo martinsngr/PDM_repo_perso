@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                |
+  \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \    /   O peration     | Website:  https://openfoam.org
+    \  /    A nd           | Version:  7
+     \/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 0.001;
+
+// 1D equivalent of singleYarn_IMPES_vertical (yarn-c.stl, x 0.4-3.6 mm):
+// x = yarn width 0.55 mm, z = mean thickness 0.237 mm,
+// y = centreline length unfolded along the crimp, 3.446 mm (straight: 3.2 mm)
+vertices        
+(
+    (0 0 0)
+    (0.55 0 0)
+    (0.55 3.446 0)
+    (0 3.446 0)
+    (0 0 0.237)
+    (0.55 0 0.237)
+    (0.55 3.446 0.237)
+    (0 3.446 0.237)
+);
+
+blocks          
+(
+    hex (0 1 2 3 4 5 6 7) (1 172 1) simpleGrading (1 1 1)
+);
+
+edges           
+(
+);
+
+patches         
+(
+    patch inlet
+    (
+        (1 5 4 0)
+    )
+
+    patch outlet
+    (
+        (3 7 6 2)
+    )
+
+    empty frontAndBack 
+    (
+	(0 4 7 3)
+        (0 3 2 1)
+	(2 6 5 1)
+        (4 5 6 7)
+    )
+);
+
+mergePatchPairs 
+(
+);
+
+// ************************************************************************* //

@@ -1,32 +1,30 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  9                                     |
-|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|  \\    /   O peration     | Version:  v2106                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    location    "0";
-    object      UnonWetting;
+    arch        "LSB;label=32;scalar=64";
+    class       volScalarField;
+    location    "constant";
+    object      K;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -1 0 0 0 0];
+dimensions      [0 2 0 0 0 0 0];
 
-internalField   uniform (0 0 0);
+internalField   uniform 1e-11;
 
-// as Ua in ../1D_vertical_impes: air cannot leave through the inlet,
-// leaves freely through the open top
 boundaryField
 {
     inlet
     {
-        type            fixedValue;
-        value           uniform (0 0 0);
+        type            zeroGradient;
     }
     outlet
     {
