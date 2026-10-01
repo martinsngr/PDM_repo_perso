@@ -18,13 +18,20 @@
 #
 # If the script is killed, the symlink stays and the full log is still in
 # /tmp/<case>.XXXXXX/ (a reboot may clear /tmp).
+#
+# LOG_DIR=<dir> writes the log in <dir>/<case>.XXXXXX/ instead of /tmp. Use
+# it on a cluster: the node-local /tmp is often small and wiped at the end of
+# the job, and a job killed at its walltime never moves the log back, e.g.
+#   LOG_DIR=$PWD/logs LOG_EVERY=100 ./run
+# The full log is kept there until the solver ends, then filtered as above.
 # Returns the exit status of the command.
 runTmpLog()
 {
     _log=$1
     shift
 
-    _logDir=$(mktemp -d /tmp/$(basename "$PWD").XXXXXX)
+    mkdir -p "${LOG_DIR:-/tmp}" || return 1
+    _logDir=$(mktemp -d "${LOG_DIR:-/tmp}/$(basename "$PWD").XXXXXX") || return 1
     rm -f "$_log"
     ln -s "$_logDir/$_log" "$_log"
 

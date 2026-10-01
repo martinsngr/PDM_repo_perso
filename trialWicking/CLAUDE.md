@@ -16,6 +16,9 @@ Working notes, setup and findings for the wicking cases in this folder:
 - **Long runs: `LOG_EVERY=N ./run`.** The log is ~0.4 kB (impesFoam) to ~0.9 kB (hybrid) per time step, i.e. GBs for
   millions of steps. With `LOG_EVERY=100` only the header, the first 10 steps and every 100th step are kept after the
   run, plus the last 400 lines in `<log>.tail`; the full log only exists in `/tmp` while the solver runs.
+- **On a cluster: `LOG_DIR=$PWD/logs LOG_EVERY=100 ./run`.** `LOG_DIR` puts the full log in a persistent directory
+  instead of the node-local `/tmp` (often small, wiped at the end of the job, and a job killed at its walltime never
+  moves the log back). Unset, the log goes to `/tmp` as before.
 - **If a run is killed**, the symlink stays and the full log is still in `/tmp` (a reboot may clear it). For a manual
   restart, redirect the log outside the workspace yourself, e.g. `> /tmp/log2.impesFoam 2>&1`.
 - Commands launched by hand for timing or tests follow the same rule: log to `/tmp` or the scratchpad.

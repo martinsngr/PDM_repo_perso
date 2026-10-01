@@ -13,6 +13,9 @@ processor[0-9]*/
 log.*
 log[0-9]*.*
 AllRun.log
+# SLURM job output (job.slurm: Log_%x_%j.log, Err_%x_%j.err)
+Log_*.log
+Err_*.err
 **/constant/polyMesh/
 **/constant/*/polyMesh/
 **/constant/polyMesh_full/
