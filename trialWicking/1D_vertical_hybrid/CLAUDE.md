@@ -15,6 +15,11 @@ Replicate the user's earlier impesFoam wicking setup (parent folder `trialWickin
   Never claim results are correct just because the case runs.
 - `hybridPorousPimpleFoam` (the single-phase solver) is **not** ported and doesn't build on OF9.
 - Don't edit the solver source from here. Solver changes belong in that repo, on `of9-port`, one justified commit each.
+- **Porous-face changes (2026-10-01):** commits `b0c0f67`..`b995db5` on `of9-port` (A: face relative flux,
+  B: opt-in Darcy total flux `darcyFaceMaxDa`, C: upwinded kr, + 2 fixes); the state before is tagged
+  `of9-port-before-porous-fixes`, the old binary is `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. Details,
+  tests and patches: `../hybridSolverChanges/`. This case uses `darcyFaceMaxDa 0.1` since then; its results with
+  the old solver are kept in `results_oldsolver/` (`liquidBalance.csv`, sampleDict profiles, log).
 
 ## This case
 This folder (renamed from `BL_flowDriven_VanGenuchten_hybridPorousInterFoam` on 2026-09-30) is the
@@ -54,9 +59,9 @@ and in the solver's `tutorials/Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_Van
   capillary diffusion. The coded function object `coatsTimeStep` in `controlDict` applies impesFoam's limits instead
   (Coats CFL with `CoatsMaxCo 0.5`, `dSmax 0.01`): each step it recomputes them from alpha.wetting (Brooks–Corey /
   Van Genuchten formulas) and overwrites `maxDeltaT` in memory; `setDeltaT.H` then grows dt by at most 1.2× per step.
-  dt follows impesFoam's (6.2e-7, dip to 4.2e-7 near 0.06 s, up to 1.9e-6). `minDeltaTCoats 1e-7` is required:
-  without a floor the dSmax rule drives dt to 1e-13 and the run blows up (this solver is less stable at very small
-  dt). PIMPLE 1 outer / 2 pressure correctors, `nAlphaSubCycles 1`; `nCorrectors 1` crashes.
+  dt follows impesFoam's (6.2e-7, dip to 4.2e-7 near 0.06 s, up to 1.9e-6). With the old solver
+  `minDeltaTCoats 1e-7` was required (without a floor the dSmax rule drove dt to 1e-13 and the run blew up); with
+  `darcyFaceMaxDa` the limit stays above ~3.4e-7 and the floor is 0. PIMPLE 1 outer / 2 pressure correctors, `nAlphaSubCycles 1`; `nCorrectors 1` crashes.
 - **End time 0.1 s**, as the impesFoam cases (~9.5 min; ~18 min with a fixed `maxDeltaT 3e-7`, same uptake within 0.3 %). Older setups (inlet alpha 1, fixed outlet p) crashed at
   ~0.058 s; this one runs to 0.1 s.
 - **Solver log:** written in `/tmp` during the run by `runTmpLog` (`../runTools.sh`, rule in `../CLAUDE.md`);

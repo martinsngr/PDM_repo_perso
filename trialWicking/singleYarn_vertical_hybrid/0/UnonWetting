@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  9                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      UnonWetting;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+// zeroGradient on the open patches (the setup of ../1D_vertical_hybrid). On
+// the top it gives the Darcy air velocity of the wall cell, used with
+// Uwetting fixed 0 so that only air leaves. On the reservoir face (left)
+// neither phase velocity is fixed, so the relative flux there is zero: the
+// face carries the total (inward) flux at alpha 0.99, 1 % air and 99 % water,
+// and no air escapes into the reservoir (impesFoam: Ua fixed 0, water only).
+boundaryField
+{
+    left
+    {
+        type            zeroGradient;
+    }
+    right
+    {
+        type            zeroGradient;
+    }
+
+    // lateral surface closed to both phases (see 0/U)
+    yarn_to_fluid
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

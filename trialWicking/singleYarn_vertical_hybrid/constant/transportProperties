@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Fluids and porous-medium models as in ../1D_vertical_impes
+// Fluids and porous-medium models as in ../singleYarn_vertical_impes_inletRes
 // (water / air, Brooks-Corey kr n = 3, Van Genuchten pc0 5000 Pa, m 0.5)
 
 phases (wetting nonWetting);
@@ -42,9 +42,9 @@ sigma            [1 0 -2 0 0 0 0]  0.072;
 activateCapillarity     1;
 
 // Darcy total flux in porous faces with K/dx^2 below this value (solver
-// commits b0c0f67..b995db5 on of9-port, see ../hybridSolverChanges): here
-// K/dx^2 = 1e-11/(20 um)^2 = 0.025, so every face is a Darcy face. Without
-// this keyword the solver uses the momentum-equation flux as before.
+// commits b0c0f67..b995db5 on of9-port, see ../hybridSolverChanges). On this
+// mesh K/dx^2 <= 1e-11/(23 um)^2 = 0.02, so every internal face is a Darcy
+// face. Without it the case diverges within 10 steps (transverse mode).
 darcyFaceMaxDa  0.1;
 
 alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;

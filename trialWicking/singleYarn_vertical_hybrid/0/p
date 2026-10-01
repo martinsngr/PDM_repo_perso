@@ -1,0 +1,119 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  9                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// p is the saturation-weighted mixture pressure
+//     p = alpha*p_wetting + (1 - alpha)*p_nonWetting = p_nonWetting - alpha*pc(alpha)
+// (see updateDarcyVelocities.H / PcCoeff in the solver). The air pressure is
+// 0 on the open patches, as in impesFoam, so both compute
+//     p = -alpha_face*pc(alpha_face)
+// every time step (codedFixedValue), with the Van Genuchten pc of
+// constant/transportProperties and the solver's Se clipping [1e-4, 1-1e-4].
+// The pc parameters are read from transportProperties, so nothing needs
+// recomputing if they change. On the reservoir face (left) alpha is 0.99
+// (p = -669 Pa); on the top (right) alpha is zeroGradient, so p follows the
+// top cells: -4995 Pa while they are dry (alpha 0.002). Same BCs as the
+// inlet / outlet of ../1D_vertical_hybrid. The lateral surface is closed.
+// The code is compiled into dynamicCode/ on the first run.
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform -4995;
+
+boundaryField
+{
+    left
+    {
+        type            codedFixedValue;
+        value           uniform -669;
+        name            airPressureZeroInlet;
+
+        code
+        #{
+            // p (mixture) = p_air - alpha*pc(alpha), with p_air = 0
+            const fvPatchScalarField& alphap =
+                patch().lookupPatchField<volScalarField, scalar>("alpha.wetting");
+
+            const dictionary& tp =
+                db().lookupObject<IOdictionary>("transportProperties");
+            const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
+
+            const scalar act  = readScalar(tp.lookup("activateCapillarity"));
+            const scalar pc0  = dimensionedScalar(vg.lookup("pc0")).value();
+            const scalar m    = readScalar(vg.lookup("m"));
+            const scalar Smin =
+                dimensionedScalar(vg.lookup("alpha.wettingminpc")).value();
+            const scalar Smax =
+                dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
+            const scalar n    = 1/(1 - m);
+
+            scalarField pb(alphap.size());
+            forAll(pb, i)
+            {
+                const scalar Se =
+                    min(max((alphap[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
+                const scalar pc = act*pc0*pow(pow(Se, -1/m) - 1, 1/n);
+                pb[i] = -alphap[i]*pc;
+            }
+            operator==(pb);
+        #};
+    }
+    right
+    {
+        type            codedFixedValue;
+        value           uniform -4995;
+        name            airPressureZeroOutlet;
+
+        code
+        #{
+            // p (mixture) = p_air - alpha*pc(alpha), with p_air = 0
+            const fvPatchScalarField& alphap =
+                patch().lookupPatchField<volScalarField, scalar>("alpha.wetting");
+
+            const dictionary& tp =
+                db().lookupObject<IOdictionary>("transportProperties");
+            const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
+
+            const scalar act  = readScalar(tp.lookup("activateCapillarity"));
+            const scalar pc0  = dimensionedScalar(vg.lookup("pc0")).value();
+            const scalar m    = readScalar(vg.lookup("m"));
+            const scalar Smin =
+                dimensionedScalar(vg.lookup("alpha.wettingminpc")).value();
+            const scalar Smax =
+                dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
+            const scalar n    = 1/(1 - m);
+
+            scalarField pb(alphap.size());
+            forAll(pb, i)
+            {
+                const scalar Se =
+                    min(max((alphap[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
+                const scalar pc = act*pc0*pow(pow(Se, -1/m) - 1, 1/n);
+                pb[i] = -alphap[i]*pc;
+            }
+            operator==(pb);
+        #};
+    }
+
+    // lateral surface closed (see 0/U): zero total flux
+    yarn_to_fluid
+    {
+        type            fixedFluxPressure;
+        value           uniform -4995;
+    }
+}
+
+// ************************************************************************* //

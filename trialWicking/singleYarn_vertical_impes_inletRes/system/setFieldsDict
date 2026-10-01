@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Initial saturation: dry yarn at 0.002, with the first 0.2 mm above the
+// reservoir face (x = xmin = 0.4 mm, caseSetup) ramped linearly from the inlet
+// value 0.99 down to 0.002, as ../1D_vertical_impes_inletRes: 10 bands of
+// 20 um, band i at 0.99 - 0.988*(i + 0.5)/10. A cell takes the value of the
+// band holding its centre (cells are 23-46 um here, so some bands are empty).
+// The box limits are absolute: update them if xmin changes.
+
+defaultFieldValues
+(
+    volScalarFieldValue Sb 0.002
+);
+
+regions
+(
+    boxToCell { box (0.00040 -1 -1) (0.00042 1 1); fieldValues ( volScalarFieldValue Sb 0.9406 ); }
+    boxToCell { box (0.00042 -1 -1) (0.00044 1 1); fieldValues ( volScalarFieldValue Sb 0.8418 ); }
+    boxToCell { box (0.00044 -1 -1) (0.00046 1 1); fieldValues ( volScalarFieldValue Sb 0.7430 ); }
+    boxToCell { box (0.00046 -1 -1) (0.00048 1 1); fieldValues ( volScalarFieldValue Sb 0.6442 ); }
+    boxToCell { box (0.00048 -1 -1) (0.00050 1 1); fieldValues ( volScalarFieldValue Sb 0.5454 ); }
+    boxToCell { box (0.00050 -1 -1) (0.00052 1 1); fieldValues ( volScalarFieldValue Sb 0.4466 ); }
+    boxToCell { box (0.00052 -1 -1) (0.00054 1 1); fieldValues ( volScalarFieldValue Sb 0.3478 ); }
+    boxToCell { box (0.00054 -1 -1) (0.00056 1 1); fieldValues ( volScalarFieldValue Sb 0.2490 ); }
+    boxToCell { box (0.00056 -1 -1) (0.00058 1 1); fieldValues ( volScalarFieldValue Sb 0.1502 ); }
+    boxToCell { box (0.00058 -1 -1) (0.00060 1 1); fieldValues ( volScalarFieldValue Sb 0.0514 ); }
+);
+
+// ************************************************************************* //

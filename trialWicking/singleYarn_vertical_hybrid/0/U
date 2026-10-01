@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  9                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+// Pressure-driven on every patch (U not fixed). The phase velocities
+// Uwetting / UnonWetting decide which phase crosses each end (see those
+// files).
+boundaryField
+{
+    left
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+    right
+    {
+        type            zeroGradient;
+    }
+
+    // lateral surface closed to both phases: an open wall is ill-posed in
+    // this solver (correctUBc.H replaces the wall flux by the cell velocity
+    // projected on the tilted face normals; see ../NOTES.md). With U fixed,
+    // correctUBc.H leaves the patch alone. Air leaves through the top only.
+    yarn_to_fluid
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

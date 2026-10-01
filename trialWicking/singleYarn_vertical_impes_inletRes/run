@@ -1,0 +1,61 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+. ../runTools.sh
+
+# Capillary rise in the yarn: same setup as ../1D_vertical_impes_inletRes
+# (reservoir = Sb 0.99 on the end face `left`, dry yarn with a 0.2 mm ramp),
+# on the yarn mesh of ../singleYarn_IMPES_vertical. Air leaves through the top
+# (`right`) only: the lateral surface (`yarn_to_fluid`) is closed, as in
+# ../singleYarn_vertical_hybrid (same problem for both solvers).
+#
+# The solver log is written in /tmp during the run (see ../runTools.sh);
+# log.impesFoam here is a symlink to it until the solver ends.
+# LOG_EVERY=N ./run keeps only every Nth time step of it, plus its last 400
+# lines in log.impesFoam.tail: use it for long runs (GBs otherwise).
+# This script deletes the mesh and all results: to continue a stopped run, see
+# "Running" in ../NOTES.md instead.
+
+N=$(foamDictionary -entry N -value caseSetup)
+
+./clean
+
+# Mesh: background block, snapped yarn cellZone, then keep only the yarn
+runApplication blockMesh
+runApplication snappyHexMesh -overwrite
+runApplication topoSet
+# -noFields: 0/ only holds the yarn-mesh patches
+runApplication splitMeshRegions -cellZones -overwrite -noFields
+rm -f 0/cellToRegion    # full-mesh field, written even with -noFields
+if [ ! -d constant/yarn/polyMesh ]; then
+    echo "ERROR: constant/yarn/polyMesh not found."
+    exit 1
+fi
+mv constant/polyMesh constant/polyMesh_full
+cp -r constant/yarn/polyMesh constant/polyMesh
+runApplication checkMesh
+
+# Initial fields: dry yarn + prewetted ramp at the bottom (system/setFieldsDict)
+cp 0/Sb.org 0/Sb
+runApplication setFields
+
+# Solver (also writes liquidBalance.csv: impesFoam fork, updateLiquidContent.H)
+# mesh, then the fields of 0/ and constant/K (decomposePar alone only
+# splits the mesh)
+runApplication decomposePar
+runApplication -s fields decomposePar -fields
+runApplication -s constant decomposePar -fields -time constant
+echo "Running impesFoam on $PWD using $N cores"
+runTmpLog log.impesFoam mpirun -np "$N" impesFoam -parallel -noFunctionObjects
+status=$?
+runApplication reconstructPar
+if [ "$status" -ne 0 ]; then
+    echo "ERROR: impesFoam failed (see log.impesFoam)."
+    exit 1
+fi
+
+# Section-averaged Sb along x at every write time
+# (postProcessing/sectionProfile/<t>/alongYarn_Sb.csv)
+runApplication -s centres postProcess -func writeCellCentres -time 0
+runApplication -s volumes postProcess -func writeCellVolumes -time 0
+python3 ../sectionProfile.py Sb > log.sectionProfile

@@ -1,0 +1,67 @@
+From c0c1b4ed30dedb2e99174fc4c6a287e1cf142b4b Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Thu, 1 Oct 2026 12:09:29 +0200
+Subject: [PATCH 4/5] B fix: Darcy number of non-coupled boundary faces from
+ the cell size
+
+deltaCoeffs on a non-coupled patch is 1/(centre-to-face distance), half a
+cell, so Da was 4x too large there: on a 10 um mesh the inlet/outlet faces
+fell out of the Darcy set (Da 0.4) while all internal faces were in it, and
+the pressure equation mixed the Darcy mobility (~1e-8) with the dt-dependent
+rAUf (~5e-12) at the inlet: GAMG stalled (1000 its) and the run diverged at
+1.4e-6 s. Also prints the boundary Darcy face count.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../createPorousMediaFields.H                 | 26 +++++++++++++++----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
+
+diff --git a/hybridPorousInterFoam/createPorousMediaFields.H b/hybridPorousInterFoam/createPorousMediaFields.H
+index 1b28597..0b71838 100644
+--- a/hybridPorousInterFoam/createPorousMediaFields.H
++++ b/hybridPorousInterFoam/createPorousMediaFields.H
+@@ -131,12 +131,18 @@ surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
+     forAll(DarcyFace.boundaryField(), patchi)
+     {
+         fvsPatchScalarField& Dp = DarcyFace.boundaryFieldRef()[patchi];
++        // On a non-coupled patch deltaCoeffs is the inverse of the
++        // centre-to-face distance, i.e. of half a cell: use the cell size
++        // (Da/4), otherwise the boundary faces of a fine mesh fall out of
++        // the Darcy set while the internal faces are in it, and the pressure
++        // equation mixes the Darcy mobility with the dt-dependent rAUf there.
++        const scalar f = Dp.patch().coupled() ? 1 : 0.25;
+         forAll(Dp, facei)
+         {
+             if
+             (
+                 Solidf.boundaryField()[patchi][facei] > 1 - small
+-             && Daf.boundaryField()[patchi][facei] < darcyFaceMaxDa
++             && f*Daf.boundaryField()[patchi][facei] < darcyFaceMaxDa
+             )
+             {
+                 Dp[facei] = 1;
+@@ -144,10 +150,20 @@ surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
+         }
+     }
+ }
+-Info<< "Darcy faces (darcyFaceMaxDa " << darcyFaceMaxDa << "): "
+-    << gSum(DarcyFace.primitiveField()) << " of "
+-    << returnReduce(mesh.nInternalFaces(), sumOp<label>())
+-    << " internal faces" << endl;
++{
++    label nb = 0, nbD = 0;
++    forAll(DarcyFace.boundaryField(), patchi)
++    {
++        nb += DarcyFace.boundaryField()[patchi].size();
++        nbD += round(sum(DarcyFace.boundaryField()[patchi]));
++    }
++    Info<< "Darcy faces (darcyFaceMaxDa " << darcyFaceMaxDa << "): "
++        << gSum(DarcyFace.primitiveField()) << " of "
++        << returnReduce(mesh.nInternalFaces(), sumOp<label>())
++        << " internal faces, " << returnReduce(nbD, sumOp<label>())
++        << " of " << returnReduce(nb, sumOp<label>())
++        << " boundary faces" << endl;
++}
+ 
+ // Cells whose faces are all Darcy faces: their velocity is the one of the
+ // Darcy flux. Other porous cells keep the momentum-equation velocity, which

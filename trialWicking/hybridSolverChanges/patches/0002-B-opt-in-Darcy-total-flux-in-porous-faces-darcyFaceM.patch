@@ -1,0 +1,154 @@
+From cf95c5944988a0da42600162be9177f8eccae732 Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Thu, 1 Oct 2026 11:57:57 +0200
+Subject: [PATCH 2/5] B: opt-in Darcy total flux in porous faces
+ (darcyFaceMaxDa)
+
+In porous faces with K_f/dx^2 < darcyFaceMaxDa, pEqn uses the Darcy mobility
+Mf and the face phase Darcy fluxes instead of rAUf and the momentum HbyA, so
+phi = phiWetting + phiNonWetting there. The momentum path fed an odd-even
+cell-velocity pattern back into the face fluxes (transverse mode still grew
+with A alone). Cells with only Darcy faces take U = reconstruct(phi). Off
+without the keyword. Valid where sqrt(K) << dx (no Brinkman layer to resolve)
+and inertia relaxes fast (rho K/(mu eps) << flow time).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../createPorousMediaFields.H                 | 71 +++++++++++++++++++
+ hybridPorousInterFoam/pEqn.H                  | 28 +++++++-
+ 2 files changed, 97 insertions(+), 2 deletions(-)
+
+diff --git a/hybridPorousInterFoam/createPorousMediaFields.H b/hybridPorousInterFoam/createPorousMediaFields.H
+index 3693cf0..985a115 100644
+--- a/hybridPorousInterFoam/createPorousMediaFields.H
++++ b/hybridPorousInterFoam/createPorousMediaFields.H
+@@ -101,6 +101,77 @@ forAll(Solidf,facei)
+ 	}
+ }
+ 
++// Faces where pEqn.H computes the total flux as a Darcy flux (DarcyFace = 1):
++// porous faces (Solidf = 1) whose Darcy number K_f/dx^2 is below
++// darcyFaceMaxDa (transportProperties). There inertia and the Brinkman
++// viscous term are negligible (sqrt(K) is much smaller than the cell), and
++// the momentum-equation flux (HbyA) carries a cell-velocity feedback that is
++// unstable for capillary-driven flow. Without the keyword no face is a Darcy
++// face and the solver is unchanged. Computed once: K and the mesh are fixed
++// (not valid with a moving or refined mesh).
++const scalar darcyFaceMaxDa
++(
++    transportProperties.lookupOrDefault<scalar>("darcyFaceMaxDa", 0)
++);
++surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
++{
++    const surfaceScalarField Daf(k0f*sqr(mesh.deltaCoeffs()));
++    forAll(DarcyFace, facei)
++    {
++        if (Solidf[facei] > 1 - small && Daf[facei] < darcyFaceMaxDa)
++        {
++            DarcyFace[facei] = 1;
++        }
++    }
++    forAll(DarcyFace.boundaryField(), patchi)
++    {
++        fvsPatchScalarField& Dp = DarcyFace.boundaryFieldRef()[patchi];
++        forAll(Dp, facei)
++        {
++            if
++            (
++                Solidf.boundaryField()[patchi][facei] > 1 - small
++             && Daf.boundaryField()[patchi][facei] < darcyFaceMaxDa
++            )
++            {
++                Dp[facei] = 1;
++            }
++        }
++    }
++}
++Info<< "Darcy faces (darcyFaceMaxDa " << darcyFaceMaxDa << "): "
++    << gSum(DarcyFace.primitiveField()) << " of "
++    << returnReduce(mesh.nInternalFaces(), sumOp<label>())
++    << " internal faces" << endl;
++
++// Cells whose faces are all Darcy faces: their velocity is the one of the
++// Darcy flux. Other porous cells keep the momentum-equation velocity, which
++// the non-Darcy faces around them use.
++volScalarField DarcyCell("DarcyCell", Solid);
++{
++    const labelUList& own = mesh.owner();
++    const labelUList& nei = mesh.neighbour();
++    forAll(own, facei)
++    {
++        if (DarcyFace[facei] < 0.5)
++        {
++            DarcyCell[own[facei]] = 0;
++            DarcyCell[nei[facei]] = 0;
++        }
++    }
++    forAll(DarcyFace.boundaryField(), patchi)
++    {
++        const labelUList& fc = mesh.boundary()[patchi].faceCells();
++        forAll(fc, facei)
++        {
++            if (DarcyFace.boundaryField()[patchi][facei] < 0.5)
++            {
++                DarcyCell[fc[facei]] = 0;
++            }
++        }
++    }
++}
++
+ //Label for mesh refinement (we only want to refine at
+ //the fluid-fluid interface in solid-free region
+ volScalarField gradSolid ("gradSolid",mag(fvc::grad(Solid)));
+diff --git a/hybridPorousInterFoam/pEqn.H b/hybridPorousInterFoam/pEqn.H
+index 138430d..f437a72 100644
+--- a/hybridPorousInterFoam/pEqn.H
++++ b/hybridPorousInterFoam/pEqn.H
+@@ -42,14 +42,36 @@
+ 
+     phiHbyA += (phiG + phiPc);
+ 
++    // Darcy faces (DarcyFace = 1, see createPorousMediaFields.H): the total
++    // flux is the sum of the two phase Darcy fluxes on the face, as in
++    // impesFoam, with the Darcy mobility Mf instead of rAUf and without the
++    // momentum-equation HbyA. Same terms as phiWetting + phiNonWetting in
++    // alphaEqn.H, so phi = phiWetting + phiNonWetting there. Other faces are
++    // unchanged.
++    const surfaceScalarField alpha1fD(fvc::interpolate(alpha1));
++    const surfaceScalarField phiDarcyExplicit
++    (
++        (
++            (M1f*(1. - alpha1fD) - M2f*alpha1fD)*fvc::snGrad(pc)
++          - Mf*fvc::interpolate(pc)*fvc::snGrad(alpha1)
++        )*mesh.magSf()
++      + Lf*(g & mesh.Sf())
++    );
++    const surfaceScalarField rAUfD
++    (
++        "rAUfD",
++        (1. - DarcyFace)*rAUf + DarcyFace*Mf
++    );
++    phiHbyA = (1. - DarcyFace)*phiHbyA + DarcyFace*phiDarcyExplicit;
++
+     // Update the pressure BCs to ensure flux consistency
+-    constrainPressure(p, U, phiHbyA, rAUf, MRF);
++    constrainPressure(p, U, phiHbyA, rAUfD, MRF);
+ 
+     while (pimple.correctNonOrthogonal())
+     {
+         fvScalarMatrix pEqn
+         (
+-            fvm::laplacian(rAUf, p) == fvc::div(phiHbyA)
++            fvm::laplacian(rAUfD, p) == fvc::div(phiHbyA)
+         );
+ 
+         pEqn.setReference(pRefCell, getRefCellValue(p, pRefCell));
+@@ -63,6 +85,8 @@
+             p.relax();
+ 
+             U = HbyA + rAU()*fvc::reconstruct(((phiG+phiPc) - pEqn.flux())/rAUf);
++            // cells with only Darcy faces: velocity of the Darcy flux
++            U = (1. - DarcyCell)*U + DarcyCell*fvc::reconstruct(phi);
+             U.correctBoundaryConditions();
+             fvConstraints.constrain(U);
+             #include "correctUBc.H"

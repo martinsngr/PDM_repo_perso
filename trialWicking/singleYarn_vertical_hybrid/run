@@ -1,0 +1,65 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+. ../runTools.sh
+
+# Capillary rise in the yarn with hybridPorousInterFoam: same setup as
+# ../1D_vertical_hybrid (reservoir = alpha 0.99 on the end face `left`, dry
+# yarn with a 0.2 mm ramp), on the yarn mesh of ../singleYarn_IMPES_vertical.
+# Twin of ../singleYarn_vertical_impes_inletRes. Air leaves through the top
+# (`right`) and the lateral surface (`yarn_to_fluid`).
+#
+# The solver log is written in /tmp during the run (see ../runTools.sh);
+# log.hybridPorousInterFoam here is a symlink to it until the solver ends.
+# LOG_EVERY=N ./run keeps only every Nth time step of it, plus its last 400
+# lines in log.hybridPorousInterFoam.tail: use it for long runs (GBs otherwise).
+# This script deletes the mesh and all results: to continue a stopped run, see
+# "Running" in ../NOTES.md instead.
+
+N=$(foamDictionary -entry N -value caseSetup)
+
+./clean
+
+# Mesh: background block, snapped yarn cellZone, then keep only the yarn
+runApplication blockMesh
+runApplication snappyHexMesh -overwrite
+runApplication topoSet
+# -noFields: 0/ only holds the yarn-mesh patches
+runApplication splitMeshRegions -cellZones -overwrite -noFields
+rm -f 0/cellToRegion    # full-mesh field, written even with -noFields
+if [ ! -d constant/yarn/polyMesh ]; then
+    echo "ERROR: constant/yarn/polyMesh not found."
+    exit 1
+fi
+mv constant/polyMesh constant/polyMesh_full
+cp -r constant/yarn/polyMesh constant/polyMesh
+runApplication checkMesh
+
+# Initial fields: dry yarn + prewetted ramp at the bottom (system/setFieldsDict)
+cp 0/alpha.wetting.orig 0/alpha.wetting
+runApplication setFields
+
+# Solver; function objects in system/controlDict: coatsTimeStep (dt limit,
+# required) and liquidBalance (liquidBalance.csv). decomposePar alone only
+# splits the mesh, then -fields splits 0/.
+# The coded p BCs and function objects are compiled first, in serial:
+# compiling them inside the parallel run aborts it (MPI_ERR_TRUNCATE). This
+# pass also writes a t = 0 row to liquidBalance.csv, removed here.
+runApplication -s precompile hybridPorousInterFoam -postProcess -time 0
+rm -f liquidBalance.csv
+runApplication decomposePar
+runApplication -s fields decomposePar -fields
+echo "Running hybridPorousInterFoam on $PWD using $N cores"
+runTmpLog log.hybridPorousInterFoam mpirun -np "$N" hybridPorousInterFoam -parallel
+status=$?
+runApplication reconstructPar
+if [ "$status" -ne 0 ]; then
+    echo "ERROR: hybridPorousInterFoam failed (see log.hybridPorousInterFoam)."
+    exit 1
+fi
+
+# Section-averaged alpha.wetting along x at every write time
+# (postProcessing/sectionProfile/<t>/alongYarn_alpha.wetting.csv)
+runApplication -s centres postProcess -func writeCellCentres -time 0
+runApplication -s volumes postProcess -func writeCellVolumes -time 0
+python3 ../sectionProfile.py alpha.wetting > log.sectionProfile

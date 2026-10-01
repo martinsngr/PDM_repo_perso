@@ -23,7 +23,7 @@ startTime       0;
 
 stopAt          endTime;
 
-// same end time as the impesFoam cases; ~9.5 min on one core
+// same end time as the impesFoam twin
 endTime         0.1;
 
 deltaT          1e-8;
@@ -53,22 +53,19 @@ maxAlphaCo      1;
 // setDeltaT.H only limits the Courant numbers of the total flux, not the
 // explicit capillary diffusion in alphaEqn. The coatsTimeStep function object
 // below applies the impesFoam limits instead (Coats CFL and dSmax, as in
-// ../1D_vertical_impes_inletRes/system/controlDict): at every step it
-// overwrites maxDeltaT in memory, and setDeltaT.H then grows dt by at most
-// 1.2x per step up to that limit. dt follows impesFoam's (6.2e-7 for most of
-// the run, up to 1.9e-6 at the end); 0.1 s takes ~9.5 min instead of ~18 min
-// with a fixed maxDeltaT 3e-7, same uptake within 0.3 %.
+// ../singleYarn_vertical_impes_inletRes/system/controlDict): at every step
+// it overwrites maxDeltaT in memory, and setDeltaT.H then grows dt by at most
+// 1.2x per step up to that limit. Setup and code as ../1D_vertical_hybrid.
 // The value here is only the first-step cap.
-maxDeltaT       3e-7;
+maxDeltaT       3e-8;
 
 CoatsMaxCo      0.5;    // maxCo of impesFoam's CFL Coats
 dSmax           0.01;   // max saturation change per step
 maxDeltaTCoats  1e-3;   // upper bound on the limit
-// lower bound on the limit. Before the porous-face changes (solver be54696)
-// a floor of 1e-7 was needed: without it the dSmax rule cut dt down to 1e-13
-// and the run blew up within 5e-5 s. With darcyFaceMaxDa the limit never
-// drops below ~3.4e-7, so no floor is needed (and a floor above the Coats
-// limit would make the explicit update unstable on finer meshes).
+// lower bound on the limit: not needed with darcyFaceMaxDa (the 1D case
+// needed 1e-7 with the previous solver). The Coats limit here is ~5.1e-8 s,
+// as for the impesFoam twin; a floor above it would make the explicit update
+// unstable.
 minDeltaTCoats  0;
 
 // Liquid uptake (liquidBalance), written at every write time to

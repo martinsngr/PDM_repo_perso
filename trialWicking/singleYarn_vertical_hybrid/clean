@@ -1,0 +1,9 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+
+# Results, meshes, generated fields and logs (keeps the initial fields in 0/)
+rm -rf -- -[0-9]* [1-9]* [0-9].* processor* postProcessing VTK
+rm -rf constant/polyMesh constant/polyMesh_full constant/yarn constant/fluid
+rm -f 0/alpha.wetting 0/cellToRegion 0/C 0/Cx 0/Cy 0/Cz 0/V
+rm -f log.* liquidBalance.csv
+rm -rf dynamicCode

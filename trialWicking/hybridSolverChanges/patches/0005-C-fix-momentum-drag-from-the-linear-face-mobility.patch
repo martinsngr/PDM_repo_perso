@@ -1,0 +1,40 @@
+From b995db537a8d22583485ddb434adc42efae55a22 Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Thu, 1 Oct 2026 12:19:26 +0200
+Subject: [PATCH 5/5] C fix: momentum drag from the linear face mobility
+
+Drag in a porous cell is the average of 1/Mf over its faces, so the upwinded
+kr of C also changed the momentum equation of porous cells next to free
+fluid. Dragf now uses the linearly interpolated mobility, as before C; the
+upwinding only enters the Darcy fluxes (porous-porous faces).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ hybridPorousInterFoam/updateVariables.H | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/hybridPorousInterFoam/updateVariables.H b/hybridPorousInterFoam/updateVariables.H
+index a3f1280..2668273 100755
+--- a/hybridPorousInterFoam/updateVariables.H
++++ b/hybridPorousInterFoam/updateVariables.H
+@@ -7,6 +7,11 @@ kr2=krModel->kra();
+ kr1f = fvc::interpolate(kr1,"kr1");
+ kr2f = fvc::interpolate(kr2,"kr2");
+ 
++// Momentum drag keeps the original (linear) face mobility, so that the
++// upwinding below does not change the momentum equation of porous cells next
++// to free fluid (porous/free interface)
++const surfaceScalarField MfLinear(k0f*(kr1f/mu1 + kr2f/mu2));
++
+ // Porous faces: kr of the upstream cell of each phase's Darcy flux (last
+ // alphaEqn.H), as impesFoam (kra upwind phia, krb upwind phib). Linear
+ // interpolation halves the water mobility of the face between a wet and a
+@@ -32,7 +37,7 @@ Mf = M1f+M2f;
+ Lf = L1f+L2f;
+ 
+ // Calculating Drag Coefficient
+-Dragf =1./Mf;
++Dragf =1./MfLinear;
+ Drag= fvc::average(Dragf)*Solid;
+ 
+ // Updating Capillary Pressure Model

@@ -1,0 +1,67 @@
+From b0c0f675ea9ecda5ff997d91e4199ead0360cd33 Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Thu, 1 Oct 2026 11:55:30 +0200
+Subject: [PATCH 1/5] A: relative flux phirPore from two-point face phase Darcy
+ fluxes
+
+The cell-centred phase velocities (fvc::grad) interpolated to faces form a
+wide stencil that is blind to odd-even modes: capillary diffusion did not
+damp them. Gave a staircase in 1D and a growing transverse mode in 2D/3D.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ hybridPorousInterFoam/alphaEqn.H | 41 +++++++++++++++++++++++++++++++-
+ 1 file changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/hybridPorousInterFoam/alphaEqn.H b/hybridPorousInterFoam/alphaEqn.H
+index 798f175..2c80e27 100644
+--- a/hybridPorousInterFoam/alphaEqn.H
++++ b/hybridPorousInterFoam/alphaEqn.H
+@@ -76,7 +76,46 @@
+ 
+     // Defining relative velocity
+     Ur = ( Uwetting/max(alpha1,0.001) - UnonWetting/max((1.-alpha1),0.001) )/eps;
+-    surfaceScalarField phirPore(fvc::interpolate(Ur) & mesh.Sf());
++    // Relative flux from the phase Darcy fluxes computed on the faces (two-
++    // point snGrad stencil, as phiPc in pEqn.H). Interpolating the cell-
++    // centred Ur (fvc::grad) to the faces cannot see odd-even (checkerboard)
++    // modes: for a pattern alternating between two cells the averaged
++    // gradient on their common face is zero, so capillary diffusion did not
++    // damp it. Only used in porous faces (Solidf = 1), as before.
++    const surfaceScalarField alpha1f(fvc::interpolate(alpha1));
++    const surfaceScalarField pcf(fvc::interpolate(pc));
++    const surfaceScalarField phiWetting
++    (
++        Solidf*M1f
++       *(
++          (
++          - fvc::snGrad(p)
++          + (1. - alpha1f)*fvc::snGrad(pc)
++          - pcf*fvc::snGrad(alpha1)
++          )*mesh.magSf()
++        + rho1*(g & mesh.Sf())
++        )
++    );
++    const surfaceScalarField phiNonWetting
++    (
++        Solidf*M2f
++       *(
++          (
++          - fvc::snGrad(p)
++          - alpha1f*fvc::snGrad(pc)
++          - pcf*fvc::snGrad(alpha1)
++          )*mesh.magSf()
++        + rho2*(g & mesh.Sf())
++        )
++    );
++    surfaceScalarField phirPore
++    (
++        "phirPore",
++        (
++            phiWetting/max(alpha1f, scalar(0.001))
++          - phiNonWetting/max(1. - alpha1f, scalar(0.001))
++        )/fvc::interpolate(eps)
++    );
+ 
+     //surfaceScalarField::Boundary& phicBf =
+     //phic.boundaryFieldRef();

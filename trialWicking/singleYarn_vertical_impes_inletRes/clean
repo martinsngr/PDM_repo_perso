@@ -1,0 +1,8 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+
+# Results, meshes, generated fields and logs (keeps 0/*.org, 0/p, 0/U*)
+rm -rf -- -[0-9]* [1-9]* [0-9].* processor* postProcessing VTK
+rm -rf constant/polyMesh constant/polyMesh_full constant/yarn constant/fluid
+rm -f 0/Sb 0/cellToRegion 0/C 0/Cx 0/Cy 0/Cz 0/V
+rm -f log.* liquidBalance.csv
