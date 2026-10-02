@@ -7,7 +7,7 @@ cd "${0%/*}" || exit 1
 # ../1D_vertical_hybrid (reservoir = alpha 0.99 on the end face `left`, dry
 # yarn with a 0.2 mm ramp), on the yarn mesh of ../singleYarn_IMPES_vertical.
 # Twin of ../singleYarn_vertical_impes_inletRes. Air leaves through the top
-# (`right`) and the lateral surface (`yarn_to_fluid`).
+# (`right`).
 #
 # The solver log is written in /tmp during the run (see ../runTools.sh);
 # log.hybridPorousInterFoam here is a symlink to it until the solver ends.

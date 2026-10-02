@@ -11,11 +11,11 @@
 # (~10 h estimated on 4 free cores)
 #SBATCH --output=Log_%x_%j.log
 #SBATCH --error=Err_%x_%j.err
-#SBATCH --mail-user=YOUR_EMAIL_ADDRESS
+#SBATCH --mail-user=martin.sinegre@gmail.com
 #SBATCH --mail-type=END,FAIL
 
 # OpenFOAM 9 environment (sourced before set -e: the bashrc may return non-zero)
-source /opt/openfoam9/etc/bashrc
+source /opt/OpenFOAM-9/etc/bashrc
 
 set -e
 cd "${SLURM_SUBMIT_DIR}"

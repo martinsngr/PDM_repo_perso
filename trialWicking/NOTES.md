@@ -108,7 +108,10 @@ grep "^Time =" log1.impesFoam | tail -1     # progress
   72 h hybrid). Submit from the case folder with `../slurmSubmit.sh`, which queues behind every active job as the
   mini01 guide requires (the partition allows oversubscription); never `./run` or `bash job.slurm` there. The job
   checks that `N` in `caseSetup` equals `--ntasks`, and runs `LOG_DIR=logs LOG_EVERY=100 ./run`. Both solvers must be
-  built on mini01 from the `of9-port` branches (OpenFOAM 9, `/opt/openfoam9`); set `--mail-user` before submitting.
+  built on mini01 from the `of9-port` branches (OpenFOAM 9, `/opt/OpenFOAM-9`); set `--mail-user` before submitting.
+  `./Allwmake` stops at `groundwater2DFoam` (does not compile on OF9) before reaching `impesFoam`: run `./Allwclean`,
+  `wmake` the five `libraries/*` in `Allwmake` order, then `wmake solvers/impesFoam`. impesFoam built this way on
+  mini03, 2026-10-02.
 - **Laptop:** set "lid close → Do nothing" and "sleep → Never" while plugged in. WSL2 may also shut down when no WSL window is open.
 - **Front analysis:** `wickingFront.ipynb` (also shows `1D_vertical_hybrid` with the old solver, `results_oldsolver/`) loads the 1D cases' `postProcessing/sampleDict` profiles and `liquidBalance.csv`, takes the front as the height where S = 0.1 and compares it with Lucas–Washburn (h = k√t, k fitted). Kernel: the repo's `.venv` (`matplotlib` and `ipykernel` added to `requirements.txt`). Current runs: k = 18.35 mm/√s (impesFoam), 18.03 (hybrid, new solver; 18.23 with the old one, whose profiles had a staircase and a spurious foot ahead of the front), h/√t constant within 2 %.
 - **Outputs:** `liquidBalance.csv` (uptake over time) and `postProcessing/sampleDict/<t>/alongYarn_Sb.xy` (Sb(x) profiles).

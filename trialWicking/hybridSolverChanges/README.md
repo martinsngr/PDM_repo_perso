@@ -3,7 +3,7 @@
 Working log of the changes made to `hybridPorousInterFoam` (repo Franjcf/hybridPorousInterFoam, branch `of9-port`,
 `be54696`) so that it can compute capillary wicking in 2D/3D. Started 2026-10-01.
 
-**Status: committed on `of9-port` (2026-10-01), not pushed.** Commits `b0c0f67` (A), `cf95c59` (B), `b93e429` (C),
+**Status: committed on `of9-port` (2026-10-01), pushed to `martinsngr/hybridporousinterfoamperso`.** Commits `b0c0f67` (A), `cf95c59` (B), `b93e429` (C),
 `c0c1b4e` (B fix), `b995db5` (C fix); the state before them is tagged `of9-port-before-porous-fixes` (= `be54696`).
 The installed `hybridPorousInterFoam` is built from `b995db5`; the previous binary is kept as
 `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. A and C are always active; B only with `darcyFaceMaxDa`. The diagnosis behind it is in `../NOTES.md` (Findings → hybridPorousInterFoam in 3D).
