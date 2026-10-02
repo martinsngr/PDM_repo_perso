@@ -105,8 +105,10 @@ grep "^Time =" log1.impesFoam | tail -1     # progress
 - **Solver logs are written in `/tmp`, not in the case folder** (`runTmpLog` in `runTools.sh`; see `CLAUDE.md`): `log1.impesFoam` is a symlink during the run and the real file afterwards. For a long run use `LOG_EVERY=100 nohup ./run > run.out 2>&1 &`, which keeps only every 100th step plus the last 400 lines (`log1.impesFoam.tail`).
 - **If the run dies, do NOT rerun `./run`:** it deletes meshes, processor folders and results. Instead, set `startFrom latestTime` in `system/controlDict`, relaunch with `nohup mpirun -np 4 impesFoam -parallel -noFunctionObjects > /tmp/log2.impesFoam 2>&1 &` (log outside the workspace), then run `reconstructPar` and `postProcess -func sampleDict`.
 - **Cluster (mini01, SLURM):** each yarn case has a `job.slurm` (4 tasks, 10 GB, `global` partition; 24 h impesFoam,
-  72 h hybrid). Submit from the case folder with `../slurmSubmit.sh`, which queues behind every active job as the
-  mini01 guide requires (the partition allows oversubscription); never `./run` or `bash job.slurm` there. The job
+  72 h hybrid). Submit from the case folder with `sbatch job.slurm` (decided 2026-10-02: the jobs then run in parallel
+  with the others) after checking with `squeue -o "%.10i %.12u %.15j %.2t %.10M %.5C %R"` that the running jobs leave
+  CPUs free (48 in all; the partition oversubscribes, so a full machine slows everyone down). `../slurmSubmit.sh` is
+  the mini01 guide's procedure (section 5: wait behind every active job). Never `./run` or `bash job.slurm` there. The job
   checks that `N` in `caseSetup` equals `--ntasks`, and runs `LOG_DIR=logs LOG_EVERY=100 ./run`. Both solvers must be
   built on mini01 from the `of9-port` branches (OpenFOAM 9, `/opt/OpenFOAM-9`); set `--mail-user` before submitting.
   `./Allwmake` stops at `groundwater2DFoam` (does not compile on OF9) before reaching `impesFoam`: run `./Allwclean`,

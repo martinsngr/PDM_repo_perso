@@ -1,7 +1,8 @@
 #!/bin/bash
 # SLURM job for this case on mini01 (see the mini01 SLURM guide).
-# Submit from this folder with ../slurmSubmit.sh (waits behind the jobs already
-# in the queue), never with ./run, bash job.slurm or ./job.slurm.
+# Submit from this folder with sbatch job.slurm after checking the load with
+# squeue (../slurmSubmit.sh queues it behind every active job instead, as the
+# guide asks), never with ./run, bash job.slurm or ./job.slurm.
 #SBATCH --job-name=yarnHybrid
 #SBATCH --partition=global
 #SBATCH --nodes=1
