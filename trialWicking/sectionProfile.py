@@ -39,7 +39,7 @@ def read_internal(path, n_cells=None):
 
 def main():
     field = sys.argv[1]
-    dx = float(sys.argv[2]) if len(sys.argv) > 2 else 20e-6
+    dx = float(sys.argv[2]) if len(sys.argv) > 2 else 50e-6
 
     x = read_internal("0/Cx")
     V = read_internal("0/V")
