@@ -1,0 +1,6 @@
+#!/bin/sh
+# BL_grav_BC, variant ABC: hybridPorousInterFoam
+# Mesh and initial fields ship with the tutorial (tutorials/Darcy_Flow_Cases/Buckley-Leverett/gravity_Driven_BrooksCorey).
+cd "${0%/*}" || exit 1
+. ../../../runTools.sh
+runTmpLog log.hybridPorousInterFoam hybridPorousInterFoam

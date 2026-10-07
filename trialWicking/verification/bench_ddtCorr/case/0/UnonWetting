@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  9                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      UnonWetting;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+// zeroGradient on both patches (the tested setup). At the outlet it gives
+// the Darcy air velocity of the top cell, used with Uwetting fixed 0 so that
+// only air leaves. At the inlet neither phase velocity is fixed, so the
+// relative flux there is zero: the face carries the total (inward) flux at
+// alpha 0.99, 1 % air and 99 % water, and no air escapes into the reservoir
+// (impesFoam: Ua fixed 0, water only).
+boundaryField
+{
+    inlet
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    sides
+    {
+        type            symmetry;
+    }
+}
+
+
+// ************************************************************************* //

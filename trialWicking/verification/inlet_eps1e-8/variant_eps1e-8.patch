@@ -1,0 +1,14 @@
+--- alphaEqn.H.b995db5
++++ alphaEqn.H.eps1e-8
+@@ -154,9 +154,9 @@
+               //This is equal to Ur = U1/phiS1 -(U2)/phiS2 at the boundary
+               phirPoreBf[patchi] =
+                           (Uwetting.boundaryField()[patchi] & mesh.Sf().boundaryField()[patchi])
+-                         /(eps.boundaryField()[patchi]*alpha1.boundaryField()[patchi] + 0.001)
++                         /(eps.boundaryField()[patchi]*alpha1.boundaryField()[patchi] + 1e-8)
+                          -(UnonWetting.boundaryField()[patchi] & mesh.Sf().boundaryField()[patchi])
+-                         /(eps.boundaryField()[patchi]*(1-alpha1.boundaryField()[patchi]) + 0.001);
++                         /(eps.boundaryField()[patchi]*(1-alpha1.boundaryField()[patchi]) + 1e-8);
+         }
+     }
+ 

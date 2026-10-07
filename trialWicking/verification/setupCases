@@ -1,0 +1,88 @@
+#!/bin/bash
+# Build the verification cases, from the paper's tutorials (Carrillo et al. 2020, Brooks-Corey closures):
+#   BL_flow_BC  flow-driven Buckley-Leverett (section 4.1.1), with p fixedFluxPressure on the inlet (see below)
+#   BL_grav_BC  gravity-driven Buckley-Leverett (section 4.1.2), tutorial as shipped
+#   BL_grav_BC_FFP  the same with U fixedValue 1e-5 + p fixedFluxPressure on the inlet (see below)
+#   eq_BC       gravity-capillarity equilibrium (section 4.1.3)
+# each for two versions of hybridPorousInterFoam:
+#
+#   port  hybridPorousInterFoam_be54696   OF9 port only (vocabulary changes from v8, tag of9-port-before-porous-fixes)
+#   ABC   hybridPorousInterFoam (b995db5) changes A, B and C, darcyFaceMaxDa 0.1 (as the wicking cases)
+#
+# The cases are taken from the committed tutorials of the solver repo (git archive, so local edits in the
+# tutorials folder are ignored). The only change is stopAt writeNow -> endTime: the committed controlDicts
+# stop at once. Meshes and initial fields ship with the tutorials, so each case only runs the solver.
+#
+# BL_flow_BC: the tutorial's inlet is U fixedValue 1e-5 with p zeroGradient (the paper's "dp/dx = 0"). For Darcy
+# flow that pair is inconsistent: with Darcy faces on (ABC) the inlet flux comes from Darcy's law with zero pressure
+# gradient and no water enters. p fixedFluxPressure sets the gradient that gives exactly U_b.S_f; the original
+# solver gives the same result with either BC (see ../NOTES.md, Verification), so it is used for both variants.
+# BL_grav_BC_FFP: the shipped gravity tutorial has U and p zeroGradient on the inlet and imposes the injection via
+# Uwetting/UnonWetting, which correctUBc.H writes on the inlet face only after the pressure solve: the pressure
+# solve lets both phases fall in under gravity and the inlet cell creates ~8.2e-7 m/s of air (8 % of the
+# injection). With U fixedValue (1e-5 0 0) and p fixedFluxPressure (which takes its flux from the U boundary
+# value) the pressure solve sees the injection; this is also the paper's text (4.1.2: the 4.1.1 system + gravity).
+#
+# Usage: ./setupCases [solverRepo]    (default ~/OpenFOAM/$USER-9/run/hybridPorousInterFoam)
+# Existing case folders are left alone; delete them to rebuild.
+
+cd "${0%/*}" || exit 1
+REPO=${1:-$HOME/OpenFOAM/$USER-9/run/hybridPorousInterFoam}
+REV=of9-port
+
+# case name -> tutorial path
+declare -A CASES=(
+    [BL_flow_BC]=tutorials/Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_BrooksCorey
+    [BL_grav_BC]=tutorials/Darcy_Flow_Cases/Buckley-Leverett/gravity_Driven_BrooksCorey
+    [BL_grav_BC_FFP]=tutorials/Darcy_Flow_Cases/Buckley-Leverett/gravity_Driven_BrooksCorey
+    [eq_BC]=tutorials/Darcy_Flow_Cases/Gravity_Capillarity_Equilibrium/gravity_Capillarity_BrooksCorey
+)
+declare -A SOLVER=(
+    [port]=hybridPorousInterFoam_be54696
+    [ABC]=hybridPorousInterFoam
+)
+
+echo "Tutorials from $REPO at $(git -C "$REPO" rev-parse --short $REV) ($REV)"
+
+for name in "${!CASES[@]}"
+do
+    tut=${CASES[$name]}
+    for variant in port ABC
+    do
+        dir=$name/$variant
+        [ -d "$dir" ] && { echo "  $dir exists, skipped"; continue; }
+        mkdir -p "$dir"
+        git -C "$REPO" archive $REV "$tut" | tar -x -C "$dir" --strip-components=$(echo "$tut" | tr -cd / | wc -c | xargs expr 1 +)
+        rm -f "$dir"/run "$dir"/clean "$dir"/log.*
+
+        foamDictionary -entry stopAt -set endTime "$dir/system/controlDict" > /dev/null
+
+        if [ $name = BL_grav_BC_FFP ]
+        then
+            foamDictionary -entry boundaryField/leftWall/type -set fixedValue "$dir/0/U" > /dev/null
+            foamDictionary -entry boundaryField/leftWall/value -add "uniform (1e-5 0 0)" "$dir/0/U" > /dev/null
+        fi
+        if [ $name = BL_flow_BC ] || [ $name = BL_grav_BC_FFP ]
+        then
+            foamDictionary -entry boundaryField/leftWall/type -set fixedFluxPressure "$dir/0/p" > /dev/null
+            foamDictionary -entry boundaryField/leftWall/value -add "uniform 0" "$dir/0/p" > /dev/null
+        fi
+
+        if [ $variant = ABC ]
+        then
+            printf '\n// change B on: porous faces with K/dx^2 < darcyFaceMaxDa use the Darcy total flux\ndarcyFaceMaxDa  0.1;\n' \
+                >> "$dir/constant/transportProperties"
+        fi
+
+        cat > "$dir/run" <<EOF
+#!/bin/sh
+# $name, variant $variant: ${SOLVER[$variant]}
+# Mesh and initial fields ship with the tutorial ($tut).
+cd "\${0%/*}" || exit 1
+. ../../../runTools.sh
+runTmpLog log.hybridPorousInterFoam ${SOLVER[$variant]}
+EOF
+        chmod +x "$dir/run"
+        echo "  $dir  (${SOLVER[$variant]})"
+    done
+done

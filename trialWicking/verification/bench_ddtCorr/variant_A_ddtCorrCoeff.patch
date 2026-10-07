@@ -1,0 +1,22 @@
+--- pEqn.H.b0c0f67
++++ pEqn.H.ddtCorrCoeff
+@@ -10,11 +10,18 @@
+ 
+     surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU()));
+     volVectorField HbyA(constrainHbyA(rAU()*UEqn.H(), U, p));
++    // Scratch test: ddtCorr term scaled by ddtCorrCoeff (PIMPLE dict, default 1;
++    // OpenFOAM 9 has no ddtPhiCoeff keyword)
++    const scalar ddtCorrCoeff
++    (
++        pimple.dict().lookupOrDefault<scalar>("ddtCorrCoeff", 1)
++    );
+     surfaceScalarField phiHbyA
+     (
+         "phiHbyA",
+         fvc::flux(HbyA)
+-      + MRF.zeroFilter(fvc::interpolate(rho*rAU())*fvc::ddtCorr(U, phi, Uf))
++      + ddtCorrCoeff
++       *MRF.zeroFilter(fvc::interpolate(rho*rAU())*fvc::ddtCorr(U, phi, Uf))
+     );
+     MRF.makeRelative(phiHbyA);
+ 

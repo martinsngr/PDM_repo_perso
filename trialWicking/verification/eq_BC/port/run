@@ -1,0 +1,6 @@
+#!/bin/sh
+# eq_BC, variant port: hybridPorousInterFoam_be54696
+# Mesh and initial fields ship with the tutorial (tutorials/Darcy_Flow_Cases/Gravity_Capillarity_Equilibrium/gravity_Capillarity_BrooksCorey).
+cd "${0%/*}" || exit 1
+. ../../../runTools.sh
+runTmpLog log.hybridPorousInterFoam hybridPorousInterFoam_be54696
