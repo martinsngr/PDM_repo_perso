@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                |
+  \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \    /   O peration     | Website:  https://openfoam.org
+    \  /    A nd           | Version:  7
+     \/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      Sb;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+
+// uniform dry state; ./run copies this file to 0/Sb and setFields adds the
+// prewetted ramp at the bottom (system/setFieldsDict)
+internalField   uniform 2e-3;
+
+boundaryField
+{
+    // infinite water reservoir: the inlet face is held at Sb 0.99, so water
+    // enters with the liquid mobility and capillary pressure of Sb 0.99 (no
+    // clamped cellZone). 0.99 rather than Sbmax (0.999): dpc/dS is singular at
+    // Sbmax. Same value as ../1D_vertical_hybrid.
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 0.99;
+    }
+    // no capillary flux through the top (Ub is fixed 0 there anyway); same as
+    // ../1D_vertical_hybrid, where a fixed value crashes the run
+    outlet
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

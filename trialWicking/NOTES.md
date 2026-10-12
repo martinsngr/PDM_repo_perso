@@ -110,7 +110,11 @@ Both cases on the same 15,188-cell mesh, Coats CFL 0.5, `LOG_EVERY=100`. Wall ti
 - **Part 2 (became change B):** with face fluxes, a transverse mode still grows (×1.5 per step, spread ~0.08). The α profile is smooth, but the cell total velocity U alternates along the column (0.08–0.30 m/s in neighbouring rows, though the face flux is uniform), and feeds back through `HbyA` (ddt/convection terms of the momentum equation). Removing inertia (`ddt(rho,U) steadyState`) makes both versions worse.
 - **Part 2 fixed in a second experimental copy (`hybridPorousInterFoamDarcy`, scratchpad; committed later as change B, the numbers below are from the prototype): Darcy total flux in porous faces.** In `pEqn.H`, faces with `Solidf = 1` use the Darcy mobility `Mf` instead of `rAUf` and the face phase Darcy fluxes (capillary + gravity, the same terms as part 1) instead of `HbyA`; porous cells take U = reconstruct(phi). Faces with `Solidf = 0` (free fluid) are unchanged by construction. Justified for this yarn: Darcy relaxation time ρK/(με) 2e-5 s (water) / 1e-6 s (air) ≪ wicking time, and Brinkman layer √K ≈ 3 µm < one cell. Bench: spread stays at round-off (1e-9 for NX = 2, 8e-8 for NX = 5), identical mean α for NX = 1, 2, 5, about 5× fewer steps than part 1 alone.
 - **Remaining difference to impesFoam (bench, 0.2 ms): mean α 0.0528 vs 0.0592.** The front part is the kr interpolation: impesFoam upwinds kr (`upwind phia/phib`), hybrid interpolates linearly; impesFoam with linear kr gives 0.0570 and the same leading edge as the hybrid. The rest sits next to the reservoir (first cell 0.896 vs 0.947), probably the inlet BC (hybrid `inletOutlet` lets 1 % air in, impesFoam water only); not checked yet.
-- **Changes A (face relative flux), B (opt-in Darcy total flux, `darcyFaceMaxDa`) and C (upwinded kr) are logged with patches in `hybridSolverChanges/`** (committed on `of9-port` 2026-10-01: A `b0c0f67`, B `cf95c59`, C `b93e429`, B fix `c0c1b4e`, C fix `b995db5`; the installed solver is `b995db5`). Bench stable (5 ms, spread ≤ 4e-7); 1D uptake within 0.5 % of the original hybrid. A porous/free interface with a wet porous side diverges in the original solver too: next problem before the fabric case.
+- **2026-10-12: change E (`c3a2e6e`, bug fix): `Solidf` stays binary at every step.** Found in the fabric work
+  (`../meshing_strat_trial/NOTES.md`): from step 1 porous/free faces had `Solidf = 0.5`. Bit-identical for all cases
+  in this folder (no free cells); installed, A–C binary kept as `hybridPorousInterFoam_b995db5`. Details in
+  `hybridSolverChanges/README.md` and the solver repo's `CHANGES_of9-port.md`.
+- **Changes A (face relative flux), B (opt-in Darcy total flux, `darcyFaceMaxDa`) and C (upwinded kr) are logged with patches in `hybridSolverChanges/`** (committed on `of9-port` 2026-10-01: A `b0c0f67`, B `cf95c59`, C `b93e429`, B fix `c0c1b4e`, C fix `b995db5`; installed until 2026-10-12, now E `c3a2e6e`). Bench stable (5 ms, spread ≤ 4e-7); 1D uptake within 0.5 % of the original hybrid. A porous/free interface with a wet porous side diverges in the original solver too: next problem before the fabric case.
 - Test bench: the 1D hybrid case widened to NX cells (symmetry sides, empty front/back) with a coded function object printing the across-width spread of α and p per step. NX = 1 stays exactly 0; NX = 2 and 5 grow from round-off.
 - Parallel: compiling the coded BCs / function objects inside `mpirun` aborts with `MPI_ERR_TRUNCATE`; the `run` script compiles them first with a serial `hybridPorousInterFoam -postProcess -time 0`.
 - On the yarn mesh the Coats limit is ~5e-8 s, below the 1D floor `minDeltaTCoats 1e-7`; the yarn case uses 2e-8.
@@ -146,15 +150,31 @@ Both cases on the same 15,188-cell mesh, Coats CFL 0.5, `LOG_EVERY=100`. Wall ti
     between cells with the port, < 0.1 % with A+B+C. ~25 min per run.
   - **Meshes:** one (the paper's 2000 cells). No refinement study (decided 2026-10-07): the check is "same setup as
     the paper, same or better agreement".
-- **Gravity–capillarity equilibrium, Brooks–Corey (paper 4.1.3), running (`verification/eq_BC`)**: tutorial =
-  paper's Fig. 6 setup (pc0 1000 Pa: Fig. 6C's analytical |dS/dy| at S = 1 is 19.5 1/m = Δρg/(β pc0); Table 2's
-  p0 100 Pa would give 196). Reference from inputs only (`analyseEquilibrium.py`: Fig. 6C relation, and the static
-  profile holding the initial 0.25 m of water). **Preliminary (t = 4,500–5,000 s of 30,000): with Darcy faces on,
-  the column does not drain.** Port: bottom at 0.997 by 1,000 s, mean |S − static| 0.18 → 0.03. A+B+C: profile
-  frozen near the initial step (S ≈ 0.51 in the lower half), mean error 0.20 throughout, although the cell phase
-  velocities show counter-current drainage (Uwetting −2.3e-5, UnonWetting +2.5e-5 m/s). So the α face fluxes
-  (change A, `phirPore`) do not carry counter-current gravity segregation with B on; cause not found yet. The
-  "round-off Courant number" of A+B+C in this case (below) is this frozen state, not a clean equilibrium.
+- **Gravity–capillarity equilibrium, Brooks–Corey (paper 4.1.3), `verification/eq_BC`, 30,000 s (2026-10-07).**
+  Tutorial = the paper's Fig. 6 setup (pc0 1000 Pa: Fig. 6C's analytical |dS/dy| at S = 1 is 19.5 1/m = Δρg/(β pc0);
+  Table 2's p0 100 Pa would give 196). 1 m, 1500 cells, lower half at S 0.5. Reference from the inputs only
+  (`analyseEquilibrium.py`: Fig. 6C relation and the static profile holding the initial 0.25 m of water). Wall time
+  1.7 h (original) / 2.2 h (modified). Figures `gravityCapillarityEquilibrium_BC.png` (last write) and
+  `gravityCapillarityEquilibrium_BC_evolution.png` (profiles at 250 → 30,000 s, water volumes vs log t).
+  - **Original (`be54696`): approaches the static profile, not fully converged at 30,000 s.** Water in the bottom
+    0.2 m 0.100 → 0.145 (1,000 s) → 0.187 (5,000 s) → 0.190 at 30,000 s (static 0.188); lower half 0.2425, still
+    falling (static 0.2375). Mean |S − exact| 0.0005 (y < 0.15 m), 0.0034 (0.3–0.5 m), 0.0099 (y > 0.5 m), but 0.034
+    in the transition band 0.17–0.3 m, which still changes by 1.6e-2 per 250 s. Fig. 6C gradient: median error 8 % for
+    S 0.05–0.2 (upper zone), 31–82 % for S 0.2–0.9 (the transition band). Water volume conserved to 3e-8.
+  - **Modified (`b995db5`, `darcyFaceMaxDa 0.1`): fails — a cell-to-cell oscillation along the 1-cell-wide column.**
+    Roughness max |S_i − (S_{i−1} + S_{i+1})/2| in the lower half: 0.29 at 250 s, 0.34 at 5,000 s, 0.74 at 7,500 s,
+    0.89 from 10,000 s (original: 0.01–0.07, from the kink at the edge of the saturated zone). The bottom 0.2 m holds
+    0.1004 m of water (unchanged) up to 5,000 s, then 0.101 (10,000 s), 0.115 (20,000 s), 0.131 (30,000 s); mean
+    |S − exact| 0.16, Fig. 6C gradient error 150 % to > 1000 %. The earlier reading "frozen" (from t ≤ 5,000 s) was the
+    first stage of this odd-even mode, not a stalled state. Water volume conserved to 4e-9. Cause not found; it
+    concerns counter-current flow at zero total flux (A, B or C not isolated yet: step 4 of the 2026-10-07 plan).
+- **Gravity-driven Buckley–Leverett with the paper's inlet, `verification/BL_grav_BC_FFP` (2026-10-07).** Tutorial with
+  `U` fixedValue (1e-5 0 0) + `p` fixedFluxPressure on the inlet (Uwetting/UnonWetting unchanged; fixedFluxPressure
+  takes its flux from the U boundary value, so U must be fixed). Predicted: interior flux 1.000e-5, plateau/front change
+  < ~0.03 %. **Measured: passes.** Interior flux 1.0000e-5 at every write in both solvers (tutorial inlet: 1.0823e-5),
+  continuity error per step ~1e-12 (tutorial inlet: 2.1e-7); plateau 0.4665 (was 0.4663; exact 0.4668); front
+  −0.16 % (original) / −0.15 % (modified) at 85,000 s (was −0.13 / −0.12 %); mean |S − exact| 1.1e-3; water stored /
+  injected 99.76 % (unchanged: the `+ 0.001` inlet term, not fixed). Port vs modified: mean |ΔS| 1.0e-4.
 - Found in the other tutorials before they were dropped (not kept):
   - **B and a fixed-velocity inlet (2026-10-07: diagnosis revised and fix tested).** Flow-driven Buckley–Leverett
     (4.1.1, `U fixedValue 1e-5`, p zeroGradient) with `darcyFaceMaxDa 0.1`: no water enters. `pEqn.H:65` replaces
@@ -177,9 +197,124 @@ Both cases on the same 15,188-cell mesh, Coats CFL 0.5, `LOG_EVERY=100`. Wall ti
   - Flow-driven Buckley–Leverett, port and A+C: front within 0.06–0.3 % of the analytical one.
   - **A+C without B: spurious currents at equilibrium.** Gravity–capillarity equilibrium (4.1.3, Brooks–Corey): cell
     Courant number ~20× the port's, `maxCo 0.01` limits dt to ~4e-3 s (port and A+B+C: 0.1 s). Same cell-velocity
-    feedback as part 2 above.
+    feedback as part 2 above. (The A+B+C run's small Courant number in this case is not a clean equilibrium: see the
+    oscillation above.)
   - Capillary rise (4.2.2, porous walls): all three versions start cleanly (A+B+C to 5 ms); ~330k steps for 5 s,
     not run. With `darcyFaceMaxDa 0.1` the porous walls (K 1e-20) are Darcy faces; air/porous faces are untouched.
+
+- **1D wicking column vs the similarity solution (2026-10-07, `verification/wicking1D/`, `analyseWicking1D.py`,
+  `wicking1D.png`).** Reference from the inputs only: with uniform air pressure and no gravity, co-current
+  spontaneous imbibition is ε∂S/∂t = ∂x(D ∂S/∂x), D = K kr_w/μ_w |dpc/dS| (BC n 3, VG pc0 5000 Pa m 0.5, K 1e-11,
+  ε 0.5), S(0) = 0.99, S(∞) = 0.002; η(S) = x/√t from Philip's iterative integral method (validated on constant D
+  against erfc: 1.7e-9). **Prediction: front (S = 0.1) x_f = 18.04 mm/√s·√t, uptake I = 6.105 mm/√s·√t** (front at
+  the top at 0.0365 s). Runs: copies of `1D_vertical_impes_inletRes` (impesFoam), `1D_vertical_hybrid` (modified)
+  and the same without `darcyFaceMaxDa` + `minDeltaTCoats 1e-7` (original), writes every 1 ms to 0.03 s
+  (0.5–4 min each). Slopes vs √t fitted for t ≥ 0.01 s (the 0.2 mm start-up ramp offsets the absolute values):
+
+  | Solver | front slope (mm/√s) | vs 18.04 | uptake slope (mm/√s) | vs 6.105 | inlet cell S (exact 0.99) | max S > 0.2 mm ahead of front, 30 ms |
+  |---|---|---|---|---|---|---|
+  | impesFoam | 17.95 | −0.5 % | 5.97 | −2.2 % | 0.968–0.976 | 0.015 |
+  | hybrid original `be54696` | 17.91 | −0.8 % | 5.84 | −4.4 % | 0.933–0.940 | 0.071 (spurious foot) |
+  | hybrid modified `b995db5` | 17.76 | −1.6 % | 5.82 | −4.6 % | 0.932–0.939 | 0.021 |
+
+  **Status: front passes** (all three within 1.6 % of a prediction made from the inputs alone; previously fitted k
+  18.35 / 18.03 mm/√s agreed with it). **Uptake: 2–5 % low, explained but not separated:** (a) the inlet cell sits
+  below the imposed 0.99 (0.97 impesFoam, 0.94 both hybrids: an inlet treatment of the original hybrid, the same with
+  and without the changes), and (b) the reference neglects the air pressure, which varies by ~1.1 kPa along the
+  column (≈2 % of the ~50 kPa capillary drive; not decaying between 5 and 25 ms), gravity ρg x_f ≤ 28 Pa. The
+  modified solver removes the original's foot ahead of the front (0.071 → 0.021). One mesh (20 µm).
+  **Follow-up checks (2026-10-08, no new runs):**
+  - **Inlet BCs.** impesFoam: Sb fixedValue 0.99, p fixedValue 0 (Ua fixed 0: water only). Hybrid: alpha.wetting
+    inletOutlet 0.99; p (mixture) coded as −α_b pc(α_b), i.e. air pressure 0 and water pressure −pc(α_b),
+    consistent with α_b; Uwetting/UnonWetting zeroGradient (relative flux 0 on the face, so 1 % of the inflow is air).
+    **The inlet face is at 0.99 in all three runs at every write** (inward face flux), so "the solver reaches a lower
+    S_in at the face" is ruled out: a reference recomputed with the face value is the reference above.
+  - **Reference self-check:** ε∫η dS = ε∫(S − S0) dη = 6.1048 mm/√s; η ends at 19.50 mm/√s.
+  - **Where the uptake deficit sits** (ε∫(S_exact − S_run) dx at 30 ms): inlet zone x < 0.2 mm 1.9 / 4.8 / 4.9 µm
+    (impesFoam / original / modified), profile body 19.5 / 53.3 / 50.6 µm, front ±0.3 mm −4.3 / −5.3 / +1.7 µm; total
+    17 / 52 / 57 µm of 1057 µm (1.6 / 4.9 / 5.4 %). The body of the profile is uniformly low, as for a lower
+    effective inlet saturation. (The 6–10 % "uptake since t = 0" deficits at 30 ms are mostly the start-up offset: the
+    runs start with 50 µm of water in the ramp; use the √t slopes.)
+  - **Effective inlet saturation:** the first cell centre is 0.974 (impesFoam) / 0.938 (both hybrids) where the exact
+    profile gives 0.989. A reference with S_in = first-cell value overcorrects: runs then 3–8 % faster (front) and
+    5–15 % more uptake. The run uptake slopes match S_in ≈ 0.984 (impesFoam) / 0.976 (hybrids) by interpolation: the
+    uptake is very sensitive to S near 1, where D(S) peaks (ΔS_in = −0.01 → about −2 % uptake). So the deficit sits in
+    the inlet half-cell (face 0.99 → cell 0.94–0.97), i.e. in the discretisation of the inlet flux, plus the
+    neglected air pressure. **Status: numerical (inlet half-cell) + reference (air pressure), not separated; needs a
+    1D mesh study** (Δx/2, Δx/4).
+  - **Front resolution:** Δx = 20.0 µm, 172 cells; front at 64–67 cells (5 ms) to 155–158 cells (30 ms); width
+    S 0.3 → 0.02 = 15–33 cells for impesFoam and the modified hybrid (exact 11–28 cells), 26–39 cells for the original.
+  - **Phase pressures and inlet-face fluxes** (`verification/wicking1DPressures.py`, `wicking1D_pressures.png`, existing
+    output). impesFoam `p` is the air pressure (`phia = phi − phib = −Ma∇p`, `phib = −Mb∇(p − pc)`); hybrid
+    p_g = p + α pc. Air pressure is raised through the whole wet zone and decays smoothly to 0 at the outlet: maximum
+    1.06–1.14 kPa in the first cell of both hybrids, 0.61–0.81 kPa at 0.05–0.15 mm in impesFoam (its face is held at
+    p_g = 0); 160 Pa (5 ms) / 20 Pa (25 ms) at the front. **Hybrid inlet face: 1.00 % of the inflow is air, inward**
+    (both hybrids, 5 and 25 ms; α_face 0.99, relative flux 0 on that face). Inlet water flux vs the exact uptake rate
+    S/(2√t): hybrids 4.09e-2 / 1.84e-2 m/s at 5 / 25 ms (−5.3 / −4.5 %), impesFoam 4.23e-2 / 1.90e-2 (−2.1 / −1.8 %),
+    matching the uptake-slope deficits. impesFoam's face water flux uses the point pc′(0.99) (−38,050 Pa): with the
+    true water-pressure jump across the half cell (secant) it would point outward (−0.19 / −0.10 m/s): its first-cell
+    state is set by that face formula. impesFoam air flux on the inlet face: −0.08 to −0.12 % (outward).
+  - **Runs 2026-10-08 (`verification/wicking1D/{impes_muA100,ABC_muA100,ABC_waterInlet}`, `wicking1DVariants.py`),
+    predictions written before the runs, both confirmed:**
+
+    | Run | front slope | vs 18.04 | uptake slope | vs 6.105 | first-cell S (exact 0.989) | inlet air / total | p_air first cell, 25 ms |
+    |---|---|---|---|---|---|---|---|
+    | impesFoam | 17.95 | −0.5 % | 5.970 | −2.2 % | 0.974 | — | 529 Pa |
+    | impesFoam, μ_air/100 | 18.01 | −0.2 % | 6.086 | −0.3 % | 0.989 | — | 3 Pa |
+    | hybrid modified | 17.76 | −1.6 % | 5.824 | −4.6 % | 0.938 | +1.00 % (in) | 1064 Pa |
+    | hybrid modified, μ_air/100 | 18.04 | −0.0 % | 6.087 | −0.3 % | 0.984 | +0.99 % (in) | 173 Pa |
+    | hybrid modified, inlet `UnonWetting` fixedValue 0 | 17.89 | −0.8 % | 5.943 | −2.6 % | 0.969 | −0.43 % (out) | 489 Pa |
+
+    (1) **μ_air/100** (prediction: first cell → ~0.99, uptake within ~1 %): both solvers within 0.3 % (uptake) and
+    0.2 % (front) of the reference. **Status: the base-run gap is the reference's uniform-air-pressure (Richards)
+    assumption, i.e. the physical air back-pressure, not numerics; both solvers verified against the similarity
+    solution on the 20 µm mesh with that effect switched off.** (2) **Water-only inlet** (prediction: the hybrid moves
+    to impesFoam): uptake −4.6 → −2.6 % (impesFoam −2.2 %), first cell 0.938 → 0.969; air now leaves through the inlet
+    (0.43 % of the flux, outward; impesFoam 0.1 %). **Split of the hybrid's −4.6 % uptake:** ~2 % from the 1 % air
+    injected by its inlet BC, ~2.5 % physical air back-pressure (in impesFoam too), ≤ 0.3 % numerics on this mesh
+    (not established: one mesh only, errors could cancel). Wall time 73 s (impesFoam μ/100), 283 s (water inlet),
+    513 s (hybrid μ/100).
+  - **Run 2 checked (code + output, 2026-10-08): `UnonWetting` fixedValue 0 does not make the inlet water-only.**
+    Solver: modified `b995db5`, `darcyFaceMaxDa 0.1` (log: Darcy faces 171/171 internal, 2/2 boundary). The total face
+    flux φ comes from the pressure equation (B's Darcy flux with both mobilities); nothing in `pEqn.H` reads
+    `UnonWetting`, and `correctUBc.H` imposes (Uwetting + UnonWetting)·Sf only when `Uwetting` is fixedValue. The
+    fixed `UnonWetting` only enters the boundary relative flux in `alphaEqn.H`: water flux on the face =
+    α_b φ + α_b(1 − α_b) ε Uw_cell/(ε α_b + 0.001), with `Uwetting` zeroGradient (first-cell water velocity). This
+    reproduces the run's face water flux to 3e-5 of the total (1.88068e-2 vs 1.88071e-2 m/s at 25 ms). The cell
+    water velocity exceeds the face total flux, so water > φ and air leaves: 0.58 % (5 ms), 0.43 % (25 ms) outward.
+    The `+ 0.001` term is active there but changes the water flux by 3e-5 of the total (× (1 − α_b) = 0.01). So run 2
+    swaps "1 % air in" for "~0.5 % air out"; a truly water-only reservoir inlet is not yet available as a BC
+    (candidate, untested: `Uwetting` fixedValue as well, so that `correctUBc.H` sets φ; that needs the inflow
+    velocity, which is unknown for spontaneous imbibition).
+  - **Code read, inlet α_b = 1 instead of 0.99 (2026-10-09, no runs).** Hybrid (original and modified): the face α
+    flux is α_b φ + flux(−flux(−phirPore, α2 ε), α) (`alphaEqn.H:254`, α2 = 1 − α, l. 220/322), so with α_b = 1 the
+    relative term is multiplied by α2_b = 0 and **the face carries water only in the α equation, exactly, whatever
+    `phirPore`, `UnonWetting` or the `+ 0.001` term** (l. 147–159). The pressure equation agrees: C's
+    `upwind(...).interpolate(kr)` returns the patch value on a boundary face, kr_a(α_b = 1) = 1e-12 (Se clipped to
+    1 − 1e-4, `krBrooksAndCorey.H:123–124`), M2f/M1f = 5.7e-11 (4.3e-5 at 0.99). The hybrid libraries clip Se
+    (`pcVanGenuchten.H:106–107`), so α_b = 1 is finite: pc_b = 70.7 Pa (not 0), dpc/dS = −3.5e5 Pa; the coded inlet p
+    gives a face water pressure of −70.7 Pa (−676 Pa at 0.99). MULES bounds α to [0, 1], so α_b = 1 is allowed
+    (`alpha.wettingmax 0.999` is a closure range, not a bound). **Consequence: the reference changes too**: with the
+    same clipped closures, S_in = 1 gives front 19.27 and uptake 6.933 mm/√s (+6.8 %, +13.6 % vs 0.99), and the
+    numbers depend on the 1e-4 clip, since pc′ diverges at Se = 1. impesFoam cannot take Sb_b = 1 with Sbmax 0.999:
+    its libraries do not clip Se (`pcVanGenuchten.H:88–89`, `krBrooksAndCorey.C:135–137`), so Se = 1.001 gives
+    pc = pc0·(negative)^0.5 = NaN (SIGFPE) and kr_a < 0; it needs Sbmax > 1 in both coefficient dicts (Sbmax = 1
+    exactly makes dpc/dS infinite on the face).
+    Still open (not run): 1D mesh study at the real air viscosity (Δx/2, where impesFoam's inlet flux depends on its
+    point-pc′ face formula); C alone (be54696 + patches 0003, 0005) for the tail.
+  - **Tail ahead of the front** (water > 0.2 mm ahead): original 2.0 → 5.8 µm from 5 to 25 ms (grows), impesFoam and
+    modified ≤ 0.5 µm. Consistent with the hypothesis that linear kr lets water leak into dry cells and upwinded kr
+    (change C) blocks it; C alone not tested (needs a be54696 + C build).
+- **The equilibrium oscillation does not appear in the wicking runs (2026-10-07, `verification/scanOddEven.py`,
+  `oddEvenScan.png`).** Scan of every write for cells that are strict local extrema of S (above or below all face
+  neighbours) by > 1e-3. Positive control `eq_BC`: modified 750 extrema (median, of 1500 cells), amplitude 0.90;
+  original 62 (median), up to 0.10 near the kink of the profile. Wicking runs, 0.005–0.1 s: `1D_vertical_hybrid` 1
+  extremum (impesFoam twin 2), max amplitude 0.016 (0.024); `singleYarn_vertical_hybrid` at most 12 of 15,188 cells
+  (0.08 %), amplitude ≤ 6.4e-3, the same level as the impesFoam twin (11, 5.9e-3). **Thesis sentence:** the odd-even
+  mode is observed in counter-current flow at zero total flux (paper 4.1.3) and is absent from our co-current wicking
+  runs, checked by a local-extremum scan of every saturation field against the impesFoam twins. It would need
+  rechecking for configurations that trap air (counter-current flow), e.g. the fabric case. The original-solver 1D run
+  (`results_oldsolver/`) keeps only profiles and is not in the scan.
 
 ### Is change B needed, or is ddtCorr the cause? (2026-10-07, `verification/bench_ddtCorr/`)
 - **Hypothesis tested:** the transverse instability without B comes from the ddtCorr term of `phiHbyA`

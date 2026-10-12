@@ -6,7 +6,8 @@ The solver before and after the porous-face changes, on tutorials of the paper w
 | Folder | Tutorial | Paper | Tests |
 |---|---|---|---|
 | `BL_flow_BC` | Buckley-Leverett/flow_Driven_BrooksCorey, **inlet p fixedFluxPressure** | 4.1.1, Fig. 4B | kr, fixed-velocity inlet |
-| `BL_grav_BC` | Buckley-Leverett/gravity_Driven_BrooksCorey | 4.1.2, Fig. 5B | kr, gravity |
+| `BL_grav_BC` | Buckley-Leverett/gravity_Driven_BrooksCorey, as shipped (inlet creates ~8 % air: see NOTES) | 4.1.2, Fig. 5B | kr, gravity |
+| `BL_grav_BC_FFP` | the same, **inlet U fixedValue 1e-5 + p fixedFluxPressure** (the paper's text) | 4.1.2, Fig. 5B | kr, gravity, consistent inlet |
 | `eq_BC` | Gravity_Capillarity_Equilibrium/gravity_Capillarity_BrooksCorey | 4.1.3, Fig. 6 | pc terms (capillary + gravity at rest) |
 
 Each case has two variants:
@@ -35,6 +36,11 @@ OpenFOAM API calls (fvOptions -> fvModels/fvConstraints, the CorrectPhi signatur
   the solver library) and comparison. `../../.venv/bin/python <script>` writes the figure next to it and prints the
   error table.
 
+- `wicking1D/` + `analyseWicking1D.py` → `wicking1D.png`, `wicking1DPressures.py` → `wicking1D_pressures.png`,
+  `wicking1DVariants.py` (μ_air/100 and water-only-inlet variants): 1D wicking column (impesFoam, hybrid original, hybrid
+  modified; writes every 1 ms to 0.03 s) vs the similarity solution computed from the inputs.
+- `scanOddEven.py` → `oddEvenScan.png`: local-extremum scan of every saturation field (eq_BC as positive control,
+  1D and yarn wicking runs with their impesFoam twins).
 - `inlet_eps1e-8/`: the `+ 0.001` → `+ 1e-8` inlet test (patch, log, fields, README).
 - `bench_ddtCorr/` + `benchDdtCorr.py`: is change B needed? (5 × 172 × 3 bench: ddtCorr, inertia, pressure-solver
   tolerance; case, variant patch, logs, figures).

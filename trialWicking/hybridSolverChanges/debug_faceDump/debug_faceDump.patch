@@ -1,0 +1,68 @@
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/hybridPorousInterFoam.C	2026-09-28 13:42:49.646598846 +0200
++++ src/hybridPorousInterFoam.C	2026-10-12 10:03:49.566195242 +0200
+@@ -76,6 +76,7 @@
+     }
+ 
+     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
++    #include "dbgSetup.H"
+     Info<< "\nStarting time loop\n" << endl;
+ 
+     while (pimple.run(runTime))
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/alphaEqn.H	2026-10-01 12:45:52.852987060 +0200
++++ src/alphaEqn.H	2026-10-12 10:03:49.566569473 +0200
+@@ -118,6 +118,9 @@
+     );
+     phiWettingUp = phiWetting;
+     phiNonWettingUp = phiNonWetting;
++    DBGC("alpha_in", alpha1) DBGC("p_in", p) DBGC("pc", pc) DBGC("eps", eps) DBGC("Solid", Solid)
++    DBGS("Solidf", Solidf) DBGS("DarcyFace", DarcyFace) DBGS("phi_old", phi)
++    DBGS("phiWetting", phiWetting) DBGS("phiNonWetting", phiNonWetting) DBGS("phirPore", phirPore)
+ 
+     //surfaceScalarField::Boundary& phicBf =
+     //phic.boundaryFieldRef();
+@@ -324,6 +327,7 @@
+         mixture.correct();
+     }
+ 
++    DBGS("alphaPhi10", alphaPhi10) DBGC("alpha_out", alpha1)
+     if (alphaApplyPrevCorr && MULESCorr)
+     {
+         talphaPhi1Corr0 = alphaPhi10 - talphaPhi1Corr0;
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/pEqn.H	2026-10-01 12:45:52.841463944 +0200
++++ src/pEqn.H	2026-10-12 10:03:49.567092075 +0200
+@@ -40,6 +40,9 @@
+         )*rAUf*mesh.magSf()
+     );
+ 
++    DBGS("rAUf", rAUf) DBGS("fluxHbyA", fvc::flux(HbyA)()) DBGS("phiG", phiG) DBGS("phiPc", phiPc)
++    DBGS("PcCoeff_f", fvc::interpolate(PcCoeff)()) DBGS("snGradAlpha", fvc::snGrad(alpha1)())
++    DBGS("surfTensionForce", mixture.surfaceTensionForce()())
+     phiHbyA += (phiG + phiPc);
+ 
+     // Darcy faces (DarcyFace = 1, see createPorousMediaFields.H): the total
+@@ -64,6 +67,7 @@
+     );
+     phiHbyA = (1. - DarcyFace)*phiHbyA + DarcyFace*phiDarcyExplicit;
+ 
++    DBGS("phiDarcyExplicit", phiDarcyExplicit) DBGS("rAUfD", rAUfD) DBGS("phiHbyA_final", phiHbyA)
+     // Update the pressure BCs to ensure flux consistency
+     constrainPressure(p, U, phiHbyA, rAUfD, MRF);
+ 
+@@ -81,6 +85,7 @@
+         if (pimple.finalNonOrthogonalIter())
+         {
+             phi = phiHbyA - pEqn.flux();
++            DBGS("pEqnFlux", pEqn.flux()()) DBGS("phi_new", phi) DBGC("p_new", p)
+ 
+             p.relax();
+ 
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/UEqn.H	2026-09-28 13:43:47.452422047 +0200
++++ src/UEqn.H	2026-10-12 10:03:49.567396012 +0200
+@@ -15,6 +15,7 @@
+         fvModels.source(rho, U)
+     );
+ 
++    DBGC("Drag", Drag) DBGC("rho", rho)
+     UEqn.relax();
+ 
+     fvConstraints.constrain(UEqn);

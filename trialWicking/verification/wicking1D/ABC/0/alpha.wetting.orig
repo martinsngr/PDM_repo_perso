@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      alpha.wetting;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+
+// uniform dry state; ./run copies this file to 0/alpha.wetting and setFields
+// adds the prewetted ramp at the bottom (system/setFieldsDict)
+internalField   uniform 0.002;
+
+boundaryField
+{
+    // infinite water reservoir (as in the Capillary_Rise tutorial): whatever
+    // enters through the inlet is at alpha 0.99, the same value as the
+    // impesFoam case (../1D_vertical_impes_inletRes)
+    inlet
+    {
+        type            inletOutlet;
+        inletValue      uniform 0.99;
+        value           uniform 0.99;
+    }
+    // zeroGradient, not fixed: a fixed alpha here (even equal to the column
+    // value) lets the capillary flux draw water in through the outlet face;
+    // it piles up in the top cell and crashes the run at ~0.035 s
+    outlet
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

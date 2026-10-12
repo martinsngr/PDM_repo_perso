@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Initial saturation: dry column at 0.002, with the 10 bottom cells (0.2 mm,
+// 20 um each) ramped linearly from the inlet value 0.99 down to 0.002
+// (cell i: 0.99 - 0.988*(i + 0.5)/10). A sharp 0.99 -> 0.002 jump next to
+// the inlet face crashes hybridPorousInterFoam; both 1D cases use the same
+// ramp so that they start from the same state.
+
+defaultFieldValues
+(
+    volScalarFieldValue Sb 0.002
+);
+
+regions
+(
+    boxToCell { box (-1 0.00000 -1) (1 0.00002 1); fieldValues ( volScalarFieldValue Sb 0.9406 ); }
+    boxToCell { box (-1 0.00002 -1) (1 0.00004 1); fieldValues ( volScalarFieldValue Sb 0.8418 ); }
+    boxToCell { box (-1 0.00004 -1) (1 0.00006 1); fieldValues ( volScalarFieldValue Sb 0.7430 ); }
+    boxToCell { box (-1 0.00006 -1) (1 0.00008 1); fieldValues ( volScalarFieldValue Sb 0.6442 ); }
+    boxToCell { box (-1 0.00008 -1) (1 0.00010 1); fieldValues ( volScalarFieldValue Sb 0.5454 ); }
+    boxToCell { box (-1 0.00010 -1) (1 0.00012 1); fieldValues ( volScalarFieldValue Sb 0.4466 ); }
+    boxToCell { box (-1 0.00012 -1) (1 0.00014 1); fieldValues ( volScalarFieldValue Sb 0.3478 ); }
+    boxToCell { box (-1 0.00014 -1) (1 0.00016 1); fieldValues ( volScalarFieldValue Sb 0.2490 ); }
+    boxToCell { box (-1 0.00016 -1) (1 0.00018 1); fieldValues ( volScalarFieldValue Sb 0.1502 ); }
+    boxToCell { box (-1 0.00018 -1) (1 0.00020 1); fieldValues ( volScalarFieldValue Sb 0.0514 ); }
+);
+
+// ************************************************************************* //

@@ -16,15 +16,24 @@ What it does
        - only 'cut' cells (corners disagree) are sub-sampled with SUB^3 points
      (limit: a yarn feature thinner than one cell can slip between corners. With 0.3 mm
       yarns and 10-30 um cells this does not happen, but keep it in mind.)
-  3. builds the fields
-       eps = 1 - f_total * VF_YARN                         (volume-conserving porosity)
-       K   = yarn tensor  if f_total >= K_THRESHOLD, else K_VOID * I
-             yarn tensor  K = Kperp*I + (Kpar - Kperp) t t   (t = unit yarn direction)
-             Kpar, Kperp from Gebart (1992) with VF_YARN and R_FIBRE
+  3. builds the fields (CUT_CELLS sets how the cut cells are treated)
+       "fractional": eps = 1 - f_total * VF_YARN               (volume-conserving porosity)
+       "binary":     eps = 1 - VF_YARN if f_total >= K_THRESHOLD, else 1   (sharp yarn surface)
+       K   = yarn permeability in every porous cell (eps <= EPS_FREE), K_VOID elsewhere.
+             hybridPorousInterFoam treats a cell as porous when eps <= 0.99 (createPorousMediaFields.H),
+             so K follows the same rule: no porous cell with K_VOID, no free cell with the yarn K.
+       K_MODE "tensor": K = Kperp*I + (Kpar - Kperp) t t   (t = unit yarn direction)
+                        Kpar, Kperp from Gebart (1992) with VF_YARN and R_FIBRE
+       K_MODE "scalar": K = K_SCALAR (volScalarField, as hybridPorousInterFoam reads it)
   4. writes 0/eps, 0/K (optionally 0/Kinv) and the check fields 0/fYarn, 0/yarnID
+
+Usage:  python3 build_fields.py [caseDir] [--k-mode scalar|tensor] [--k-scalar 1e-11]
+                                [--cut-cells binary|fractional]
+        Defaults: the CONFIGURATION block. STL_FILE and DOMAIN_FILE are relative to this script's folder.
 
 Requires: pip install numpy trimesh rtree      (optional, much faster: pip install embreex)
 """
+import argparse
 import json
 import math
 import os
@@ -46,7 +55,11 @@ VF_YARN     = 0.50          # fibre volume fraction inside the yarns [-]   <-- E
 R_FIBRE     = 7.5e-6        # fibre radius [m]                            <-- MEASURE
 PACKING     = "hex"         # Gebart packing: "hex" or "quad"
 K_VOID      = 1.0           # permeability of the free space [m2] (as in Boubaker et al. 2026)
-K_THRESHOLD = 0.5           # cell gets the yarn permeability if f_total >= this
+K_THRESHOLD = 0.5           # "binary": a cell is yarn if f_total >= this
+EPS_FREE    = 0.99          # free-fluid threshold of hybridPorousInterFoam (porous: eps <= EPS_FREE)
+CUT_CELLS   = "fractional"  # "fractional" or "binary" (see step 3 above)
+K_MODE      = "tensor"      # "tensor" (Gebart, oriented) or "scalar" (K_SCALAR in every yarn cell)
+K_SCALAR    = 1e-11         # [m2], only used with K_MODE = "scalar"
 
 ORIENTATION  = "axis"       # "axis":   each yarn gets its main in-plane axis (x or y), no crimp
                             # "texgen": local tangent from the TexGen model (follows crimp)
@@ -217,13 +230,28 @@ def write_field(case, name, values, dims):
 
 
 # ------------------------------------------------------------------ main
+def parse_args():
+    global CASE_DIR, K_MODE, K_SCALAR, CUT_CELLS
+    ap = argparse.ArgumentParser(description="uniform hex mesh + eps/K fields from the TexGen STL")
+    ap.add_argument("case", nargs="?", default=CASE_DIR, help="OpenFOAM case directory")
+    ap.add_argument("--k-mode", choices=("tensor", "scalar"), default=K_MODE)
+    ap.add_argument("--k-scalar", type=float, default=K_SCALAR, help="yarn K [m2] for --k-mode scalar")
+    ap.add_argument("--cut-cells", choices=("fractional", "binary"), default=CUT_CELLS)
+    a = ap.parse_args()
+    CASE_DIR, K_MODE, K_SCALAR, CUT_CELLS = a.case, a.k_mode, a.k_scalar, a.cut_cells
+
+
 def main():
+    parse_args()
     t_start = time.perf_counter()
-    bodies = load_yarns(os.path.join(CASE_DIR, STL_FILE), STL_SCALE)
+    here = os.path.dirname(os.path.abspath(__file__))
+    bodies = load_yarns(os.path.join(here, STL_FILE), STL_SCALE)
     print(f"{len(bodies)} yarn bodies loaded")
+    print(f"Case: {CASE_DIR}   cut cells: {CUT_CELLS}   K: {K_MODE}"
+          + (f" {K_SCALAR:g} m2" if K_MODE == "scalar" else ""))
 
     # domain and grid
-    domain_file = os.path.join(CASE_DIR, DOMAIN_FILE) if DOMAIN_FILE else None
+    domain_file = os.path.join(here, DOMAIN_FILE) if DOMAIN_FILE else None
     if domain_file and os.path.isfile(domain_file):
         with open(domain_file) as fh:
             rev = json.load(fh)
@@ -271,8 +299,11 @@ def main():
     # flatten to OpenFOAM cell order (x fastest, then y, then z) == Fortran order
     F = f_total.ravel(order="F")
     OWN = owner.ravel(order="F")
-    eps = 1.0 - F * VF_YARN
-    is_yarn = F >= K_THRESHOLD
+    if CUT_CELLS == "binary":
+        eps = np.where(F >= K_THRESHOLD, 1.0 - VF_YARN, 1.0)
+    else:
+        eps = 1.0 - F * VF_YARN
+    is_yarn = eps <= EPS_FREE                   # porous for the solver -> gets the yarn K
 
     # orientation of each yarn cell
     tang = np.zeros((ncells, 3))
@@ -296,9 +327,11 @@ def main():
 
     # write
     write_field(CASE_DIR, FIELD_EPS, eps, "[0 0 0 0 0 0 0]")
-    if FIELD_K:
+    if FIELD_K and K_MODE == "scalar":
+        write_field(CASE_DIR, FIELD_K, np.where(is_yarn, K_SCALAR, K_VOID), "[0 2 0 0 0 0 0]")
+    elif FIELD_K:
         write_field(CASE_DIR, FIELD_K, K, "[0 2 0 0 0 0 0]")
-    if FIELD_KINV:
+    if FIELD_KINV and K_MODE == "tensor":
         Kinv = np.broadcast_to(I / K_VOID, (ncells, 3, 3)).copy()
         Kinv[idx] = I / k_perp + (1 / k_par - 1 / k_perp) * tt[idx]
         write_field(CASE_DIR, FIELD_KINV, Kinv, "[0 -2 0 0 0 0 0]")
@@ -314,7 +347,10 @@ def main():
           f"Kpar = {k_par:.3e} m2, Kperp = {k_perp:.3e} m2, ratio {k_par / k_perp:.2f}")
     print(f"Cut cells: {n_cut:,} ({n_cut / ncells * 100:.1f} % of mesh; overlapping yarns counted twice)")
     print(f"Yarn volume, fractional (sum f*V):   {F.sum() * v_cell * 1e9:.4f} mm3")
-    print(f"Yarn volume, thresholded (f>={K_THRESHOLD}): {is_yarn.sum() * v_cell * 1e9:.4f} mm3")
+    print(f"Porous cells (eps <= {EPS_FREE}): {is_yarn.sum():,}, volume {is_yarn.sum() * v_cell * 1e9:.4f} mm3; "
+          f"free cells: {(~is_yarn).sum():,}")
+    print(f"Solid volume sum((1-eps)*V): {(1 - eps).sum() * v_cell * 1e9:.4f} mm3 "
+          f"(fractional value: {F.sum() * VF_YARN * v_cell * 1e9:.4f} mm3)")
     print(f"Yarn volume, STL bodies (whole bodies, incl. parts outside REV): {v_body * 1e9:.4f} mm3")
     print(f"Yarn fraction of REV: {F.mean():.3f}    mean porosity of REV: {eps.mean():.3f}")
     print(f"Cells where yarns overlap: {overlap:,}")

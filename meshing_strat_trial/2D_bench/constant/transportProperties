@@ -1,0 +1,83 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Same fluids and porous-medium models as the wicking cases in ../trialWicking
+// (singleYarn_vertical_hybrid): water / air, Brooks-Corey kr n = 3, Van
+// Genuchten pc0 5000 Pa, m 0.5. Yarn K 1e-11 m2, eps 0.5 come from 0/K, 0/eps
+// (setup values, not calibrated). Identical in 2D_bench and REV_hybrid.
+
+phases (wetting nonWetting);
+
+// water: mu 1e-3 Pa.s
+wetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 1e-6;
+    rho             [1 -3 0 0 0 0 0] 1000;
+}
+
+// air: mu 1.76e-5 Pa.s
+nonWetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 1.76e-5;
+    rho             [1 -3 0 0 0 0 0] 1;
+}
+
+// surface tension of the free-fluid interface (gaps, eps > 0.99)
+sigma            [1 0 -2 0 0 0 0]  0.072;
+
+// Contact angle of the free interface on the yarn surfaces
+// (porousInterfaceProperties.C). Solver default: model off
+// (activatePorousContactAngle 0), theta0 90 deg when on. Kept at the default
+// for the setup runs; the real value comes later.
+activatePorousContactAngle 0;
+theta0                     90;
+
+activateCapillarity     1;
+
+// Darcy total flux in porous faces with K/dx^2 below this value (solver
+// changes B, ../trialWicking/hybridSolverChanges). Yarn faces here:
+// 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free and porous/free faces are not
+// (K_VOID = 1 m2, or Solidf = 0).
+darcyFaceMaxDa  0.1;
+
+// p BC of the porous faces of the open patches (../tools/pOpenAir):
+// 1 = air at 0 Pa (p = -alpha*pc, as the 1D / single-yarn cases),
+// 0 = mixture at 0 Pa (p = 0, as the solver at interior porous/free faces)
+openPorousAirZero 1;
+
+alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;
+alpha.wettingmax           alpha.wettingmax [0  0  0 0 0 0 0] 0.999;
+
+relativePermeabilityModel  BrooksAndCorey;
+capillarityModel           VanGenuchten;
+
+BrooksAndCoreyCoeffs
+{
+    n 3;
+}
+
+VanGenuchtenCoeffs
+{
+    alpha.wettingminpc alpha.wettingminpc [0 0 0 0 0 0 0] 0;
+    alpha.wettingmaxpc alpha.wettingmaxpc [0 0 0 0 0 0 0] 0.999;
+    pc0 pc0 [1 -1 -2 0 0 0 0] 5000;
+    m 0.5;
+}
+
+// ************************************************************************* //

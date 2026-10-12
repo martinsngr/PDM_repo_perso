@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  9                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// p is the saturation-weighted mixture pressure
+//     p = alpha*p_wetting + (1 - alpha)*p_nonWetting = p_nonWetting - alpha*pc(alpha)
+// (see updateDarcyVelocities.H / PcCoeff in the solver). The air pressure is
+// 0 at both ends, as in impesFoam, so both patches compute
+//     p = -alpha_face*pc(alpha_face)
+// every time step (codedFixedValue), with the Van Genuchten pc of
+// constant/transportProperties and the solver's Se clipping [1e-4, 1-1e-4].
+// The pc parameters are read from transportProperties, so nothing needs
+// recomputing if they change. At the inlet alpha is 0.99 (p = -669 Pa); at
+// the outlet alpha is zeroGradient, so p follows the top cell: -4995 Pa while
+// it is dry (alpha 0.002), -3908 Pa at 0.055 s. A fixed -4995 Pa would put
+// the air at the top ~1.2 kPa below 0 once the front arrives (~0.035 s).
+// The code is compiled into dynamicCode/ on the first run.
+
+// trial with the exact same BC as impes to see the difference in the pressure treatment.
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 0.0;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+       
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+        
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

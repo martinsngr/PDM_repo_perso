@@ -5,8 +5,10 @@ Working log of the changes made to `hybridPorousInterFoam` (repo Franjcf/hybridP
 
 **Status: committed on `of9-port` (2026-10-01), pushed to `martinsngr/hybridporousinterfoamperso`.** Commits `b0c0f67` (A), `cf95c59` (B), `b93e429` (C),
 `c0c1b4e` (B fix), `b995db5` (C fix); the state before them is tagged `of9-port-before-porous-fixes` (= `be54696`).
-The installed `hybridPorousInterFoam` is built from `b995db5`; the previous binary is kept as
-`$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. A and C are always active; B only with `darcyFaceMaxDa`. The diagnosis behind it is in `../NOTES.md` (Findings → hybridPorousInterFoam in 3D).
+**2026-10-12: change E (binary `Solidf`, bug fix, see below) committed on `of9-port` as `c3a2e6e` (+ docs commit `d1c688a`, `CHANGES_of9-port.md`), pushed 2026-10-12; the installed
+`hybridPorousInterFoam` is built from it, the A–C binary is kept as `$FOAM_USER_APPBIN/hybridPorousInterFoam_b995db5`.**
+The port-only binary is kept as `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. The complete list of changes on
+the branch (port, A, B, C, fixes, E, open issues, build/revert) is in the solver repo: `CHANGES_of9-port.md`. A and C are always active; B only with `darcyFaceMaxDa`. The diagnosis behind it is in `../NOTES.md` (Findings → hybridPorousInterFoam in 3D).
 
 ## Why
 
@@ -22,9 +24,11 @@ driver, so its discretisation is the whole flow.
 
 ## Changes (patches in `patches/`, one per commit)
 
-All changes only act on faces between two porous cells (`Solidf = 1`). `Solidf` is binary in this solver: a face
+All changes only act on faces between two porous cells (`Solidf = 1`). `Solidf` is meant to be binary: a face
 between a porous and a free cell has `Solidf = 0` and is computed as before, so free-fluid regions and the
-porous/free interface (Darcy–Brinkman–Stokes coupling) are unchanged.
+porous/free interface (Darcy–Brinkman–Stokes coupling) are unchanged. **Correction (2026-10-12): before change E
+this held only at start-up; from the first time step `Solidf` was 0.5 on porous/free faces (upstream bug, see E).
+A–C were tested on cases without free cells, where this makes no difference.**
 
 ### A. Relative flux from two-point face fluxes — `alphaEqn.H`
 - **Before:** `phirPore = interpolate(Ur) & Sf`, with `Ur` from the cell-centred phase velocities `Uwetting`,
@@ -62,6 +66,24 @@ porous/free interface (Darcy–Brinkman–Stokes coupling) are unchanged.
 - **Fix (5th patch):** the momentum drag of a porous cell is the average of 1/Mf over its faces, so the upwinded
   kr also changed the momentum equation of porous cells next to free fluid. `Dragf` now uses the linearly
   interpolated mobility, as before C; upwinding only enters the Darcy fluxes.
+
+### E. Binary `Solidf` at every step (bug fix, 2026-10-12) — `binarySolidf.H` (new), `createPorousMediaFields.H`, `updateDarcyVelocities.H`
+- **Bug (upstream, commit `98e48b9` "added dynamic mesh capability"):** `updateDarcyVelocities.H`, called at the
+  start of every α equation, recomputes `Solidf = fvc::interpolate(Solid)` without the clipping that
+  `createPorousMediaFields.H` applies at start-up, so porous/free faces get `Solidf = 0.5` from step 1. The start-up
+  clipping also skipped boundary faces (coupled patches are averaged too: processor, cyclic).
+- **Consequence:** the porous phase fluxes became half-active on porous/free faces, with K interpolated between the
+  porous cell and the free cell (0.5 m² with K_VOID = 1) and the Van Genuchten pc of the free cell (MPa when dry).
+  Wet porous cells next to free cells emptied into them in one step (relative flux 1.6e4 vs 1e-26 on porous faces).
+- **Fix:** `binarySolidf.H` clips Solidf to 0/1 on internal and boundary faces, included after both
+  `interpolate(Solid)` calls.
+- **Diagnosis and tests:** `../../meshing_strat_trial/NOTES.md` (Step-1 flux diagnosis, Fix 1) and
+  `debug_faceDump/` (face-flux dump tooling and log). Bit-identical to `b995db5` without free cells (1D 0.1 s, all-porous
+  bench); with free cells the first-step failure is gone; the parallel bench with the processor boundary on the
+  porous/free faces fails with internal-face clipping only and matches the serial run with E.
+- **Not tested:** upstream cases with porous/free faces, e.g. the tutorial `porous_Boundary` (porous walls next to
+  free fluid, already different with A and C, see Tests): E is expected to change them; rerun before relying on them.
+- Patch: `patches/0006-E-keep-Solidf-binary-at-every-step-and-on-coupled-bo.patch` (paths relative to `OpenFoamV8/solvers`, as 0001–0005).
 
 ## Tests (scratchpad bench: the 1D hybrid case widened to NX cells, symmetry sides, empty front/back)
 
@@ -129,7 +151,9 @@ ungated prototype; the 4 patches apply cleanly on `of9-port` `be54696` (`git am 
 ## Open items
 - Porous_Boundary tutorial difference (see Tests): understand before the fabric/gap work.
 - Inlet difference (D): only partly explained.
-- **Porous/free interface with a wet porous side fails in the original solver too (2026-10-01).** 2D test:
+- **Porous/free interface with a wet porous side fails in the original solver too (2026-10-01).** **Update
+  2026-10-12: the first-step failure was the unbinary `Solidf` (fixed by E); a second, slower failure remains, see
+  `../../meshing_strat_trial/NOTES.md`.** 2D test:
   porous strip (ε 0.5, K 1e-11) | band of split cells (ε 0.75, K 5e-11, Da 0.125) | free air gap (ε 1), 20 µm
   cells, water entering the porous part from below with the usual 0.2 mm ramp. The original solver, A+C and A+B+C
   all diverge within ~11 steps (1.2e-9 s); it starts in the split cells next to the gap, at the wet end of the
