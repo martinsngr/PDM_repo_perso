@@ -25,10 +25,14 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|outlet|top|bottom)"
+    "(inlet|outlet)"
     {
         type            pressureInletOutletVelocity;
         value           uniform (0 0 0);
+    }
+    "(top|bottom)"      // closed walls behind the yarn walls
+    {
+        type noSlip;
     }
 }
 

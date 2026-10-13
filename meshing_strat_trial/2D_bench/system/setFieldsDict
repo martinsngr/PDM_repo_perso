@@ -14,9 +14,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Porous slab (yarn) z 0.06-0.22 mm: eps 0.5, K 1e-11 (as REV_hybrid built
-// with build_fields.py --cut-cells binary --k-mode scalar). Free fluid:
-// eps 1, K 1 (K_VOID). alpha.wetting is written by ../tools/initFields.py.
+// Porous yarn walls z < 0.16 mm and z > 0.32 mm: eps 0.5, K 1e-11 (as
+// REV_hybrid built with build_fields.py --cut-cells binary --k-mode scalar).
+// The walls stop 3 cells (60 um) before the open outlet: porous faces on an
+// open patch are unstable (../NOTES.md, open porous boundary). Free fluid
+// (gap and outlet end): eps 1, K 1 (K_VOID). alpha.wetting is written by
+// ../tools/initFields.py (./Allpre).
 
 defaultFieldValues
 (
@@ -26,14 +29,15 @@ defaultFieldValues
 
 regions
 (
-    boxToCell
+    boxToCell       // lower wall
     {
-        box (-1 -1 0.00006) (1 1 0.00022);
-        fieldValues
-        (
-            volScalarFieldValue eps 0.5
-            volScalarFieldValue K 1e-11
-        );
+        box (-1 -1 -1) (0.00194 1 0.00016);
+        fieldValues ( volScalarFieldValue eps 0.5 volScalarFieldValue K 1e-11 );
+    }
+    boxToCell       // upper wall
+    {
+        box (-1 -1 0.00032) (0.00194 1 1);
+        fieldValues ( volScalarFieldValue eps 0.5 volScalarFieldValue K 1e-11 );
     }
 );
 

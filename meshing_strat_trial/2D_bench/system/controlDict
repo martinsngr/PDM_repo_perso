@@ -19,18 +19,18 @@ application     hybridPorousInterFoam;
 startFrom       latestTime;
 startTime       0;
 stopAt          endTime;
-// 1D estimate (K 1e-11, pc0 5000): front x_f = 18 mm/sqrt(s)*sqrt(t), i.e. at
-// the outlet (1 mm) after ~3 ms
-endTime         5e-3;
+// 2 ms (validated length): gap meniscus ~0.8 mm, wall front ~1.15 mm; the walls
+// end at 1.94 mm (wall front there after roughly 5-6 ms)
+endTime         0.002;
 deltaT          1e-8;
 writeControl    adjustableRunTime;
-writeInterval   2.5e-4;
+writeInterval   5e-05;
 purgeWrite      0;
 writeFormat     ascii;
 writePrecision  6;
 writeCompression off;
 timeFormat      general;
-timePrecision   6;
+timePrecision   12;
 runTimeModifiable yes;
 
 // Time step: solver limits on the total flux (free cells), then the

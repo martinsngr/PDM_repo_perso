@@ -1,0 +1,25 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# Mesh and initial fields of the 2D bench (porous slab between two free
+# layers, see system/blockMeshDict). Overwrites the mesh and the fields;
+# then ./run. Python: $PY, else the repo .venv, else python3 (numpy only).
+
+PY=${PY:-../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+
+./clean
+# 0.orig holds the source fields; 0 is generated (eps, K by setFields, alpha.wetting by initFields.py)
+rm -rf constant/polyMesh 0
+cp -r 0.orig 0
+rm -f log.blockMesh log.checkMesh log.setFields log.postProcess.writeCellCentres log.initFields
+
+runApplication blockMesh
+runApplication checkMesh
+# eps and K: reset to the defaults, then the slab
+runApplication setFields
+runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
+"$PY" ../tools/initFields.py > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+cat log.initFields
+rm -f 0/C 0/Cx 0/Cy 0/Cz

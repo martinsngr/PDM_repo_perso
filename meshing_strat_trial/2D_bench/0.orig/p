@@ -27,9 +27,14 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|outlet|top|bottom)"
+    "(inlet|outlet)"
     {
         #include "../../tools/pOpenAir"
+    }
+    "(top|bottom)"      // closed walls behind the yarn walls
+    {
+        type fixedFluxPressure;
+        value uniform 0;
     }
 }
 

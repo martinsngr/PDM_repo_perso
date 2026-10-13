@@ -25,9 +25,13 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|outlet|top|bottom)"
+    "(inlet|outlet)"
     {
         type            zeroGradient;
+    }
+    "(top|bottom)"      // closed walls behind the yarn walls
+    {
+        type zeroGradient;
     }
 }
 

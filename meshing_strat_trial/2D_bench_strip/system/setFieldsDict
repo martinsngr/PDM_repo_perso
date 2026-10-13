@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Porous slab (yarn) z 0.06-0.22 mm: eps 0.5, K 1e-11 (as REV_hybrid built
+// with build_fields.py --cut-cells binary --k-mode scalar). Free fluid:
+// eps 1, K 1 (K_VOID). alpha.wetting is written by ../tools/initFields.py.
+
+defaultFieldValues
+(
+    volScalarFieldValue eps 1
+    volScalarFieldValue K 1
+);
+
+regions
+(
+    boxToCell
+    {
+        box (-1 -1 0.00006) (1 1 0.00022);
+        fieldValues
+        (
+            volScalarFieldValue eps 0.5
+            volScalarFieldValue K 1e-11
+        );
+    }
+);
+
+// ************************************************************************* //

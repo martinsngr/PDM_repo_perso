@@ -9,14 +9,10 @@ Last updated 2026-10-13 (session 2: thick-wall slit bench, scratch changes H, F�
 
 | Path | What it is |
 |---|---|
-| `Textiles/PW-22-15-0.4-0.5.stl` | TexGen plain-weave model (cm), copy in `constant/triSurface/` (identical, md5 checked) |
-| `inspect_stl.py` | STL checks + REV detection → `rev_domain.json` (`--zgap` adds free space above/below) |
-| `build_fields.py` | Uniform hex mesh (`blockMeshDict`) + `eps`, `K`, `fYarn`, `yarnID` from the STL |
-| `check_periodicity.py` | Compares opposite REV faces (is `cyclic` valid?) |
-| `system/`, `constant/`, `0/` (top level) | Original meshing trial: mesh + tensor-K fields, `fractional` cut cells. Not a solver case (placeholder `system/`). Kept as is. |
+| `REV/` | **The REV, in one folder** (merged 2026-10-13 from `REV_hybrid/` and the meshing files that were at the top level): geometry `Textiles/PW-22-15-0.4-0.5.stl` + `features.csv` (TexGen script `funge.py`; copy in `constant/triSurface/`), `inspect_stl.py` (STL checks, REV box → `rev_domain.json`, `--zgap` adds free space), `build_fields.py` (uniform hex mesh `system/blockMeshDict` + `eps`, `K`, `fYarn`, `yarnID`; STL and `rev_domain.json` found next to the script), `check_periodicity.py`, ParaView state `meshing.pvsm`; solver dictionaries `system/`, `constant/`, `0.orig/`; `./Allpre` = geometry → mesh → fields → initial α. Solver run scripts not written yet. The original meshing trial outputs (tensor K, fractional cut cells, top-level `0/`, `system/`) were removed: regenerate with `build_fields.py <dir> --k-mode tensor --cut-cells fractional` (also in git history before 2026-10-13). |
 | `tools/` | Shared by both cases: `runTools.sh`, `initFields.py`, coded BC `pOpenAir`, function objects `coatsTimeStep`, `liquidBalance` |
-| `2D_bench/` | Small 2D test: porous slab between two free layers, wetted from its end |
-| `REV_hybrid/` | The REV case (**in progress, not runnable yet**) |
+| `2D_bench/` | **The 2D bench (since 2026-10-13): thick-wall slit**, yarn wall 8 cells \| gap 8 \| yarn wall 8, H + F′ + I on; `check.py` = expected-behaviour checks |
+| `2D_bench_strip/` | The first 2D bench (2026-10-12, was `2D_bench/`): porous strip between two open free layers, with `variants/` (debugging runs, referees R1–R3) and their results; template of `slit_test/makeSlit.py` |
 | `slit_test/` | Slit capillary-rise tests (gap capillarity): `makeSlit.py` (defaults = validated setup; `--nw/--dx/--add` for the thick-wall bench), `slitReport.py`, `benchSlit.py` (thick-wall bench), `figures/`; `old_runs/` = superseded runs (see "Slit tests") |
 | `.gitignore` | generated files of the cases (`0/`, variant runs, `liquidBalance.csv`); logs, polyMesh, time folders are in the repo-root `.gitignore` |
 
@@ -98,7 +94,28 @@ Inlet/outlet faces are 25 % free.
   and REV: −1 and 1e-14). Avoids the 50,000-step / 50 MB logs of a collapsed dt.
 - `liquidBalance`: same 4 columns as trialWicking + `porousLiquid_mL`, `freeLiquid_mL`, `meanSaturationPorous`.
 
-### `2D_bench/`
+### `2D_bench/` (thick-wall slit bench, 2026-10-13)
+- Same case as `slit_test/makeSlit.py --walls porous --nw 8 --w 8 --K 1e-11 --theta 60` with the H/F′/I keywords
+  (decided with the user: the bench should match the slit build), as a standalone case: 2.0 × 0.48 mm, 100 × 1 × 24
+  cells (20 µm); yarn walls z < 0.16 and > 0.32 mm (eps 0.5, K 1e-11, ending 3 cells before the outlet), gap 8 cells;
+  `inlet` reservoir (total pressure for free faces, `openFreeTotalPressure 1`), `outlet` open, `top`/`bottom` closed
+  walls behind the yarn walls; contact angle on, 60°; `porousFreeDarcyFaces`, `porousContactAngleWallLike`,
+  `porousFreeFluxForce`, `porousFreeNoSlip` on. Initial state: walls dry with the 0.2 mm ramp, gap air with a 0.1 mm
+  water column (`initFields.py --closed-patch top --closed-patch bottom --free-fill 1e-4`, new options). 2 ms.
+- `./Allpre` → `./run` (serial, ~3 min) → `../../.venv/bin/python check.py` (writes `check_summary.md`,
+  `check.png`; exit 1 if a check fails).
+- **First run (2026-10-13, installed `b525086`) — measured:** fields at 2 ms bit-identical to the slit run
+  `slit_test/V_w8_t60_K1e-11` (same mesh, ε, K, initial α); all 10 checks pass: 2 ms reached, budget 5e-15, max |U|
+  1.2 m/s, no stray water; gap meniscus 0.43 / 0.79 mm at 1 / 2 ms (impermeable walls, Bosanquet: 0.63 / 1.16); wall
+  front 0.75 / 1.15 mm (walls alone, 1D similarity: 0.60 / 0.83), uniform across the wall within 1 cell; wall water
+  41 → 369 cell volumes. **The walls lead the gap** (wall front 0.36 mm ahead of the meniscus at 2 ms): the walls
+  draw water out of the gap (meniscus 32 % below the impermeable rise) and are fed sideways along the wetted gap.
+  The meniscus first drops (0.11 → 0.09 mm, the column feeds the walls), then rises about linearly in t.
+
+### `2D_bench_strip/` (first bench, 2026-10-12; was `2D_bench/`, renamed 2026-10-13)
+- Kept with its variants and results; paths in the sections below that say `2D_bench/variants/` now are
+  `2D_bench_strip/variants/`. `slit_test/makeSlit.py` uses its `system/`, `constant/`, `0.orig/` as template
+  (unchanged, so slit results stay reproducible).
 - 1.0 × 0.3 mm (x–z), 50 × 1 × 15 cells (20 µm, as the REV); `frontAndBack` empty. Porous slab z 0.06–0.22 mm
   (8 cells, eps 0.5, K 1e-11, `setFieldsDict`), free layers below (3 cells) and above (4 cells).
   Patches and BCs as the REV: `inlet`, `outlet`, `bottom`, `top` open. 750 cells (400 porous, 350 free); 742
@@ -118,12 +135,14 @@ Inlet/outlet faces are 25 % free.
     (dt per step) and `<mode>_summary.md` (table).
   - `variants/tools` is a symlink to `../../tools`, so the `#include "../../tools/..."` still work one level deeper.
 
-### `REV_hybrid/` (incomplete)
-Present: `system/{controlDict, fvSchemes, fvSolution}`, `constant/{transportProperties, g,
-momentumTransport, dynamicMeshDict}`, `0.orig/{p, U, Uwetting, UnonWetting}` (same as the bench; cyclic patches via
-`setConstraintTypes`). Missing: `Allpre` (build_fields `--k-mode scalar --cut-cells binary` → blockMesh →
-checkMesh → cell centres → initFields), `run` (decompose, serial precompile of coded BC/FOs, mpirun),
-`clean`, `caseSetup` (N), `decomposeParDict`, `job.slurm`, endTime.
+### `REV/` (was `REV_hybrid/`; merged with the meshing files 2026-10-13; solver run not set up yet)
+Present: `system/{controlDict, fvSchemes, fvSolution}`, `constant/{transportProperties, g, momentumTransport,
+dynamicMeshDict, triSurface/}`, `0.orig/{p, U, Uwetting, UnonWetting}` (cyclic sideA/sideB via `setConstraintTypes`),
+the geometry and meshing scripts, `Allpre` and `clean`. **`./Allpre` (tested 2026-10-13, 20 s):** `build_fields.py .
+--k-mode scalar --k-scalar 1e-11 --cut-cells binary` → blockMesh → checkMesh (169,442 cells, Mesh OK) → cell centres →
+`initFields.py` (78,528 porous, 90,914 free; inlet 1,862 faces, 1,262 porous; 9,325 ramp cells). Missing: `run`
+(decompose, serial precompile of coded BC/FOs, mpirun), `caseSetup` (N), `decomposeParDict`, `job.slurm`, endTime;
+setup decisions listed at the top of `Allpre` (top/bottom, gap water column, H/F′/I keywords, contact angle).
 
 ## Findings
 
@@ -742,8 +761,8 @@ through its tutorial files.
 real walls within 2 % (K 1e-20), yarn-like walls (K 1e-11) stable, ~1 m/s, no droplets, water budget ~1e-26, mesh
 error ~4 % at 20 µm. **Committed and installed (`b525086`, opt-in keywords); solver repo not pushed yet (push from VS
 Code); mini01: pull, `wmake libso` in `libraries/porousInterfaceProperties`, `wmake` in the solver.**
-1. Bench and REV dictionaries: add the three keywords where gaps meet yarns (`2D_bench` and `REV_hybrid`
-   transportProperties not changed yet; REV also needs `activatePorousContactAngle 1` and θ).
+1. ~~Bench dictionaries~~ done: `2D_bench/` is the thick-wall slit bench with the keywords (all checks pass).
+   REV: add the keywords, `activatePorousContactAngle 1`, θ, `openFreeTotalPressure 1`, gap water column at the inlet.
 2. Air next to wet porous walls with the unbounded I (10–60 m/s): understand (I is bounded for now).
 3. Bench extensions: gaps interrupted by porous "crossings" (wall-first, then gap: needs an empty gap to start filling
    from a wet wall, and probably a saturation-dependent contact angle); θ 75 (dry polyester); 5 ms runs.
@@ -769,7 +788,7 @@ figures, this file, `.gitignore` entries; solver patches 0007/0008 in `../trialW
    e. REV: total-pressure inlet; porous faces on the outlet closed or yarns ending before it.
 2. Open G items (`F/G open questions` checklist): small 3D bench (edges/corners, staircase), 10 µm mesh, contact-angle
    model + G, gap air jets near a free inlet next to open boundaries (numerical, unexplained).
-3. REV: top/bottom closed walls or air padding (open porous boundary unstable), complete `REV_hybrid` (scripts,
+3. REV: top/bottom closed walls or air padding (open porous boundary unstable), complete `REV/` (was `REV_hybrid`; scripts,
    `job.slurm`, `build_fields.py --k-mode scalar --cut-cells binary`, initFields with pure-air gaps), local smoke
    test, then mini01.
 4. Later: tensor K (solver change), real K/pc/contact angle (polyester).

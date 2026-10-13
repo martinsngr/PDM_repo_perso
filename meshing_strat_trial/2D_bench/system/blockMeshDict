@@ -14,50 +14,47 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// 2D bench (x-z plane, one cell in y): 1.0 x 0.3 mm, 20 um cells as the REV.
-// Wicking along x (gravity -x, constant/g), reservoir on inlet (x = 0).
-// Porous slab z 0.06-0.22 mm (system/setFieldsDict) between two free layers
-// (3 and 4 cells), i.e. a yarn wetted from its end with porous/free faces
-// along its whole length, as the yarns of the REV next to the gaps.
-// Patch names and BCs as REV_hybrid: inlet, outlet, bottom, top open.
+// 2D bench (x-z plane, one cell in y), thick-wall slit: porous yarn wall |
+// free gap | porous yarn wall, 2.0 x 0.48 mm, 20 um cells as the REV
+// (100 x 24 cells). Across z: wall 8 cells (0-0.16 mm) | gap 8 cells
+// (0.16-0.32 mm) | wall 8 cells (0.32-0.48 mm); walls of 8 cells = half a REV
+// yarn width (../NOTES.md, REV yarn dimensions), closed behind (top, bottom).
+// Wicking along x (gravity -x, constant/g): reservoir on inlet (x = 0), open
+// to air on outlet (x = 2 mm). Walls set by system/setFieldsDict.
+// Identical to slit_test/makeSlit.py --walls porous --nw 8 --w 8 (same
+// coordinates, so results can be compared bit for bit).
 
-convertToMeters 1e-3;
+convertToMeters 1;
 
 vertices
 (
-    (0   0    0  )
-    (1.0 0    0  )
-    (1.0 0.02 0  )
-    (0   0.02 0  )
-    (0   0    0.3)
-    (1.0 0    0.3)
-    (1.0 0.02 0.3)
-    (0   0.02 0.3)
+    (0 0 0) (0.002 0 0) (0.002 2e-05 0) (0 2e-05 0)
+    (0 0 0.00048) (0.002 0 0.00048) (0.002 2e-05 0.00048) (0 2e-05 0.00048)
 );
 
 blocks
 (
-    hex (0 1 2 3 4 5 6 7) (50 1 15) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) (100 1 24) simpleGrading (1 1 1)
 );
 
 boundary
 (
-    inlet
+    inlet           // reservoir
     {
         type patch;
         faces ((0 4 7 3));
     }
-    outlet
+    outlet          // open to air
     {
         type patch;
         faces ((2 6 5 1));
     }
-    bottom
+    bottom          // closed wall behind the lower yarn wall
     {
         type patch;
         faces ((0 3 2 1));
     }
-    top
+    top             // closed wall behind the upper yarn wall
     {
         type patch;
         faces ((4 5 6 7));

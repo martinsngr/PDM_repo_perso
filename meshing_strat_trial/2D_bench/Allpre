@@ -2,9 +2,14 @@
 cd "${0%/*}" || exit 1
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 
-# Mesh and initial fields of the 2D bench (porous slab between two free
-# layers, see system/blockMeshDict). Overwrites the mesh and the fields;
-# then ./run. Python: $PY, else the repo .venv, else python3 (numpy only).
+# Mesh and initial fields of the 2D bench (thick-wall slit: porous yarn wall |
+# free gap | porous yarn wall, see system/blockMeshDict). Overwrites the mesh
+# and the fields; then ./run. Python: $PY, else the repo .venv, else python3
+# (numpy only).
+# Initial state (../tools/initFields.py): yarn walls dry (0.002) with the 0.2 mm
+# wetted ramp at the inlet (0.99 -> dry), gap pure air except a 0.1 mm water
+# column at the inlet (the meniscus must start inside the domain, ../NOTES.md
+# "Slit tests"), top/bottom closed (alpha zeroGradient).
 
 PY=${PY:-../../.venv/bin/python}
 [ -x "$PY" ] || PY=python3
@@ -20,6 +25,6 @@ runApplication checkMesh
 # eps and K: reset to the defaults, then the slab
 runApplication setFields
 runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
-"$PY" ../tools/initFields.py > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+"$PY" ../tools/initFields.py --closed-patch top --closed-patch bottom --free-fill 1e-4 > log.initFields 2>&1 || { cat log.initFields; exit 1; }
 cat log.initFields
 rm -f 0/C 0/Cx 0/Cy 0/Cz

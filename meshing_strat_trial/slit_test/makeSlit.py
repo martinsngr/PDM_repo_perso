@@ -15,7 +15,7 @@ are unstable (../NOTES.md). Across z:
                    walls; contact angle from the solver's porous contact-angle model (activatePorousContactAngle 1,
                    theta0 = THETA), as the REV yarn surfaces; change G on (bench default).
 Solver settings, function objects (Coats/capillary-wave dt, liquidBalance, waterBudget, stopGuard) and p/U BCs come
-from ../2D_bench. Free cells start as pure air; porous walls get the bench's 0.2 mm wetted ramp at the inlet.
+from ../2D_bench_strip. Free cells start as pure air; porous walls get the bench's 0.2 mm wetted ramp at the inlet.
 --run runs blockMesh, setFields, initFields and the solver (serial, log in /tmp via runTools.sh).
 """
 import argparse
@@ -25,7 +25,7 @@ import shutil
 import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BENCH = os.path.join(HERE, "..", "2D_bench")
+BENCH = os.path.join(HERE, "..", "2D_bench_strip")   # template: strip bench of 2026-10-12
 NW = 4                 # default porous wall thickness [cells] (--nw)
 DX = 20e-6             # default cell size [m] (--dx)
 LX = 2e-3              # length along x [m]
@@ -62,7 +62,7 @@ def main():
                     help="free inlet faces at static p = 0 (old setup); default: total pressure 0 (reservoir at rest)")
     ap.add_argument("--solver", default="hybridPorousInterFoam")
     ap.add_argument("--alphaScheme", default=None,
-                    help="div(phi,alpha) scheme for free faces, e.g. 'Gauss vanLeer' (default: as 2D_bench)")
+                    help="div(phi,alpha) scheme for free faces, e.g. 'Gauss vanLeer' (default: as 2D_bench_strip)")
     ap.add_argument("--alphaSubCycles", type=int, default=None)
     ap.add_argument("--dx", type=float, default=DX, help="cell size [m] (gap/wall widths and --wall-end are in cells)")
     ap.add_argument("--add", action="append", default=[],

@@ -19,6 +19,7 @@ Writes 0/alpha.wetting (needs numpy only):
   boundary field, from constant/polyMesh/boundary
     - inlet patch:  inletOutlet, inletValue per face = S_IN on porous faces, FREE_IN (default 1) on free faces
     - --fixed-patch patches: fixedValue S_IN
+    - --closed-patch patches: zeroGradient (walls)
     - cyclic/empty/symmetry patches: their constraint type
     - every other patch (open to air): inletOutlet, inletValue per face = S_DRY on porous faces,
       FREE_DRY on free faces (air enters dry)
@@ -123,6 +124,12 @@ def main():
                     help="patch(es) with alpha fixedValue S_IN (e.g. the yarn part of the inlet); repeatable")
     ap.add_argument("--porous-value", type=float, default=None,
                     help="uniform alpha in every porous cell (replaces dry value and ramp; referee tests)")
+    ap.add_argument("--closed-patch", action="append", default=[],
+                    help="closed patch(es) (walls behind porous cells, no flow): alpha zeroGradient; repeatable")
+    ap.add_argument("--free-fill", type=float, default=0.0,
+                    help="free cells closer than this to the inlet plane [m] start full of water (initial "
+                         "water column in the gaps: the VOF interface must start inside the domain, ../NOTES.md "
+                         "'Slit tests'); 0 = none")
     ap.add_argument("--free-water-above", type=float, default=None,
                     help="free cells whose centre has z >= this value [m] start full of water (alpha 1)")
     a = ap.parse_args()
@@ -160,6 +167,8 @@ def main():
         alpha[porous] = a.porous_value
     if a.free_water_above is not None:
         alpha[(~porous) & (C[:, 2] >= a.free_water_above)] = 1.0
+    if a.free_fill > 0:
+        alpha[(~porous) & (dist < a.free_fill)] = 1.0
 
     inlet_value = np.where(porous[cells_in], a.s_in, a.free_in)
 
@@ -168,11 +177,15 @@ def main():
                              f"inlet {a.s_in} porous / {a.free_in:g} free"
                              + (f", fixed {a.s_in} on {a.fixed_patch}" if a.fixed_patch else "")
                              + (f", porous uniform {a.porous_value}" if a.porous_value is not None else "")
-                             + (f", free water for z >= {a.free_water_above}" if a.free_water_above is not None else ""))
+                             + (f", free water for z >= {a.free_water_above}" if a.free_water_above is not None else "")
+                             + (f", free water column {a.free_fill:g} m from '{a.inlet}'" if a.free_fill > 0 else "")
+                             + (f", closed {a.closed_patch}" if a.closed_patch else ""))
     txt += f"internalField   {scalar_list(alpha)};\n\nboundaryField\n{{\n"
     for name, typ, nf, sf in patches:
         if typ in ("cyclic", "empty", "symmetry", "symmetryPlane", "wedge", "processor"):
             body = f"type {typ};"
+        elif name in a.closed_patch:
+            body = "type zeroGradient;"
         elif name in a.fixed_patch:
             body = f"type fixedValue;\n        value uniform {a.s_in};"
         elif name == a.inlet:
