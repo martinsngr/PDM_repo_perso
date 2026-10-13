@@ -14,7 +14,7 @@ cd "${0%/*}" || exit 1
 # LOG_EVERY=N ./run keeps only every Nth time step of it, plus its last 400
 # lines in log.hybridPorousInterFoam.tail: use it for long runs (GBs otherwise).
 # This script deletes the mesh and all results: to continue a stopped run, see
-# "Running" in ../NOTES.md instead.
+# "Running (yarn cases)" in ../../NOTES_cases.md instead.
 
 N=$(foamDictionary -entry N -value caseSetup)
 

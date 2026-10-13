@@ -6,7 +6,7 @@
 #   mode steps [N]  : N time steps (default 10), fields written at every step
 #   mode run   [T]  : up to T s (default 2e-4), fields written every T/10 (or every $WRITE s)
 # Both modes stop early if dt collapses (minDeltaTStop, ../../tools/stopGuard).
-# Variants (see ../../NOTES.md, bench debugging):
+# Variants (see ../../../NOTES_solver.md, changes E, F, G, and ../../../NOTES_cases.md, 2D_bench_strip):
 #   base      bench as is (contact angle off, sigma 0.072, VG pc0 5000 m 0.5, ramp)
 #   ca90      activatePorousContactAngle 1 (theta0 90), as Boubaker et al. 2026
 #   sigma0    sigma 0: no free-interface surface tension

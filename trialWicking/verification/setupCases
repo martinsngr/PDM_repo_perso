@@ -16,7 +16,7 @@
 # BL_flow_BC: the tutorial's inlet is U fixedValue 1e-5 with p zeroGradient (the paper's "dp/dx = 0"). For Darcy
 # flow that pair is inconsistent: with Darcy faces on (ABC) the inlet flux comes from Darcy's law with zero pressure
 # gradient and no water enters. p fixedFluxPressure sets the gradient that gives exactly U_b.S_f; the original
-# solver gives the same result with either BC (see ../NOTES.md, Verification), so it is used for both variants.
+# solver gives the same result with either BC (see ../../NOTES_solver.md, Verification), so it is used for both variants.
 # BL_grav_BC_FFP: the shipped gravity tutorial has U and p zeroGradient on the inlet and imposes the injection via
 # Uwetting/UnonWetting, which correctUBc.H writes on the inlet face only after the pressure solve: the pressure
 # solve lets both phases fall in under gravity and the inlet cell creates ~8.2e-7 m/s of air (8 % of the

@@ -1,25 +1,13 @@
-# Context: hybridPorousInterFoam trial (OpenFOAM 9)
+# 1D_vertical_hybrid: 1D capillary wicking column in hybridPorousInterFoam
 
-## Goal
-Replicate the user's earlier impesFoam wicking setup (parent folder `trialWicking/`) using
-**hybridPorousInterFoam** instead. This folder started as a clean copy of the solver's tutorial
-`Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_VanGenuchten`. This is master-thesis work.
+Case description (was this folder's `CLAUDE.md` until 2026-10-13; repo rules are in the root `CLAUDE.md`).
+Goal: the impesFoam 1D wicking setup of `trialWicking/` replicated with hybridPorousInterFoam. Started as a clean
+copy of the solver's tutorial `Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_VanGenuchten`.
 
 ## Solver
-- Source: `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8` (repo Franjcf/hybridPorousInterFoam),
-  branch **`of9-port`** (9 commits on top of `master`, d98e12e..be54696). Built and installed in
-  `$FOAM_USER_APPBIN`, with its 3 libraries in `$FOAM_USER_LIBBIN`.
-- The port only renamed API calls, mirroring OF9 `interFoam`: fvOptions → fvModels/fvConstraints,
-  the new `CorrectPhi` signature + `pressureReference`, and link flags. Physics and numerics were left unchanged.
-- Correctness is **not validated**. The user checks results against Carrillo et al. 2020 themselves.
-  Never claim results are correct just because the case runs.
-- `hybridPorousPimpleFoam` (the single-phase solver) is **not** ported and doesn't build on OF9.
-- Don't edit the solver source from here. Solver changes belong in that repo, on `of9-port`, one justified commit each.
-- **Porous-face changes (2026-10-01):** commits `b0c0f67`..`b995db5` on `of9-port` (A: face relative flux,
-  B: opt-in Darcy total flux `darcyFaceMaxDa`, C: upwinded kr, + 2 fixes); the state before is tagged
-  `of9-port-before-porous-fixes`, the old binary is `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. Details,
-  tests and patches: `../hybridSolverChanges/`. This case uses `darcyFaceMaxDa 0.1` since then; its results with
-  the old solver are kept in `results_oldsolver/` (`liquidBalance.csv`, sampleDict profiles, log).
+`hybridPorousInterFoam`, branch `of9-port` of the solver repo; this case uses `darcyFaceMaxDa 0.1` (changes A–C and
+later, see `../../NOTES_solver.md`). Its results with the original solver are kept in `results_oldsolver/`
+(`liquidBalance.csv`, sampleDict profiles, log).
 
 ## This case
 This folder (renamed from `BL_flowDriven_VanGenuchten_hybridPorousInterFoam` on 2026-09-30) is the
@@ -64,7 +52,7 @@ and in the solver's `tutorials/Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_Van
   `darcyFaceMaxDa` the limit stays above ~3.4e-7 and the floor is 0. PIMPLE 1 outer / 2 pressure correctors, `nAlphaSubCycles 1`; `nCorrectors 1` crashes.
 - **End time 0.1 s**, as the impesFoam cases (~9.5 min; ~18 min with a fixed `maxDeltaT 3e-7`, same uptake within 0.3 %). Older setups (inlet alpha 1, fixed outlet p) crashed at
   ~0.058 s; this one runs to 0.1 s.
-- **Solver log:** written in `/tmp` during the run by `runTmpLog` (`../runTools.sh`, rule in `../CLAUDE.md`);
+- **Solver log:** written in `/tmp` during the run by `runTmpLog` (`../runTools.sh`, rule in the repo-root `CLAUDE.md`);
   `log.hybridPorousInterFoam` is a symlink until the solver ends. `LOG_EVERY=N ./run` keeps only every Nth step plus
   the last 400 lines (`log.hybridPorousInterFoam.tail`).
 - **Output:** `liquidBalance.csv` (coded function object in `controlDict`, same format as the impesFoam fork)
@@ -74,16 +62,3 @@ and in the solver's `tutorials/Darcy_Flow_Cases/Buckley-Leverett/flow_Driven_Van
   `../1D_vertical_impes` (clamped reservoir) gives 0.614 / 0.705 / 0.782 / 0.841 / 0.878 / 0.893 / 0.906. Water
   collects at the top once the front arrives (top cell 0.975 at 0.1 s), as in impesFoam, since both block water
   at the outlet.
-
-## OpenFOAM 9 notes
-- Source terms and constraints go in `constant/fvModels` / `system/fvConstraints`. There is no `fvOptions`.
-- `pMin`/`pMax` in `fvSolution` PIMPLE are a fatal error in OF9 (they belong in fvConstraints `limitPressure`).
-- `singleGraph` doesn't exist in OF9. Use `postProcess -func "graphCell(start=(...), end=(...), fields=(alpha.wetting))"`
-  or `graphUniform`.
-
-## How to work with this user
-- Keep changes minimal, justified and traceable, and list every change to case dictionaries.
-- Ask before browsing folders outside this case folder, including the parent `trialWicking/` impesFoam setup:
-  ask for paths or permission first.
-- This folder is inside the git repo `PDM_repo_perso` (pushed to GitHub). Don't commit unless asked, and keep
-  results/logs out of commits.

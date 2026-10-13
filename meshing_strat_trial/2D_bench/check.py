@@ -10,7 +10,7 @@ next to the gap ("surface"), against the closed walls ("back") and wall-averaged
 the porous cells, cell volumes); max |U|; stray water (gap cells with alpha > 0.05 more than 3 cells ahead of the
 meniscus: droplets or films). Water budget from waterBudget.csv.
 
-References (no exact solution for the coupled case, see ../NOTES.md "Thick-wall slit bench"):
+References (no exact solution for the coupled case, see ../../NOTES_solver.md "Verification"):
   - gap with impermeable walls: Bosanquet slit rise (gap 8, theta 60, from the 0.1 mm column); porous walls of
     K 1e-20 and real walls give it +8 % at 2 ms;
   - walls without gap: 1D similarity solution of the yarn, front 18.04 mm/sqrt(s), shifted so that it starts at the

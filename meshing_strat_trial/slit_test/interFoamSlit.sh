@@ -1,7 +1,7 @@
 #!/bin/bash
 # interFoamSlit.sh - the S0 slit (real walls, gap 8 cells, 20 um, 2 mm, gravity -x) with stock OpenFOAM 9 interFoam,
 # as in the previous student's work (interFoam, wall contact-angle BC, inlet alpha inletOutlet 1 / value 1).
-# Reference for the hybridPorousInterFoam slit tests (../NOTES.md "Slit tests").
+# Reference for the hybridPorousInterFoam slit tests (../../NOTES_cases.md "Slit tests").
 #
 #   ./interFoamSlit.sh <name> <fill [m]> <static|total> [theta=60] [T=2e-3]
 #

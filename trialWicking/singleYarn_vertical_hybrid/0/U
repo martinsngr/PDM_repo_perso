@@ -36,7 +36,7 @@ boundaryField
 
     // lateral surface closed to both phases: an open wall is ill-posed in
     // this solver (correctUBc.H replaces the wall flux by the cell velocity
-    // projected on the tilted face normals; see ../NOTES.md). With U fixed,
+    // projected on the tilted face normals; see ../../NOTES_solver.md, A, B). With U fixed,
     // correctUBc.H leaves the patch alone. Air leaves through the top only.
     yarn_to_fluid
     {

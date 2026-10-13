@@ -42,7 +42,7 @@ sigma            [1 0 -2 0 0 0 0]  0.072;
 activateCapillarity     1;
 
 // Darcy total flux in porous faces with K/dx^2 below this value (solver
-// commits b0c0f67..b995db5 on of9-port, see ../hybridSolverChanges): here
+// commits b0c0f67..b995db5 on of9-port, see ../../NOTES_solver.md): here
 // K/dx^2 = 1e-11/(20 um)^2 = 0.025, so every face is a Darcy face. Without
 // this keyword the solver uses the momentum-equation flux as before.
 darcyFaceMaxDa  0.1;

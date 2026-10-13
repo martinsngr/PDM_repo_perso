@@ -8,7 +8,7 @@ cd "${0%/*}" || exit 1
 # (numpy only).
 # Initial state (../tools/initFields.py): yarn walls dry (0.002) with the 0.2 mm
 # wetted ramp at the inlet (0.99 -> dry), gap pure air except a 0.1 mm water
-# column at the inlet (the meniscus must start inside the domain, ../NOTES.md
+# column at the inlet (the meniscus must start inside the domain, ../../NOTES_cases.md
 # "Slit tests"), top/bottom closed (alpha zeroGradient).
 
 PY=${PY:-../../.venv/bin/python}

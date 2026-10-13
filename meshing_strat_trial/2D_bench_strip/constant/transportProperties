@@ -51,7 +51,7 @@ theta0                     90;
 activateCapillarity     1;
 
 // Darcy total flux in porous faces with K/dx^2 below this value (solver
-// changes B, ../trialWicking/hybridSolverChanges). Yarn faces here:
+// changes B, ../../NOTES_solver.md). Yarn faces here:
 // 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free faces are not (K_VOID = 1 m2);
 // porous/free faces are with porousFreeDarcyFaces (harmonic K, see below).
 darcyFaceMaxDa  0.1;

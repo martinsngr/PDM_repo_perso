@@ -4,7 +4,7 @@ cd "${0%/*}" || exit 1
 
 # REV of the plain-weave fabric, from the TexGen geometry to the initial fields.
 # Overwrites the mesh and 0/; then the solver run (not written yet, see
-# ../NOTES.md "Next steps"). Python: $PY, else the repo .venv (numpy, trimesh).
+# ../../NOTES_cases.md "Next steps"). Python: $PY, else the repo .venv (numpy, trimesh).
 #
 #   geometry   Textiles/PW-22-15-0.4-0.5.stl (TexGen, funge.py), copy in
 #              constant/triSurface/; REV box in rev_domain.json (inspect_stl.py,
@@ -14,7 +14,7 @@ cd "${0%/*}" || exit 1
 #              yarnID by build_fields.py; alpha.wetting by ../tools/initFields.py
 #              (yarns dry with the 0.2 mm wetted ramp at the inlet, gaps pure air)
 #
-# Open setup decisions for the REV (../NOTES.md): top/bottom open porous faces
+# Open setup decisions for the REV (../../NOTES_cases.md, REV case status): top/bottom open porous faces
 # (unstable in the 2D tests: close or pad with --zgap), water column in the gaps
 # at the inlet (initFields.py --free-fill), H/F'/I keywords and contact angle
 # in constant/transportProperties (as ../2D_bench).

@@ -128,7 +128,7 @@ def main():
                     help="closed patch(es) (walls behind porous cells, no flow): alpha zeroGradient; repeatable")
     ap.add_argument("--free-fill", type=float, default=0.0,
                     help="free cells closer than this to the inlet plane [m] start full of water (initial "
-                         "water column in the gaps: the VOF interface must start inside the domain, ../NOTES.md "
+                         "water column in the gaps: the VOF interface must start inside the domain, ../../NOTES_cases.md "
                          "'Slit tests'); 0 = none")
     ap.add_argument("--free-water-above", type=float, default=None,
                     help="free cells whose centre has z >= this value [m] start full of water (alpha 1)")

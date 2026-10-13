@@ -18,7 +18,7 @@ FoamFile
 // free gap | porous yarn wall, 2.0 x 0.48 mm, 20 um cells as the REV
 // (100 x 24 cells). Across z: wall 8 cells (0-0.16 mm) | gap 8 cells
 // (0.16-0.32 mm) | wall 8 cells (0.32-0.48 mm); walls of 8 cells = half a REV
-// yarn width (../NOTES.md, REV yarn dimensions), closed behind (top, bottom).
+// yarn width (../../NOTES_cases.md, REV geometry), closed behind (top, bottom).
 // Wicking along x (gravity -x, constant/g): reservoir on inlet (x = 0), open
 // to air on outlet (x = 2 mm). Walls set by system/setFieldsDict.
 // Identical to slit_test/makeSlit.py --walls porous --nw 8 --w 8 (same

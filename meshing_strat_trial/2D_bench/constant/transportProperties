@@ -20,7 +20,7 @@ FoamFile
 // Genuchten pc0 5000 Pa, m 0.5. Yarn K 1e-11 m2, eps 0.5 come from 0/K, 0/eps
 // (setup values, not calibrated). Identical in 2D_bench and REV_hybrid, except
 // the contact angle and the free-fluid keywords below (bench: gap between yarn
-// walls, validated in slit_test/, ../NOTES.md "Thick-wall slit bench").
+// walls, validated in slit_test/, ../../NOTES_solver.md "Verification").
 
 phases (wetting nonWetting);
 
@@ -55,7 +55,7 @@ theta0                     60;
 activateCapillarity     1;
 
 // Darcy total flux in porous faces with K/dx^2 below this value (solver
-// changes B, ../trialWicking/hybridSolverChanges). Yarn faces here:
+// changes B, ../../NOTES_solver.md). Yarn faces here:
 // 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free faces are not (K_VOID = 1 m2);
 // porous/free faces are with porousFreeDarcyFaces (harmonic K, see below).
 darcyFaceMaxDa  0.1;
@@ -98,7 +98,7 @@ VanGenuchtenCoeffs
 }
 
 // Free fluid next to the yarn surfaces (opt-in changes H, F', I of of9-port
-// b525086, ../../trialWicking/hybridSolverChanges): with them, impermeable
+// b525086, ../../NOTES_solver.md): with them, impermeable
 // porous walls give the capillary rise of real walls within 2 %; without them
 // -35 to +60 % and spurious currents of 30-70 m/s (slit tests).
 // H : contact angle applied on the porous/free faces only, as a wall (the

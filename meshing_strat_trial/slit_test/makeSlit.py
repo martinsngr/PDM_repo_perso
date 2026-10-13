@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-makeSlit.py  -  slit capillary-rise benchmarks (gap capillarity, S0-S3 of ../NOTES.md ("Slit tests")).
+makeSlit.py  -  slit capillary-rise benchmarks (gap capillarity, S0-S3 of ../../NOTES_cases.md ("Slit tests")).
 
     ../../.venv/bin/python makeSlit.py <name> --walls real|porous --w 8 --theta 60 [--K 1e-20] [--T 2e-3] [--run]
 
@@ -8,7 +8,7 @@ makeSlit.py  -  slit capillary-rise benchmarks (gap capillarity, S0-S3 of ../NOT
 water at total pressure 0 = reservoir at rest, openFreeTotalPressure 1; --static-inlet: static p = 0; porous faces
 alpha 0.99), open to air at x = 2 mm (outlet). The gap starts with a water column of --fill (0.1 mm; without it the
 meniscus does not form). Porous walls stop --wall-end cells (3) before the outlet: porous faces on the open outlet
-are unstable (../NOTES.md). Across z:
+are unstable (../../NOTES_cases.md). Across z:
   --walls real   : the gap only (w cells); the z patches are walls with constantAlphaContactAngle theta0 = THETA
                    (standard interFoam wall treatment, the reference for the free-surface model).
   --walls porous : --nw porous cells (4; eps 0.5, permeability K) | gap of w cells | --nw porous cells; behind them closed

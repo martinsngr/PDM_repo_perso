@@ -10,7 +10,7 @@
       with openFreeTotalPressure 1 (transportProperties, default 0): total
       pressure 0 on inflow faces, p = -0.5*rho*|U|^2 (fluid at rest outside,
       as a reservoir; the static p = 0 inlet gives the entering water its
-      velocity for free, ../NOTES.md "Slit tests"), p = 0 on outflow faces
+      velocity for free, ../../NOTES_cases.md "Slit tests"), p = 0 on outflow faces
     - porous face (eps <= 0.99), switch openPorousAirZero in
       constant/transportProperties:
         1 (default): air at 0 Pa, p = -alpha*pc(alpha), as the 1D and single

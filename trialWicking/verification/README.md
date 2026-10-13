@@ -17,7 +17,7 @@ Each case has two variants:
 | `port` | `hybridPorousInterFoam_be54696` | OF9 port only, i.e. the v8 solver with the vocabulary changes (tag `of9-port-before-porous-fixes`) |
 | `ABC` | `hybridPorousInterFoam` (`b995db5`) | changes A, B and C with `darcyFaceMaxDa 0.1`, as in the wicking cases |
 
-The changes are described in `../hybridSolverChanges/README.md`. Both binaries link the same porous libraries
+The changes are described in `../../NOTES_solver.md` and `CHANGES_of9-port.md` (solver repo). Both binaries link the same porous libraries
 (`git diff be54696 b995db5 -- OpenFoamV8/libraries` is empty). The port itself (`0a408f5` -> `be54696`) only renames
 OpenFOAM API calls (fvOptions -> fvModels/fvConstraints, the CorrectPhi signature, link flags); no physics term changes.
 
@@ -47,4 +47,4 @@ OpenFOAM API calls (fvOptions -> fvModels/fvConstraints, the CorrectPhi signatur
 
 ## Results
 
-See `../NOTES.md` (Findings -> Verification).
+See `../../NOTES_solver.md` (Verification).
