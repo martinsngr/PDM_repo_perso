@@ -52,13 +52,22 @@ activateCapillarity     1;
 
 // Darcy total flux in porous faces with K/dx^2 below this value (solver
 // changes B, ../trialWicking/hybridSolverChanges). Yarn faces here:
-// 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free and porous/free faces are not
-// (K_VOID = 1 m2, or Solidf = 0).
+// 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free faces are not (K_VOID = 1 m2);
+// porous/free faces are with porousFreeDarcyFaces (harmonic K, see below).
 darcyFaceMaxDa  0.1;
 
+// Change G (of9-port 1b007d8): porous/free faces as two-phase Darcy faces, i.e.
+// the capillary pressure jump at the yarn surface (air pressure continuous next
+// to air-filled gaps, water pressure next to wet gaps). Needs the porous/free
+// faces to be Darcy faces (here K_f/dx^2 = 2e-11/(20 um)^2 = 0.05 < 0.1; the
+// log reports it). Free cells must start as pure air (tools/initFields.py).
+porousFreeDarcyFaces on;
+
 // p BC of the porous faces of the open patches (../tools/pOpenAir):
-// 1 = air at 0 Pa (p = -alpha*pc, as the 1D / single-yarn cases),
-// 0 = mixture at 0 Pa (p = 0, as the solver at interior porous/free faces)
+// 1 = air at 0 Pa (p = -alpha*pc, as the 1D / single-yarn cases; consistent with
+//     the interior porous/free faces under porousFreeDarcyFaces),
+// 0 = mixture at 0 Pa (p = 0; what the solver did at interior porous/free faces
+//     before change G, kept for comparison)
 openPorousAirZero 1;
 
 alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;

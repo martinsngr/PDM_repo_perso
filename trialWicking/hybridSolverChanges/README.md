@@ -7,7 +7,11 @@ Working log of the changes made to `hybridPorousInterFoam` (repo Franjcf/hybridP
 `c0c1b4e` (B fix), `b995db5` (C fix); the state before them is tagged `of9-port-before-porous-fixes` (= `be54696`).
 **2026-10-12: change E (binary `Solidf`, bug fix, see below) committed on `of9-port` as `c3a2e6e` (+ docs commit `d1c688a`, `CHANGES_of9-port.md`), pushed 2026-10-12; the installed
 `hybridPorousInterFoam` is built from it, the A–C binary is kept as `$FOAM_USER_APPBIN/hybridPorousInterFoam_b995db5`.**
-The port-only binary is kept as `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`. The complete list of changes on
+The port-only binary is kept as `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`.
+**2026-10-12 (afternoon): F (`febfcae`) and G (`1b007d8`) committed on `of9-port` (+ docs `8b35cc4`), installed
+(`hybridPorousInterFoam` = A–G; the E binary is kept as `hybridPorousInterFoam_c3a2e6e`); push from VS Code.**
+**2026-10-13: H (`1588863`), F′ (`3aded21`), I (`b525086`), all opt-in, committed on `of9-port` (+ docs `1a79db9`),
+installed (`hybridPorousInterFoam` = A–I; the G binary is kept as `hybridPorousInterFoam_1b007d8`); not pushed yet.** The complete list of changes on
 the branch (port, A, B, C, fixes, E, open issues, build/revert) is in the solver repo: `CHANGES_of9-port.md`. A and C are always active; B only with `darcyFaceMaxDa`. The diagnosis behind it is in `../NOTES.md` (Findings → hybridPorousInterFoam in 3D).
 
 ## Why
@@ -75,6 +79,13 @@ A–C were tested on cases without free cells, where this makes no difference.**
 - **Consequence:** the porous phase fluxes became half-active on porous/free faces, with K interpolated between the
   porous cell and the free cell (0.5 m² with K_VOID = 1) and the Van Genuchten pc of the free cell (MPa when dry).
   Wet porous cells next to free cells emptied into them in one step (relative flux 1.6e4 vs 1e-26 on porous faces).
+- **Upstream history of `Solidf` on porous/free faces (checked 2026-10-12, `git log -S`):** `0a12b0b` (2019-10-17, first
+  commit) used `Solidf = interpolate(Solid)` unclipped, i.e. 0.5 on porous/free faces (capillary and porous terms
+  half-active there, with the free cell's pc); `cd088db` (2019-10-28, "fixed some instabilities") added the clipping to
+  0/1, i.e. **no porous capillary term on porous/free faces by design**; `98e48b9` (2020-09-11, dynamic mesh) recomputes
+  `Solidf` every step without the clipping, so **since then upstream runs with 0.5 again from the first step** (most
+  likely by accident). E restores the authors' `cd088db` intent, but it **changes the behaviour of current upstream
+  code** (results obtained with upstream code after 2020-09, possibly including published ones, used the half term).
 - **Fix:** `binarySolidf.H` clips Solidf to 0/1 on internal and boundary faces, included after both
   `interpolate(Solid)` calls.
 - **Diagnosis and tests:** `../../meshing_strat_trial/NOTES.md` (Step-1 flux diagnosis, Fix 1) and
@@ -84,6 +95,46 @@ A–C were tested on cases without free cells, where this makes no difference.**
 - **Not tested:** upstream cases with porous/free faces, e.g. the tutorial `porous_Boundary` (porous walls next to
   free fluid, already different with A and C, see Tests): E is expected to change them; rerun before relying on them.
 - Patch: `patches/0006-E-keep-Solidf-binary-at-every-step-and-on-coupled-bo.patch` (paths relative to `OpenFoamV8/solvers`, as 0001–0005).
+
+### F. Consistent velocity of mixed cells (`febfcae`) — `pEqn.H`, `createPorousMediaFields.H`
+- Flaw of B: cells with Darcy and non-Darcy faces kept U from `HbyA + rAU·reconstruct((phiG + phiPc − pEqn.flux())/rAUf)`,
+  with `pEqn.flux()` built with Mf on Darcy faces → Mf/rAUf times too large; U drifted by m/s per step (single-yarn wall
+  cells 2.3e4 m/s) and fed back through `HbyA`/`ddtCorr` on non-Darcy faces. Fix: face driving force per face mobility
+  (phiDarcyExplicit/Mf on Darcy faces, snGrad(p)|Sf| for the pressure part); fixed-U non-coupled boundary faces ignored
+  in the Darcy-cell rule. α/p/φ unchanged where tested (all-porous bench bit-identical, single-yarn 225 steps
+  bit-identical, written U 2.3e4 → 18.9 m/s). **U written by older binaries near walls / porous-free faces is not
+  meaningful** (p, α, φ, Uwetting from ∇p are). Patch `patches/0007-*.patch`.
+
+### G. Porous/free faces as two-phase Darcy faces (`1b007d8`, opt-in `porousFreeDarcyFaces on;`)
+- The model had no capillary pressure jump at a porous surface next to free fluid (mixture p continuous, porous air
+  pressure α·pc above the free air): a wet yarn next to a gap drains. G makes `porousFace` (≥ 1 porous side) carry the
+  porous two-phase fluxes with pc = 0 in free cells (phase pressures continuous), harmonic K on those faces, the water
+  Darcy flux as α flux there, and a warning if such faces are not Darcy faces. Diagnosis, referee tests (R1–R3),
+  parallel/cyclic and long-run checks: `../../meshing_strat_trial/NOTES.md` ("Second failure: root cause analysis",
+  "Option (ii) implemented as changes F and G", "Pre-commit checks of F/G"). **Use free cells initialised as pure
+  air.** Patch `patches/0008-*.patch`.
+
+### H, F′, I: free capillary flow between porous walls (2026-10-13, all opt-in)
+Found and validated on the thick-wall slit bench (`../../meshing_strat_trial/slit_test/`, `makeSlit.py --nw 8`,
+`benchSlit.py`; NOTES.md there, "Thick-wall slit bench and scratch changes H, F′, I"). Used together:
+`activatePorousContactAngle 1; theta0 <angle>; porousContactAngleWallLike 1; porousFreeFluxForce 1; porousFreeNoSlip 1;`
+with `porousFreeDarcyFaces on;`.
+- **H (`1588863`, library `porousInterfaceProperties.C`, `porousContactAngleWallLike 1`):** the porous contact-angle
+  model computed the interface normal from α including the porous cells (a saturation) and imposed θ on a band 2–3
+  cells deep on both sides of the porous surface. Now θ is applied on porous/free faces only, as a wall, and the
+  normal ignores the porous saturation.
+- **F′ (`3aded21`, `pEqn.H`, `porousFreeFluxForce 1`):** with G the free cells next to a porous surface are mixed cells
+  of F, whose velocity used φ/Mf on those faces, ill-conditioned for nearly impermeable porous cells (arbitrary
+  wall-normal velocity). Now the reconstructed velocity carries the face flux there. Also removes the gap air jets of
+  the 2D bench (8.6 → 0.10 m/s).
+- **I (`b525086`, `UEqn.H`, `porousFreeNoSlip 1`):** the free fluid was coupled to the porous cell centre with an
+  interpolated (air) viscosity: about a quarter of a wall's shear, near slip. Now shear μ_free·ΔU/(Δx/2) on
+  porous/free Darcy faces (added coefficient ≥ 0: air next to a wet wall keeps the old coupling, open).
+- **Result (slit 2 ms):** impermeable porous walls = real walls with `constantAlphaContactAngle` within 2 % (gap 4/8/15
+  cells, θ 40/60/80°; before −35 to +60 %), max |U| ~1 m/s (before 30–68 m/s); permeable walls monotone in K; mesh
+  10 vs 20 µm 3–4 %. Keywords off: bit-identical to `1b007d8`.
+- Patches `patches/0009-*`, `0010-*`, `0011-*`, paths relative to `OpenFoamV8` (H touches a library):
+  `git am --directory=OpenFoamV8`.
 
 ## Tests (scratchpad bench: the 1D hybrid case widened to NX cells, symmetry sides, empty front/back)
 
@@ -168,7 +219,10 @@ ungated prototype; the 4 patches apply cleanly on `of9-port` `be54696` (`git am 
   pc0 ∝ √(ε/K)).
 
 ## Using it / tracking
-- Cases opt in with `darcyFaceMaxDa 0.1;` in `constant/transportProperties` (A and C are always on).
+- Cases opt in with `darcyFaceMaxDa 0.1;` in `constant/transportProperties` (A and C are always on); G, H, F′, I
+  with their keywords (see above and `CHANGES_of9-port.md` in the solver repo, "User-facing keywords").
+- Compare with the original solver: `git diff of9-port-before-porous-fixes of9-port -- OpenFoamV8` in the solver
+  repo (more commands in `CHANGES_of9-port.md`, "Comparing with the original solver").
 - See the changes: `git log of9-port-before-porous-fixes..of9-port` and `git diff of9-port-before-porous-fixes of9-port`
   in the solver repo; the same commits are exported in `patches/` (paths relative to `OpenFoamV8/solvers`).
 - Go back to the old solver: run `$FOAM_USER_APPBIN/hybridPorousInterFoam_be54696`, or rebuild from the tag

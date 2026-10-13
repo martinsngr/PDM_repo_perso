@@ -5,3 +5,15 @@ REV_hybrid/0/
 */liquidBalance.csv
 # bench variant runs (results); the scripts in variants/ are tracked
 2D_bench/variants/*_*/
+# slit test runs (results, makeSlit.py); the scripts and figures/ are tracked
+slit_test/S*_*/
+slit_test/D_*/
+slit_test/__pycache__/
+slit_test/old_runs/*
+!slit_test/old_runs/README.md
+slit_test/.makeSlit_run.py
+slit_test/IF_*/
+# thick-wall bench runs (2026-10-13: B_ installed solver, H_/HF_/I_/J_/N_/P_ scratch changes, R_/V_ regression)
+slit_test/[BHIJNPRV]_*/
+slit_test/HF_*/
+2D_bench/variants/.makeVariant_frozen.sh

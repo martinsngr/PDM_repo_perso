@@ -1,0 +1,358 @@
+From 1b007d8d75d4659fd977a069be87ef28c5a33323 Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Mon, 12 Oct 2026 14:24:58 +0200
+Subject: [PATCH 8/8] G: opt-in porous/free faces as two-phase Darcy faces
+ (porousFreeDarcyFaces)
+
+Problem. p is the mixture pressure p_air - alpha*pc in porous cells and the
+fluid pressure in free cells. On porous/free faces (Solidf = 0) the solver
+used the momentum flux with no capillary term, i.e. p continuous: next to a
+free cell holding air, the air pressure in the porous cell exceeded the free
+air pressure by alpha*pc (about 4-5 kPa for Van Genuchten pc0 5000 Pa, m 0.5,
+even when dry). A wet porous region next to free fluid then drains instead
+of wicking, and in spontaneous imbibition the error is of the order of the
+capillary drive itself. The physical condition at a porous/free face is
+continuity of the air pressure (free cell holding air) or of the water
+pressure (free cell holding water) (cf. Mosthaf et al. 2011, WRR).
+
+Change (keyword porousFreeDarcyFaces in transportProperties, default off):
+- porousFace.H (new): porousFace = 1 on faces with at least one porous side
+  (= Solidf without the keyword). It replaces Solidf in the phase Darcy
+  fluxes and the alpha flux split (alphaEqn.H), the kr upwinding
+  (updateVariables.H) and the Darcy-face selection (createPorousMediaFields).
+- updateVariables.H: pc = dpc/dS = 0 in free cells. With linear face
+  interpolation the phase fluxes on porous/free faces are then driven by the
+  differences of the phase pressures p_air = p + alpha*pc and
+  p_water = p - (1 - alpha)*pc, continuous across the face.
+- createPorousMediaFields.H: harmonic permeability on porous/free faces (the
+  porous half cell carries the resistance; linear interpolation gave
+  (K + K_free)/2); start-up mobilities and pc recomputed once if such faces
+  exist (they were built before Solid was known); count of porous/free faces
+  and a warning if some are not Darcy faces (darcyFaceMaxDa too small for
+  them), where the coupling would not apply.
+- alphaEqn.H: on porous/free faces the alpha flux is the water Darcy flux
+  phiWetting itself. The drift form (alpha_up*phi + relative flux), kept
+  between porous cells, gives the wrong phase split across the alpha and eps
+  jumps of a porous/free face (it pushed water out of the porous cell at
+  about 1.3 times an incoming air flux).
+
+Checks (2D bench: porous slab between free layers, 20 um cells, K 1e-11,
+VG pc0 5000 Pa m 0.5; free cells initialised as pure air): closed ramp
+without reservoir: water stays in the porous slab (+0.0000 % over 5 ms;
+without G -42 % in 0.2 ms) and its saturation profile matches the same slab
+without free cells to 4e-5; static wet slab: at rest, p in the slab =
+-alpha*pc next to free air at 0; dry slab next to a water-filled free layer
+imbibes (without G: almost nothing); wicking bench with air-filled free
+layers runs to 5 ms (without G: collapse at 18 us) and follows the no-free-
+cell reference with a small speed-up (lateral air escape). Processor and
+cyclic boundaries on the porous/free faces: same results as internal faces
+within solver tolerance. Without porous/free faces, or without the keyword:
+bit-identical to the previous solver (1D wicking column to 0.1 s, all-porous
+bench).
+
+Open: free cells must start as pure air (alpha 0), not at the porous dry
+value, otherwise surface-tension currents grow on small alpha variations;
+air jets of a few m/s remain near a free inlet next to open boundaries
+(numerical, not explained); exact phase-pressure differences only for 0.5
+interpolation weights; momentumPredictor path not adapted.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ hybridPorousInterFoam/alphaEqn.H              |  16 ++-
+ .../createPorousMediaFields.H                 | 123 +++++++++++++++++-
+ hybridPorousInterFoam/porousFace.H            |  26 ++++
+ hybridPorousInterFoam/updateDarcyVelocities.H |   1 +
+ hybridPorousInterFoam/updateVariables.H       |  15 ++-
+ 5 files changed, 171 insertions(+), 10 deletions(-)
+ create mode 100644 OpenFoamV8/solvers/hybridPorousInterFoam/porousFace.H
+
+diff --git a/hybridPorousInterFoam/alphaEqn.H b/hybridPorousInterFoam/alphaEqn.H
+index 6cc9dbd..22233c0 100644
+--- a/hybridPorousInterFoam/alphaEqn.H
++++ b/hybridPorousInterFoam/alphaEqn.H
+@@ -86,7 +86,7 @@
+     const surfaceScalarField pcf(fvc::interpolate(pc));
+     const surfaceScalarField phiWetting
+     (
+-        Solidf*M1f
++        porousFace*M1f
+        *(
+           (
+           - fvc::snGrad(p)
+@@ -98,7 +98,7 @@
+     );
+     const surfaceScalarField phiNonWetting
+     (
+-        Solidf*M2f
++        porousFace*M2f
+        *(
+           (
+           - fvc::snGrad(p)
+@@ -234,14 +234,14 @@
+         (
+            
+             //flux in solid-free regions
+-            (1-Solidf)*fvc::flux
++            (1-porousFace)*fvc::flux
+             (
+                 phiCN(),
+                 (cnCoeff*alpha1 + (1.0 - cnCoeff)*alpha1.oldTime())(),
+                 compressionScheme.rewind()
+             )
+ 
+-	    //flux in porous media
++	    //flux in porous media (both sides porous)
+             + Solidf*
+             (fvc::flux
+             (
+@@ -257,6 +257,14 @@
+             )
+             )
+ 
++            // Change G, porous/free faces: the water Darcy flux itself. The
++            // drift form above (alpha_up*phi + relative flux) rebuilds it
++            // from interpolated alpha and eps; across the alpha and eps
++            // jumps of a porous/free face it gives the wrong phase split
++            // (e.g. water leaving the porous cell while only air enters it).
++            // Zero without porousFreeDarcyFaces (porousFace = Solidf).
++            + (porousFace - Solidf)*phiWetting
++
+             //Alternative flux formulation (better porous contact angle results
+             //but no fancy (i.e. PLIC) interface compression schemes.
+             //(fvc::flux
+diff --git a/hybridPorousInterFoam/createPorousMediaFields.H b/hybridPorousInterFoam/createPorousMediaFields.H
+index cf5c79e..fbaa946 100644
+--- a/hybridPorousInterFoam/createPorousMediaFields.H
++++ b/hybridPorousInterFoam/createPorousMediaFields.H
+@@ -100,6 +100,64 @@ surfaceScalarField Solidf(fvc::interpolate(Solid));
+ //Eliminating intermediate values of Solid Indicator Function
+ #include "binarySolidf.H"
+ 
++// Change G (opt-in): porous/free faces carry the porous two-phase fluxes,
++// with pc = 0 in free cells and the harmonic face permeability (see
++// porousFace.H). Without the keyword porousFace = Solidf: solver unchanged.
++const Switch porousFreeDarcyFaces
++(
++    transportProperties.lookupOrDefault<Switch>("porousFreeDarcyFaces", false)
++);
++surfaceScalarField porousFace("porousFace", Solidf);
++#include "porousFace.H"
++// porous/free faces; a face on a coupled patch is seen from both sides and
++// counts 1/2 on each
++scalar nPorousFreeFaces = 0;
++if (porousFreeDarcyFaces)
++{
++    // Harmonic permeability on porous/free faces: resistance of the porous
++    // half cell plus the (negligible) free half cell. Linear interpolation
++    // would give (K_porous + K_free)/2, i.e. the free-cell value.
++    const surfaceScalarField& w = mesh.weights();
++    const labelUList& own = mesh.owner();
++    const labelUList& nei = mesh.neighbour();
++    forAll(k0f, facei)
++    {
++        if (porousFace[facei] > 0.5 && Solidf[facei] < 0.5)
++        {
++            k0f[facei] =
++                1/(w[facei]/k0[own[facei]] + (1 - w[facei])/k0[nei[facei]]);
++            nPorousFreeFaces++;
++        }
++    }
++    forAll(k0f.boundaryField(), patchi)
++    {
++        const fvPatchScalarField& k0p = k0.boundaryField()[patchi];
++        if (k0p.coupled())
++        {
++            fvsPatchScalarField& k0fp = k0f.boundaryFieldRef()[patchi];
++            const scalarField k0i(k0p.patchInternalField());
++            const scalarField k0n(k0p.patchNeighbourField());
++            const scalarField& wp = w.boundaryField()[patchi];
++            forAll(k0fp, facei)
++            {
++                if
++                (
++                    porousFace.boundaryField()[patchi][facei] > 0.5
++                 && Solidf.boundaryField()[patchi][facei] < 0.5
++                )
++                {
++                    k0fp[facei] =
++                        1/(wp[facei]/k0i[facei] + (1 - wp[facei])/k0n[facei]);
++                    nPorousFreeFaces += 0.5;
++                }
++            }
++        }
++    }
++    reduce(nPorousFreeFaces, sumOp<scalar>());
++    Info<< "porousFreeDarcyFaces: " << round(nPorousFreeFaces)
++        << " porous/free faces carry the porous two-phase fluxes" << endl;
++}
++
+ // Faces where pEqn.H computes the total flux as a Darcy flux (DarcyFace = 1):
+ // porous faces (Solidf = 1) whose Darcy number K_f/dx^2 is below
+ // darcyFaceMaxDa (transportProperties). There inertia and the Brinkman
+@@ -117,7 +175,7 @@ surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
+     const surfaceScalarField Daf(k0f*sqr(mesh.deltaCoeffs()));
+     forAll(DarcyFace, facei)
+     {
+-        if (Solidf[facei] > 1 - small && Daf[facei] < darcyFaceMaxDa)
++        if (porousFace[facei] > 1 - small && Daf[facei] < darcyFaceMaxDa)
+         {
+             DarcyFace[facei] = 1;
+         }
+@@ -135,7 +193,7 @@ surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
+         {
+             if
+             (
+-                Solidf.boundaryField()[patchi][facei] > 1 - small
++                porousFace.boundaryField()[patchi][facei] > 1 - small
+              && f*Daf.boundaryField()[patchi][facei] < darcyFaceMaxDa
+             )
+             {
+@@ -195,7 +253,68 @@ volScalarField DarcyCell("DarcyCell", Solid);
+     }
+ }
+ 
++// Change G: porous/free faces that are not Darcy faces (K_f/dx^2 above
++// darcyFaceMaxDa) fall back to the momentum path with an interpolated
++// capillary term, i.e. without the consistent phase-pressure coupling of G
++if (porousFreeDarcyFaces)
++{
++    scalar nNonDarcy = 0;
++    forAll(DarcyFace, facei)
++    {
++        if
++        (
++            porousFace[facei] > 0.5 && Solidf[facei] < 0.5
++         && DarcyFace[facei] < 0.5
++        )
++        {
++            nNonDarcy++;
++        }
++    }
++    forAll(DarcyFace.boundaryField(), patchi)
++    {
++        if (DarcyFace.boundaryField()[patchi].coupled())
++        {
++            forAll(DarcyFace.boundaryField()[patchi], facei)
++            {
++                if
++                (
++                    porousFace.boundaryField()[patchi][facei] > 0.5
++                 && Solidf.boundaryField()[patchi][facei] < 0.5
++                 && DarcyFace.boundaryField()[patchi][facei] < 0.5
++                )
++                {
++                    nNonDarcy += 0.5;
++                }
++            }
++        }
++    }
++    reduce(nNonDarcy, sumOp<scalar>());
++    if (nNonDarcy > 0)
++    {
++        WarningInFunction
++            << round(nNonDarcy) << " of " << round(nPorousFreeFaces)
++            << " porous/free faces are not Darcy faces (K_f*deltaCoeffs^2 >= "
++            << "darcyFaceMaxDa " << darcyFaceMaxDa << "): there the "
++            << "porousFreeDarcyFaces coupling does not apply. Increase "
++            << "darcyFaceMaxDa or check K and the mesh." << endl;
++    }
++    else
++    {
++        Info<< "porousFreeDarcyFaces: all " << round(nPorousFreeFaces)
++            << " porous/free faces are Darcy faces" << endl;
++    }
++}
++
+ //Label for mesh refinement (we only want to refine at
+ //the fluid-fluid interface in solid-free region
+ volScalarField gradSolid ("gradSolid",mag(fvc::grad(Solid)));
+ volScalarField meshingIndicator("meshingIndicator", alpha1*(1-10*Solid));
++
++// Change G: mobilities, kr and pc above were built before Solid and the
++// porous/free faces were known; recompute them once (pc = 0 in free cells).
++// Only if there are porous/free faces: without them the start-up state is
++// left exactly as without G.
++if (porousFreeDarcyFaces && nPorousFreeFaces > 0)
++{
++    #include "updateVariables.H"
++}
+diff --git a/hybridPorousInterFoam/porousFace.H b/hybridPorousInterFoam/porousFace.H
+new file mode 100644
+index 0000000..848484e
+--- /dev/null
++++ b/hybridPorousInterFoam/porousFace.H
+@@ -0,0 +1,26 @@
++// porousFace: faces on which the porous two-phase (Darcy) terms are used:
++// phase Darcy fluxes and relative flux (alphaEqn.H), upwinded kr
++// (updateVariables.H) and the Darcy-face selection (createPorousMediaFields.H).
++// Without porousFreeDarcyFaces: porousFace = Solidf (both sides porous).
++// With porousFreeDarcyFaces (change G): also porous/free faces (at least one
++// side porous). There the free cell has pc = 0 (updateVariables.H), so the
++// phase fluxes are driven by the differences of the phase pressures
++// (p_air = p + alpha*pc, p_water = p - (1 - alpha)*pc), which are continuous
++// across the face: air pressure for a dry free cell, water pressure for a wet
++// one (capillary pressure jump at the porous surface).
++porousFace = fvc::interpolate(Solid);
++{
++    const scalar threshold = porousFreeDarcyFaces ? small : 1 - small;
++    forAll(porousFace, facei)
++    {
++        porousFace[facei] = porousFace[facei] > threshold ? 1 : 0;
++    }
++    forAll(porousFace.boundaryField(), patchi)
++    {
++        fvsPatchScalarField& pfp = porousFace.boundaryFieldRef()[patchi];
++        forAll(pfp, facei)
++        {
++            pfp[facei] = pfp[facei] > threshold ? 1 : 0;
++        }
++    }
++}
+diff --git a/hybridPorousInterFoam/updateDarcyVelocities.H b/hybridPorousInterFoam/updateDarcyVelocities.H
+index 81f38a6..8c8c02b 100644
+--- a/hybridPorousInterFoam/updateDarcyVelocities.H
++++ b/hybridPorousInterFoam/updateDarcyVelocities.H
+@@ -19,6 +19,7 @@ Solidf = fvc::interpolate(Solid);
+ // Keep Solidf binary as at start-up (createPorousMediaFields.H): this
+ // recomputation (added for dynamic meshes) left 0.5 on porous/free faces
+ #include "binarySolidf.H"
++#include "porousFace.H"
+ 
+ 
+ 
+diff --git a/hybridPorousInterFoam/updateVariables.H b/hybridPorousInterFoam/updateVariables.H
+index 2668273..4cc81d7 100755
+--- a/hybridPorousInterFoam/updateVariables.H
++++ b/hybridPorousInterFoam/updateVariables.H
+@@ -16,10 +16,10 @@ const surfaceScalarField MfLinear(k0f*(kr1f/mu1 + kr2f/mu2));
+ // alphaEqn.H), as impesFoam (kra upwind phia, krb upwind phib). Linear
+ // interpolation halves the water mobility of the face between a wet and a
+ // dry cell and slows the front.
+-kr1f = (1. - Solidf)*kr1f
+-  + Solidf*upwind<scalar>(mesh, phiWettingUp).interpolate(kr1);
+-kr2f = (1. - Solidf)*kr2f
+-  + Solidf*upwind<scalar>(mesh, phiNonWettingUp).interpolate(kr2);
++kr1f = (1. - porousFace)*kr1f
++  + porousFace*upwind<scalar>(mesh, phiWettingUp).interpolate(kr1);
++kr2f = (1. - porousFace)*kr2f
++  + porousFace*upwind<scalar>(mesh, phiNonWettingUp).interpolate(kr2);
+ 
+ // Updating Mobilities
+ M1 = k0*kr1/mu1;
+@@ -45,6 +45,13 @@ autoPtr<capillarityModel> myCapModel = capillarityModel::New("pc",transportPrope
+ myCapModel().correct();
+ pc = myCapModel().pc()*activateCapillarity; 
+ dPcdS = myCapModel().dpcdS()*activateCapillarity; 
++// Change G: no capillary pressure in free cells (the porous/free faces then
++// carry the capillary pressure jump of the porous side only)
++if (porousFreeDarcyFaces)
++{
++    pc *= Solid;
++    dPcdS *= Solid;
++}
+ PcCoeff = (  
+ 	-pc
+ 	+(1./M)*(M1*(1.-alpha1) - M2*(alpha1))*dPcdS
+-- 
+2.34.1
+

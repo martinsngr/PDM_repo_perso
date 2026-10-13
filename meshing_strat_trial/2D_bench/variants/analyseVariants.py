@@ -26,8 +26,8 @@ sys.path.insert(0, "../../tools")
 from initFields import read_internal  # noqa: E402
 
 NX, NZ, DX = 50, 15, 20e-3            # cells, cell size [mm]
-ORDER = ["base", "ca90", "sigma0", "pcMild", "noRamp", "airZero0", "fullSlab", "paperLike", "closedTB", "fullSlabClosed"]
-CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948", "#6b6a64", "#1f1f1e"]
+ORDER = ["base", "ca90", "sigma0", "pcMild", "noRamp", "airZero0", "fullSlab", "paperLike", "closedTB", "fullSlabClosed", "gapInletAir", "yarnInletFixed", "plic"]
+CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948", "#6b6a64", "#1f1f1e", "#2a78d6", "#eb6834", "#1baf7a"]
 SEQ = LinearSegmentedColormap.from_list("blue", ["#fcfcfb", "#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"])
 DIV = LinearSegmentedColormap.from_list("div", ["#104281", "#3987e5", "#f0efec", "#e66767", "#a32020"])
 INK, MUTED, GRID = "#1f1f1e", "#6b6a64", "#e4e3de"

@@ -1,0 +1,92 @@
+From 3aded21b580170dda4fe9c8643b1ae41ed51c89e Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Tue, 13 Oct 2026 11:02:45 +0200
+Subject: [PATCH 10/11] F': opt-in flux-consistent velocity of free cells next
+ to porous/free Darcy faces
+
+Problem. Change F rebuilds the velocity of cells with Darcy and non-Darcy
+faces from the face driving force of each face's own flux; on Darcy faces
+that is phiDarcyExplicit/Mf - snGrad(p)*|Sf|, i.e. phi/Mf. With change G
+the porous/free faces are Darcy faces, so the free cells next to a porous
+surface are such mixed cells. When the porous side is nearly impermeable
+(Mf -> 0) phi/Mf is ill-conditioned: the reconstructed velocity of the free
+cell gets an arbitrary component normal to the porous surface, which enters
+the fluxes of its free faces through HbyA/ddtCorr. Slit between porous walls
+of K 1e-20: wall-normal velocity next to the walls larger than the
+tangential one (0.87 vs 0.52 m/s at 0.1 ms), spurious currents 14-49 m/s
+and droplets ahead of the meniscus, even with change H. Same flaw behind the
+gap air jets (3.7-9 m/s) near the inlet of the 2D bench with air gaps.
+
+Change (pEqn.H, keyword porousFreeFluxForce 1 in transportProperties,
+default 0 = change F as before): on porous/free Darcy faces
+(DarcyFace = 1, Solidf = 0) the face force of the U reconstruction is
+(phi - interpolate(HbyA).Sf)/rAUf, the force that makes the reconstructed
+velocity carry the face flux phi (about 0 for an impermeable wall), instead
+of phiDarcyExplicit/Mf - snGrad(p)*|Sf|. Other faces unchanged; cells with
+only Darcy faces are still overwritten by reconstruct(phi). phi itself is
+not changed.
+
+Checks (with H and I): slit with porous walls K 1e-20 ... 1e-11: max |U|
+0.8-1.1 m/s in all cases (real walls 0.75-0.94), no droplets, gap rise
+monotone in K; 2D bench with air gaps: yarn front/saturation unchanged to
+3-4 digits, gap air velocity 8.6 -> 0.10 m/s; closed-ramp referee
+unchanged. Keyword off: bit-identical.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../createPorousMediaFields.H                    |  7 +++++++
+ solvers/hybridPorousInterFoam/pEqn.H             | 16 ++++++++++++++--
+ 2 files changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/solvers/hybridPorousInterFoam/createPorousMediaFields.H b/solvers/hybridPorousInterFoam/createPorousMediaFields.H
+index fbaa946..244f2b7 100644
+--- a/solvers/hybridPorousInterFoam/createPorousMediaFields.H
++++ b/solvers/hybridPorousInterFoam/createPorousMediaFields.H
+@@ -100,6 +100,13 @@ surfaceScalarField Solidf(fvc::interpolate(Solid));
+ //Eliminating intermediate values of Solid Indicator Function
+ #include "binarySolidf.H"
+ 
++// Change F' (pEqn.H): velocity of free cells next to porous/free Darcy faces
++// from the face flux. 1 = on, 0 (default) = change F as before.
++const scalar porousFreeFluxForce
++(
++    transportProperties.lookupOrDefault<scalar>("porousFreeFluxForce", 0)
++);
++
+ // Change G (opt-in): porous/free faces carry the porous two-phase fluxes,
+ // with pc = 0 in free cells and the harmonic face permeability (see
+ // porousFace.H). Without the keyword porousFace = Solidf: solver unchanged.
+diff --git a/solvers/hybridPorousInterFoam/pEqn.H b/solvers/hybridPorousInterFoam/pEqn.H
+index fbe6f11..d2520ed 100644
+--- a/solvers/hybridPorousInterFoam/pEqn.H
++++ b/solvers/hybridPorousInterFoam/pEqn.H
+@@ -91,12 +91,24 @@
+             // Mf/rAUf times too large on Darcy faces). Same as before on
+             // momentum faces; cells with only Darcy faces are overwritten
+             // below.
++            // Change F' (opt-in porousFreeFluxForce 1): on
++            // porous/free Darcy faces the force is the one that makes the
++            // reconstructed velocity carry the face flux phi,
++            // (phi - HbyA_f.Sf)/rAUf, instead of the Darcy driving force
++            // phiDarcyExplicit/Mf - snGrad(p)|Sf| (= phi/Mf, ill-conditioned
++            // when Mf -> 0: arbitrary wall-normal velocity in the free cells
++            // next to nearly impermeable porous cells).
++            const surfaceScalarField pfD
++            (
++                porousFreeFluxForce*DarcyFace*(1. - Solidf)
++            );
+             U = HbyA + rAU()*fvc::reconstruct
+             (
+                 (1. - DarcyFace)*(phiG + phiPc)/rAUf
+-              + DarcyFace*phiDarcyExplicit
++              + (DarcyFace - pfD)*phiDarcyExplicit
+                /max(Mf, dimensionedScalar(Mf.dimensions(), vSmall))
+-              - fvc::snGrad(p)*mesh.magSf()
++              - (1. - pfD)*fvc::snGrad(p)*mesh.magSf()
++              + pfD*(phi - (fvc::interpolate(HbyA) & mesh.Sf()))/rAUf
+             );
+             // cells with only Darcy faces: velocity of the Darcy flux
+             U = (1. - DarcyCell)*U + DarcyCell*fvc::reconstruct(phi);
+-- 
+2.34.1
+

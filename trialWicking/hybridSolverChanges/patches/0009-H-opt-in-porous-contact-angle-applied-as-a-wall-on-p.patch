@@ -1,0 +1,137 @@
+From 15888632ff395d1178766de5271a23b29b185971 Mon Sep 17 00:00:00 2001
+From: martinsngr <martin.sinegre@gmail.com>
+Date: Tue, 13 Oct 2026 11:00:58 +0200
+Subject: [PATCH 09/11] H: opt-in porous contact angle applied as a wall on
+ porous/free faces
+
+Problem. With activatePorousContactAngle 1, correctContactAngleDB
+- computes the interface normal from alpha including the porous cells,
+  where alpha is a saturation, not a VoF fraction: water in a free cell next
+  to a dry porous cell looks like an interface parallel to the porous
+  surface (along the whole wetted surface), a wet porous cell next to a dry
+  free cell looks like a liquid film;
+- imposes the contact angle on every face where the smoothed gradient of
+  Solid is non-zero, i.e. a band 2-3 cells deep on both sides of the porous
+  surface, which covers most of a gap of 4-8 cells.
+Slit capillary rise between porous walls (20 um cells, walls K 1e-20, i.e.
+impermeable): rise -35 % to +60 % vs the same slit with real walls and
+constantAlphaContactAngle (worst for narrow gaps and extreme angles),
+spurious velocities 30-68 m/s, droplets thrown ahead of the meniscus; with
+K 1e-11 walls a film of alpha 0.1-0.4 ran ahead along the walls.
+
+Change (porousInterfaceProperties.C, keyword porousContactAngleWallLike 1 in
+transportProperties, used with activatePorousContactAngle 1; default 0 =
+previous behaviour): porous/free faces act as the walls of the free fluid,
+as a contact-angle wall patch in interFoam.
+- For the interface normal, porous cells take the area mean of alpha of
+  their free neighbours (zero gradient into the wall), and on porous/free
+  faces the normal is the gradient of the free cell.
+- The contact angle is applied on porous/free faces only, with the face
+  normal (towards the porous cell) as wall normal and the formula of
+  correctContactAngle (a12 bounded to [-1, 1], det >= 1e-12).
+Surface tension itself is unchanged (still only on non-porous faces).
+
+Checks: with F' and I (next commits), slit with impermeable porous walls
+matches the real-wall slit within 2 % for gaps of 4, 8, 15 cells and
+contact angles 40, 60, 80 deg, velocities as with real walls (0.5-1.2 m/s).
+Alone, H removes the film and the spurious currents next to permeable
+walls (K 1e-11: 3-5 -> 1.4 m/s) but not next to nearly impermeable walls
+(fixed by F'). A variant extrapolating alpha into the wall with the contact-
+angle gradient (as constantAlphaContactAngle) made no measurable difference
+and is not included. Keyword off: bit-identical. Uniform meshes assumed
+(0.5 interpolation weights).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../porousInterfaceProperties.C               | 61 ++++++++++++++++++-
+ 1 file changed, 60 insertions(+), 1 deletion(-)
+
+diff --git a/libraries/porousInterfaceProperties/porousInterfaceProperties.C b/libraries/porousInterfaceProperties/porousInterfaceProperties.C
+index 99a7577..ab469f8 100644
+--- a/libraries/porousInterfaceProperties/porousInterfaceProperties.C
++++ b/libraries/porousInterfaceProperties/porousInterfaceProperties.C
+@@ -181,6 +181,41 @@ void Foam::interfaceProperties::calculateK()
+     //Smoothing Alpha
+     volScalarField alpha1Smoothed (C_*alpha1_ +(1-C_)*fvc::average(fvc::interpolate(alpha1_)));
+ 
++    // Change H (opt-in porousContactAngleWallLike 1, with
++    // activatePorousContactAngle 1): porous/free faces act as the walls of the
++    // free fluid, as a contact-angle wall patch in interFoam.
++    //  - The interface normal does not see the porous saturation: porous cells
++    //    take the area mean of alpha of their free neighbours (zero gradient
++    //    into the wall), and on porous/free faces the normal is the gradient
++    //    of the free cell.
++    //  - The contact angle is applied on porous/free faces only (wall normal =
++    //    face normal towards the porous cell), not on a smoothed band of faces
++    //    on both sides of the porous surface.
++    const label wallLike
++    (
++        transportPropertiesDict_.lookupOrDefault<label>("porousContactAngleWallLike", 0)
++    );
++    const bool H = (activatePorousContactAngle_ == 1 && wallLike == 1);
++    const surfaceScalarField pf(pos0(0.01 - mag(fvc::interpolate(Solid_) - 0.5)));
++    if (H)
++    {
++        // alpha of the free side of porous/free faces (linear weights 0.5:
++        // uniform meshes)
++        const surfaceScalarField afree
++        (
++            2*fvc::interpolate(alpha1Smoothed*(1 - Solid_))
++        );
++        const volScalarField num(fvc::surfaceSum(pf*afree*mesh.magSf()));
++        const volScalarField den(fvc::surfaceSum(pf*mesh.magSf()));
++        forAll(alpha1Smoothed, celli)
++        {
++            if (Solid_[celli] > 0.5)
++            {
++                alpha1Smoothed[celli] =
++                    den[celli] > 0 ? num[celli]/den[celli] : 0;
++            }
++        }
++    }
+ 
+     // Cell gradient of alpha
+     //const volVectorField gradAlpha(fvc::grad(alpha1_, "nHat"));
+@@ -193,6 +228,15 @@ void Foam::interfaceProperties::calculateK()
+     //    (mesh.Sf()/mesh.magSf())
+     //   *(fvc::snGrad(alpha1_) - (mesh.Sf() & gradAlphaf)/mesh.magSf());
+ 
++    if (H)
++    {
++        // porous/free faces: gradient of the free cell
++        const surfaceScalarField freef(fvc::interpolate(1 - Solid_));
++        gradAlphaf =
++            pf*fvc::interpolate(gradAlpha*(1 - Solid_))/max(freef, small)
++          + (1 - pf)*gradAlphaf;
++    }
++
+     // Face unit interface normal
+     surfaceVectorField nHatfv(gradAlphaf/(mag(gradAlphaf) + deltaN_));
+ 
+@@ -201,7 +245,22 @@ void Foam::interfaceProperties::calculateK()
+     //     (gradAlphaf + deltaN_*vector(0, 0, 1)
+     //    *sign(gradAlphaf.component(vector::Z)))/(mag(gradAlphaf) + deltaN_)
+     // );
+-    if (activatePorousContactAngle_==1)
++    if (H)
++    {
++        // contact angle on porous/free faces only (as correctContactAngle)
++        const surfaceScalarField sgn(sign(fvc::snGrad(Solid_)*dimensionedScalar(dimLength, 1)));
++        const surfaceVectorField nW(sgn*Sf/mesh.magSf());
++        const scalar theta = convertToRad*theta0_;
++        const surfaceScalarField a12(max(min(nHatfv & nW, scalar(1)), scalar(-1)));
++        const surfaceScalarField b2(cos(acos(a12) - theta));
++        const surfaceScalarField det(max(1.0 - a12*a12, scalar(1e-12)));
++        const surfaceScalarField a((cos(theta) - a12*b2)/det);
++        const surfaceScalarField b((b2 - a12*cos(theta))/det);
++        surfaceVectorField nCA(a*nW + b*nHatfv);
++        nCA /= (mag(nCA) + deltaN_.value());
++        nHatfv = pf*nCA + (1 - pf)*nHatfv;
++    }
++    else if (activatePorousContactAngle_==1)
+     {correctContactAngleDB(nHatfv,gradAlphaf);}
+     correctContactAngle(nHatfv.boundaryFieldRef(), gradAlphaf.boundaryField());
+ 
+-- 
+2.34.1
+

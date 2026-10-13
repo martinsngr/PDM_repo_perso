@@ -8,16 +8,20 @@ Run from a case folder after blockMesh, the eps field and
 
 Writes 0/alpha.wetting (needs numpy only):
   internal field
-    - every cell dry at S_DRY (porous and free: no alpha jump at the yarn surface at t = 0)
+    - porous cells dry at S_DRY; free cells at FREE_DRY (default 0, pure air). A free region at
+      alpha 0.002 is not "dry" for the VOF part: small alpha variations there get full-strength interface
+      normals and surface-tension currents grow (2D bench R1, gapInletAir, 2026-10-12)
     - porous cells (eps <= 0.99) within RAMP of the inlet face: linear ramp S_IN -> S_DRY in
       10 bands, band i at S_IN - (S_IN - S_DRY)*(i + 0.5)/10, as ../trialWicking/1D_vertical_hybrid
       (a sharp S_IN -> S_DRY jump at the inlet crashes the solver within microseconds)
     - free cells near the inlet stay dry: with the default contact angle (90 deg) the gaps are fed
       from the reservoir face only
   boundary field, from constant/polyMesh/boundary
-    - inlet patch:  inletOutlet, inletValue per face = S_IN on porous faces, 1 on free faces (reservoir)
+    - inlet patch:  inletOutlet, inletValue per face = S_IN on porous faces, FREE_IN (default 1) on free faces
+    - --fixed-patch patches: fixedValue S_IN
     - cyclic/empty/symmetry patches: their constraint type
-    - every other patch (open to air): inletOutlet, inletValue S_DRY (air enters dry)
+    - every other patch (open to air): inletOutlet, inletValue per face = S_DRY on porous faces,
+      FREE_DRY on free faces (air enters dry)
   The wicking direction is the inlet patch normal; the ramp uses the distance of the cell centre
   to the inlet plane (the inlet must be a plane normal to x, y or z).
 """
@@ -111,6 +115,16 @@ def main():
     ap.add_argument("--ramp", type=float, default=2e-4, help="wetted ramp length [m], 0 = no ramp")
     ap.add_argument("--s-in", type=float, default=0.99, help="reservoir saturation of porous faces")
     ap.add_argument("--s-dry", type=float, default=0.002, help="initial (dry) saturation")
+    ap.add_argument("--free-dry", type=float, default=0.0,
+                    help="initial alpha of the free cells and inflow value of free faces of open patches (0 = air)")
+    ap.add_argument("--free-in", type=float, default=1.0,
+                    help="inletValue on the free faces of the inlet (1 = reservoir water, s-dry = air only)")
+    ap.add_argument("--fixed-patch", action="append", default=[],
+                    help="patch(es) with alpha fixedValue S_IN (e.g. the yarn part of the inlet); repeatable")
+    ap.add_argument("--porous-value", type=float, default=None,
+                    help="uniform alpha in every porous cell (replaces dry value and ramp; referee tests)")
+    ap.add_argument("--free-water-above", type=float, default=None,
+                    help="free cells whose centre has z >= this value [m] start full of water (alpha 1)")
     a = ap.parse_args()
     case = a.case
 
@@ -134,7 +148,7 @@ def main():
     x0, sgn = (lo, 1.0) if C[cells_in, ax].mean() < 0.5 * (lo + hi) else (hi, -1.0)
     dist = sgn * (C[:, ax] - x0)
 
-    alpha = np.full(ncells, a.s_dry)
+    alpha = np.where(porous, a.s_dry, a.free_dry)
     if a.ramp > 0:
         band = np.floor(dist / (a.ramp / N_BANDS)).astype(int)
         ramp = porous & (band < N_BANDS)
@@ -142,20 +156,31 @@ def main():
     else:                                             # --ramp 0: sharp start, wet inlet face only
         ramp = np.zeros(ncells, dtype=bool)
 
-    inlet_value = np.where(porous[cells_in], a.s_in, 1.0)
+    if a.porous_value is not None:
+        alpha[porous] = a.porous_value
+    if a.free_water_above is not None:
+        alpha[(~porous) & (C[:, 2] >= a.free_water_above)] = 1.0
+
+    inlet_value = np.where(porous[cells_in], a.s_in, a.free_in)
 
     txt = HEADER.format(name="alpha.wetting",
-                        note=f"dry {a.s_dry}, porous ramp {a.ramp:g} m from '{a.inlet}', "
-                             f"inlet {a.s_in} porous / 1 free")
+                        note=f"dry {a.s_dry} porous / {a.free_dry:g} free, porous ramp {a.ramp:g} m from '{a.inlet}', "
+                             f"inlet {a.s_in} porous / {a.free_in:g} free"
+                             + (f", fixed {a.s_in} on {a.fixed_patch}" if a.fixed_patch else "")
+                             + (f", porous uniform {a.porous_value}" if a.porous_value is not None else "")
+                             + (f", free water for z >= {a.free_water_above}" if a.free_water_above is not None else ""))
     txt += f"internalField   {scalar_list(alpha)};\n\nboundaryField\n{{\n"
     for name, typ, nf, sf in patches:
         if typ in ("cyclic", "empty", "symmetry", "symmetryPlane", "wedge", "processor"):
             body = f"type {typ};"
+        elif name in a.fixed_patch:
+            body = f"type fixedValue;\n        value uniform {a.s_in};"
         elif name == a.inlet:
             lst = scalar_list(inlet_value)
             body = f"type inletOutlet;\n        inletValue {lst};\n        value {lst};"
         else:
-            body = f"type inletOutlet;\n        inletValue uniform {a.s_dry};\n        value uniform {a.s_dry};"
+            pv = scalar_list(np.where(porous[owner[sf:sf + nf]], a.s_dry, a.free_dry))
+            body = f"type inletOutlet;\n        inletValue {pv};\n        value {pv};"
         txt += f"    {name}\n    {{\n        {body}\n    }}\n"
     txt += "}\n"
     with open(os.path.join(case, "0/alpha.wetting"), "w") as fh:

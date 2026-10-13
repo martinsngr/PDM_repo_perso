@@ -6,7 +6,11 @@
 
   p is the mixture pressure p_air - alpha*pc(alpha) (updateDarcyVelocities.H,
   PcCoeff). On every face:
-    - free-fluid face (eps > 0.99): p = 0 (air, or reservoir water, at 0 Pa)
+    - free-fluid face (eps > 0.99): p = 0 (air, or reservoir water, at 0 Pa);
+      with openFreeTotalPressure 1 (transportProperties, default 0): total
+      pressure 0 on inflow faces, p = -0.5*rho*|U|^2 (fluid at rest outside,
+      as a reservoir; the static p = 0 inlet gives the entering water its
+      velocity for free, ../NOTES.md "Slit tests"), p = 0 on outflow faces
     - porous face (eps <= 0.99), switch openPorousAirZero in
       constant/transportProperties:
         1 (default): air at 0 Pa, p = -alpha*pc(alpha), as the 1D and single
@@ -29,6 +33,14 @@ code
         db().lookupObject<IOdictionary>("transportProperties");
     const scalar airZero =
         tp.lookupOrDefault<scalar>("openPorousAirZero", 1);
+    const scalar freeTotal =
+        tp.lookupOrDefault<scalar>("openFreeTotalPressure", 0);
+    const fvPatchVectorField& Up =
+        patch().lookupPatchField<volVectorField, vector>("U");
+    const fvsPatchScalarField& phip =
+        patch().lookupPatchField<surfaceScalarField, scalar>("phi");
+    const fvPatchScalarField& rhop =
+        patch().lookupPatchField<volScalarField, scalar>("rho");
     const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
     const scalar act  = readScalar(tp.lookup("activateCapillarity"));
     const scalar pc0  = dimensionedScalar(vg.lookup("pc0")).value();
@@ -47,6 +59,10 @@ code
                 min(max((alphap[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
             const scalar pc = act*pc0*pow(pow(Se, -1/m) - 1, 1/n);
             pb[i] = -airZero*alphap[i]*pc;
+        }
+        else if (freeTotal > 0 && phip[i] < 0)
+        {
+            pb[i] = -0.5*rhop[i]*magSqr(Up[i]);
         }
     }
     operator==(pb);

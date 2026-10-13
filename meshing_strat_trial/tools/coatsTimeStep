@@ -6,8 +6,9 @@
   dSmax, Brooks-Corey kr / Van Genuchten pc), with two changes for meshes
   that mix porous and free cells:
     1. Coats CFL and dSmax are evaluated in porous cells only (Solid = 1),
-       and the capillary sum K*A/d over porous faces only (both cells
-       porous). Free cells carry K_VOID = 1 m2, which would make the
+       and the capillary sum K*A/d over the faces carrying porous capillary
+       fluxes: the solver's porousFace with its k0f if registered (change G:
+       porous/free faces too, harmonic K), else both cells porous. Free cells carry K_VOID = 1 m2, which would make the
        capillary term, and so dt, meaningless there. In free cells the
        solver's own limits (maxCo, maxAlphaCo of setDeltaT.H) apply.
     2. Capillary-wave limit of the free surface (Brackbill et al. 1992),
@@ -77,12 +78,26 @@ codeExecute
         dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
     const scalar nvg = 1/(1 - m);
 
-    // porous faces: both neighbours porous (as Solidf in the solver)
+    // Faces carrying porous capillary fluxes and their permeability: the
+    // solver's own porousFace and k0f when registered (solver with change G:
+    // porous/free faces included, harmonic K there); otherwise faces with
+    // both neighbours porous and linearly interpolated K (identical to
+    // porousFace and k0f without G)
+    const bool solverFaces =
+        mesh().foundObject<surfaceScalarField>("porousFace")
+     && mesh().foundObject<surfaceScalarField>("k0f");
     surfaceScalarField porousf(fvc::interpolate(Solid));
     porousf = pos0(porousf - (1 - small));
     const scalarField sumKA
     (
-        fvc::surfaceSum
+        solverFaces
+      ? fvc::surfaceSum
+        (
+            mesh().lookupObject<surfaceScalarField>("porousFace")
+           *mesh().lookupObject<surfaceScalarField>("k0f")
+           *mesh().magSf()/mag(mesh().delta())
+        )().primitiveField()
+      : fvc::surfaceSum
         (
             porousf*fvc::interpolate(K)*mesh().magSf()/mag(mesh().delta())
         )().primitiveField()

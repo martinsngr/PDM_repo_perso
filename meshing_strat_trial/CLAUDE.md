@@ -4,11 +4,11 @@ Working notes, setup and findings for this folder (fabric REV with hybridPorousI
 
 ## Rules for this folder
 
-- **Work from this folder.** It is self-contained: tools in `tools/`, cases `2D_bench/` and `REV_hybrid/`.
+- **Work from this folder.** It is self-contained: tools in `tools/`, cases `2D_bench/`, `slit_test/` and `REV_hybrid/`.
   `../trialWicking/` holds the 1D / single-yarn cases and is the reference (read it when needed; don't add new
   work there).
 - **Solver:** `hybridPorousInterFoam`, OpenFOAM 9, source `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8`,
-  branch `of9-port` (installed `b995db5`: changes A/B/C, see `../trialWicking/hybridSolverChanges/`). Don't edit
+  branch `of9-port` (installed `b525086`: changes A–I; H, F′, I opt-in, see `../trialWicking/hybridSolverChanges/` and NOTES.md). Don't edit
   the solver from here; solver changes go to that repo, one justified commit each. Correctness is not validated:
   never claim results are right because a case runs.
 - **Solver logs never in the workspace:** use `runTmpLog` from `tools/runTools.sh` (log in /tmp, symlink in the

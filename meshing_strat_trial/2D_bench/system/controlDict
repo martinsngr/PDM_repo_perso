@@ -57,6 +57,7 @@ functions
     coatsTimeStep { #include "../../tools/coatsTimeStep" }
     liquidBalance { #include "../../tools/liquidBalance" }
     stopGuard     { #include "../../tools/stopGuard" }
+    waterBudget   { #include "../../tools/waterBudget" }
 }
 
 // ************************************************************************* //
