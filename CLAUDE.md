@@ -8,8 +8,9 @@ Working notes, loaded for the whole repo:
 - `meshing_strat_trial/`: current work, fabric REV. Self-contained: `2D_bench/` (thick-wall slit bench),
   `REV/` (geometry, mesh, fields and solver case in one folder), `slit_test/`, `2D_bench_strip/` (first bench,
   archive), `tools/` (shared scripts, function objects, `runTools.sh`).
-- `trialWicking/`: 1D column and single-yarn cases, verification against the paper. Reference work: read it when
-  needed, don't add new work there.
+- `trialWicking/`: 1D column and single-yarn cases. Reference work: read it when needed, don't add new work there.
+- `verification/`: all verification evidence (paper tutorials, 1D similarity, benches) and `PLAN.md` (planned
+  studies, their rules: predictions before runs, one recorded solver version per study, stop after each study).
 - `NOTES_cases.md` (cases) and `NOTES_solver.md` (solver): update them after each piece of work, measured results
   kept apart from hypotheses.
 

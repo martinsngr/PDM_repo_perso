@@ -1,9 +1,0 @@
-#!/bin/sh
-# 1D wicking column vs the similarity solution (verification/wicking1D): original hybridPorousInterFoam_be54696 (no Darcy faces, minDeltaTCoats 1e-7 as results_oldsolver), writes every 1 ms to 0.03 s.
-cd "${0%/*}" || exit 1
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
-. ../../../runTools.sh
-runApplication blockMesh
-cp 0/alpha.wetting.orig 0/alpha.wetting
-runApplication setFields
-runTmpLog log.hybridPorousInterFoam_be54696 hybridPorousInterFoam_be54696

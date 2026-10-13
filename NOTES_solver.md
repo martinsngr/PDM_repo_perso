@@ -80,7 +80,7 @@ gave a staircase 1D profile. Bench: the 1D column widened to NX cells (symmetry 
 - **Part 2 → B:** with A, a transverse mode still grew: the momentum-equation cell velocity alternated between rows
   (0.08–0.30 m/s, face flux uniform) and fed back through `HbyA`. B (Darcy flux on Darcy faces) keeps the spread at
   round-off (1e-9 NX = 2, 8e-8 NX = 5), same mean α for NX = 1, 2, 5, ~5× fewer steps. 5 ms: spread ≤ 4e-7.
-- **Is B needed? (2026-10-07, `trialWicking/verification/bench_ddtCorr/`):** ddtCorr coefficient 1 / 0.1 / 0, removing
+- **Is B needed? (2026-10-07, `verification/bench_ddtCorr/`):** ddtCorr coefficient 1 / 0.1 / 0, removing
   inertia (`ddt steadyState`, crashes earlier), tight pressure tolerance (seed 3e-5 → 2.4e-9 but same growth rate
   ~6e5–1e6 1/s, saturation 0.05–0.2): none removes the mode; only B does (spread ≤ 1.3e-7). **B is needed**; mechanism
   beyond "the momentum flux in porous faces feeds it" not established (decided not to dig further).
@@ -153,7 +153,7 @@ rise was −35 % to +60 % off the real-wall rise depending on width and angle.
 
 ## Verification
 
-### Against the paper and analytical solutions (`trialWicking/verification/`, 2026-10-05 to 10-09)
+### Against the paper and analytical solutions (`verification/`, 2026-10-05 to 10-09)
 - **OF9 port physics-neutral** (API renames only; porous libraries unchanged; OF8 not rebuilt for a bitwise check).
 - **Gravity-driven Buckley–Leverett (paper 4.1.2):** original port and A+B+C both: plateau −0.1 %, front −0.11 to −0.16 %,
   same water deficit 0.24 % from the inlet treatment (`alphaEqn.H` divides the boundary relative flux by εα_b + 0.001;
@@ -217,5 +217,5 @@ Model questions (raised by an independent review, 2026-10-13; answers so far in 
 - I: state the slip assumption with its bound (above).
 - Verification still missing: static meniscus at 4/8/15 cells (Δp vs 2σcosθ/w, no flow); ablation of G, H, F′, I one at
   a time on the 15-cell slit (K 1e-11 and 1e-20, plus H with θ 90°); kr variant on yarn/gap faces; porous_Boundary
-  original vs E. Planned in this order (see `NOTES_cases.md`, Next steps).
+  original vs E. **Planned in detail in `verification/PLAN.md`** (Studies 1, 2a, 2b, 3).
 - Thesis: say the interface model changed (supervisor to be informed); cite Mosthaf et al. 2011.

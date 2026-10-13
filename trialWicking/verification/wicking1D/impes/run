@@ -1,9 +1,0 @@
-#!/bin/sh
-# 1D wicking column vs the similarity solution (verification/wicking1D): impesFoam, copy of ../../../1D_vertical_impes_inletRes, writes every 1 ms to 0.03 s.
-cd "${0%/*}" || exit 1
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
-. ../../../runTools.sh
-runApplication blockMesh
-cp 0/Sb.org 0/Sb
-runApplication setFields
-runTmpLog log.impesFoam impesFoam

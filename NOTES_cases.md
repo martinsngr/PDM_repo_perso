@@ -17,12 +17,12 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `trialWicking/singleYarn_IMPES_vertical/` | 1D vertical setup on the yarn geometry, open lateral wall (crashed near saturation, see below) |
 | `trialWicking/singleYarn_vertical_impes_inletRes/` | Yarn twin of `1D_vertical_impes_inletRes` (15,188 cells, lateral wall closed). 0.1 s: mini03 3.8 h |
 | `trialWicking/singleYarn_vertical_hybrid/` | Yarn twin of `1D_vertical_hybrid` (lateral wall closed). 0.1 s: mini03 11.9 h |
-| `trialWicking/verification/` | Paper tutorials and the 1D similarity solution (results in `NOTES_solver.md`) |
 | `trialWicking/wickingFront.ipynb` | Front analysis of the 1D cases (front at S = 0.1 vs √t, profiles, p_air/p_water) |
 | `meshing_strat_trial/REV/` | **The REV in one folder:** TexGen geometry (`Textiles/`, `funge.py`), `inspect_stl.py` (REV box → `rev_domain.json`, `--zgap`), `build_fields.py` (mesh + eps, K, fYarn, yarnID), `check_periodicity.py`, `meshing.pvsm`, solver dictionaries, `Allpre` (geometry → mesh → fields → initial α). Run scripts not written yet |
 | `meshing_strat_trial/2D_bench/` | **The 2D bench:** thick-wall slit (yarn wall 8 cells \| gap 8 \| yarn wall 8), G + H + F′ + I on; `Allpre`, `run`, `check.py` |
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
+| `verification/` (repo root) | All verification: paper tutorials, 1D similarity solution, ddtCorr bench, inlet test (moved from `trialWicking/verification/` 2026-10-13; results in `NOTES_solver.md`), and **`PLAN.md`: the planned studies 1–3** |
 | `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (open-patch p BC), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
 
 ## Common setup and rules
@@ -177,12 +177,10 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 ## Next steps
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
-1. **Verification of the new physics** (review items, `NOTES_solver.md` open issues), in this order:
-   a. ablation on the 15-cell slit, K 1e-11 and 1e-20: all on; G, H, F′, I off one at a time; H with θ 90°;
-   b. flux signs and saturation alternation on the yarn/gap faces (2D bench, R2);
-   c. static meniscus at 4/8/15 cells (g = 0, closed ends): Δp vs 2σcosθ/w, residual |U| (needs a closed-ends option);
-   d. kr variant on yarn/gap faces (kr = 1 for the gap phase);
-   e. `porous_Boundary` tutorial, original vs E (what E changes in a published-type case).
+1. **Verification: `verification/PLAN.md`, start there** (agreed 2026-10-13, nothing run yet): Study 1 equilibrium
+   oscillation (EQ0m-dt first), 2a ablation of G/H/F′/I on the 15-cell slit, 2b face checks (bench, R2), 3 sensitivity
+   (θ, K, pc0). Still to schedule after them: static meniscus at 4/8/15 cells (Δp vs 2σcosθ/w), kr variant on yarn/gap
+   faces, `porous_Boundary` tutorial original vs E.
 2. **REV:** take the decisions above, write `run`/`job.slurm`, local smoke test, then mini01. Before: parallel/cyclic and a
    small 3D check of H/F′/I.
 3. Bench extensions: 15-cell gap (REV median), gaps interrupted by porous crossings (yarn first, then gap: needs an empty
