@@ -1,0 +1,13 @@
+--- a/OpenFoamV8/libraries/porousInterfaceProperties/porousInterfaceProperties.C
++++ b/OpenFoamV8/libraries/porousInterfaceProperties/porousInterfaceProperties.C
+@@ -215,6 +215,10 @@
+                     den[celli] > 0 ? num[celli]/den[celli] : 0;
+             }
+         }
++        // coupled patches: processor patch values hold the neighbour cell
++        // values and are not updated by the loop above; refresh them so that
++        // gradients across processor boundaries see the modified porous cells
++        alpha1Smoothed.correctBoundaryConditions();
+     }
+ 
+     // Cell gradient of alpha

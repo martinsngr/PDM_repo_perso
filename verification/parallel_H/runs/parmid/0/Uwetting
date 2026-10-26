@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      Uwetting;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Darcy phase velocity (0 in free cells: Solid*M*(...) in
+// updateDarcyVelocities.H). zeroGradient on every open patch: then
+// correctUBc.H keeps the pressure-equation flux and alphaEqn.H has no relative
+// flux on the patch. A fixedValue here (the 1D outlet had Uwetting fixed 0)
+// makes correctUBc.H impose (Uwetting + UnonWetting).Sf on the whole patch,
+// which closes its free-fluid faces (both velocities are 0 there).
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+
+    "(inlet|outlet)"
+    {
+        type            zeroGradient;
+    }
+    "(top|bottom)"      // closed walls behind the yarn walls
+    {
+        type fixedValue;
+        value uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

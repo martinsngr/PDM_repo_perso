@@ -29,9 +29,16 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|outlet|top|bottom)"
+    "(inlet|top|bottom)"
     {
         type            zeroGradient;
+    }
+    // closed walls: U is noSlip there, so correctUBc.H leaves the patch
+    // alone; fixedValue 0 as on the walls of ../2D_bench
+    "(outlet|inletPad)"
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
     }
 }
 

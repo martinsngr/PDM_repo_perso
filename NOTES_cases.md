@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-13.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-26.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -31,7 +31,7 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
   m 0.5, water/air (μ 1e-3 / 1.76e-5 Pa·s), σ 0.072. pc0 5000 Pa is consistent with K 1e-11 by Leverett scaling (4–8 kPa).
   The wicking rate constrains K·pc0, the equilibrium height (pc0/ρg ≈ 0.5 m) constrains pc0: fitting both needs
   experimental-length samples. Real K (tensor), pc and contact angle (polyester) come later.
-- **Gravity along the wicking direction** (−x), reservoir at x-min.
+- **Gravity along the wicking direction** (−x), reservoir at x-min (REV: −y, reservoir at y-min).
 - **Case layout (meshing_strat_trial):** source fields in `0.orig/`, `./Allpre` writes `0/` (eps, K by setFields or
   build_fields, `alpha.wetting` by `initFields.py`); `0/` is never edited by hand and not committed; `./clean` keeps
   `0`, `0.orig` and the mesh.
@@ -90,19 +90,32 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 - TexGen plain weave `PW-22-15-0.4-0.5.stl` (cm → ×0.01). REV 1.82 × 2.67 × 0.28 mm, 91 × 133 × 14 cells of 20 µm =
   169,442 cells. `build_fields.py --k-mode scalar --k-scalar 1e-11 --cut-cells binary` (f ≥ 0.5 → yarn; every cell with
   eps ≤ 0.99 gets the yarn K, others K_VOID = 1 m²): 78,528 porous, 90,914 free; inlet 1,862 faces (1,262 porous).
-  Free fraction per z layer 0.86 (bottom) → 0.15 (middle) → 0.91 (top): the edge layers are mostly open space beside the
+  Free fraction per z layer 0.86 (bottom) → 0.15 (middle) → 0.91 (top) counting every cell touched by a yarn as yarn;
+  with the binary cut the solver sees (f ≥ 0.5): 0.94 → 0.21 → 0.97. The edge layers are mostly open space beside the
   crimped fabric.
 - **Yarns:** thickness median 6 cells (120 µm), max 7–8; width ~15 cells (300 µm); yarns 0/4 and 5/9 are halves cut by
   the periodic boundaries. A yarn flank facing an in-plane gap is ~8 cells deep, a face facing a crimp pocket ~3.
 - **Gaps** (narrowest free run between yarns along x, y or z, per free cell): median 15 cells (300 µm), p25 9, p10 6, p5 4;
   ≤ 4 cells 6 %, ≤ 8 cells 20 %. Narrow throats at mid-thickness where warp and weft cross; near the surfaces medians
   18–58 cells. 82 % of the free cells inside the fabric envelope, 1 % enclosed. TexGen model, not the real fabric.
+- **Boundaries and connectivity** (binary mesh, measured 2026-10-26 with `tools/revGeometry.py --axis x|y`): yarns 0–4
+  run along y over 2.66 mm (0 and 4 are halves at the x-periodic planes, one yarn across them), yarns 5–9 along x over
+  1.82 mm (5 and 9 halves at the y planes). Each periodic plane cuts a crossing yarn along its centreline: porous faces
+  x planes 1,262 of 1,862 (68 %), y planes 984 of 1,274 (77 %); bottom 747 and top 417 of 12,103 (6.2 / 3.4 %, yarn
+  crests); **no porous/free face pair across the x or the y planes** (first and last layers identical); 38,242
+  internal porous/free faces. The free cells form one network (all but 4 cells) joining the opposite faces in x and in
+  y, still connected without the outer 4 z layers. Straight full-length free rows exist only in the outer layers (along
+  x: 396 of 1,862 rows, z layers 0–2 and 10–13; along y: 204 of 1,274, z layers 0–2 and 11–13). Widest path crossing
+  the REV: cells ≥ 3 cells from the nearest yarn cell and from the top/bottom planes along x, only ≥ 2 along y (the
+  in-plane gaps between the y-yarns are narrower). **The gaps form a continuous but tortuous network** (over and
+  under the crossing yarns), not isolated pockets.
 
 ### Gap vs yarn wicking (estimates)
 Viscous Washburn h²/t = σw cosθ/(3μ) for a slit: w 160 µm θ 60° → 44 mm/√s, w 300 µm θ 75° → 43, θ 85° → 25; yarn
 (K 1e-11, pc0 5000) 18 mm/√s. **A straight continuous gap out-runs the yarn unless θ ≳ 87°**, but stops at
 h_eq = 2σcosθ/(ρgw) ≈ 13 mm (300 µm, θ 75°) while the yarn holds ~0.5 m. In a plain weave the gaps are interrupted by
-crossing yarns (hypothesis, not checked from `fYarn`: mostly no continuous channels → yarns lead). In the 2D bench the
+crossing yarns (checked 2026-10-26, REV geometry above: the free space is continuous along x but tortuous, straight
+channels only in the outer layers; whether the menisci pass the widenings behind each crossing is open). In the 2D bench the
 yarn walls lead even with a straight gap (they draw water out of it).
 
 ### 2D bench (`2D_bench/`, since 2026-10-13)
@@ -118,6 +131,11 @@ yarn walls lead even with a straight gap (they draw water out of it).
   uniform across the wall. **The walls lead the gap** (0.36 mm at 2 ms): they draw water out of the gap and are fed
   sideways along it. The meniscus first drops (0.11 → 0.09 mm) while the column feeds the walls.
 - Known bias: θ fixed at 60° also on the wet wall surface ahead of the meniscus (physically ~0°): the gap rise is biased low.
+- **20 ms run (`2D_bench_long/`, 2026-10-15, `b525086`):** stable (α bounded, budget 2.6e-14, max |U| 1.85 m/s); fronts
+  reach the slit end at ~5–6 ms; afterwards a non-physical steady through-flow (~0.05 m/s in the gap, 10 % of the early
+  wicking rate) leaves through the open outlet, with ±1 m/s churning in the outlet cells. Open outlets are not valid
+  once water reaches them (details in its README).
+- **θ 120° (`2D_bench_t120/`, run 2026-10-14):** stopped by stopGuard at 1.71 ms (dt 1e-14, min α −0.26). Not analysed.
 
 ### Slit tests (`slit_test/`, 2026-10-12/13)
 - **Setup:** 2 mm vertical slit, 20 µm, reservoir at x = 0, open at x = 2 mm; `S0` real walls with
@@ -125,6 +143,9 @@ yarn walls lead even with a straight gap (they draw water out of it).
   Bosanquet rise ρ d(hḣ)/dt = 2σcosθ/w − 12μhḣ/w² − ρgh from the 0.1 mm start.
 - **Inlet:** a static p = 0 inlet gives the entering water velocity without the dynamic-pressure cost (~60 % too fast
   at 2 ms); free inlet faces at total pressure 0 (`openFreeTotalPressure 1`, p = −½ρ|U|²) = reservoir at rest.
+  Porous inlet faces (1D, single yarn, yarn part of the bench) keep static p: Darcy faces (B) and impesFoam carry no
+  ½ρU², and it is small anyway (estimate, not run: pore velocity at 1 ms ~0.2 m/s → ~20 Pa vs pc ~kPa; comparable only
+  for t < ~10 µs, inside the initial ramp). In the gap ½ρU² (50–500 Pa) competes with 2σcosθ/w = 450 Pa.
 - **Initial water column needed:** with α `inletOutlet` an empty gap sees α = 0 on the inlet and never rises (stock
   interFoam the same); α fixed 1 on the inlet with an empty gap gives a spurious kick (6× too fast, 23 m/s); a 1-cell
   column drains back; 5 cells (0.1 mm) correct. The previous student's case had initial water in its `0/alpha.water`.
@@ -143,14 +164,44 @@ start as pure air**; 3–4-cell gaps are not representative; with reservoir wate
 referees `R1staticWet`, `R2waterGap`, `R3closedRamp(Slab)`, figures `variants/figures/`; face-flux debug build and the
 Solidf-bug figures in `debug_faceDump/`.
 
-### REV case status (`REV/`)
-`./Allpre` works (20 s, Mesh OK). Missing: `run` (decompose, serial precompile, mpirun), `caseSetup` (N),
-`decomposeParDict`, `job.slurm`, endTime. Decisions to take (listed at the top of `Allpre`):
-- top/bottom: open porous faces are unstable → closed walls or free-cell padding (`inspect_stl.py --zgap`);
-- outlet: yarns end before it, or porous outlet faces closed;
-- inlet: total pressure for free faces; water column in the gaps at the inlet (`initFields.py --free-fill`);
-- keywords G + H + F′ + I, `activatePorousContactAngle 1`, θ (as `2D_bench`);
-- y cyclic (checked by `check_periodicity.py`), parallel: E handles coupled faces; H/F′/I not yet tested on coupled faces.
+### REV case status (`REV/`, set up 2026-10-26)
+**Setup (decided with the user 2026-10-26):** wicking along **y** (along yarns 0–4 over 2.67 mm = 2 weave repeats,
+yarns 5–9 crossing), gravity −y, reservoir at y = 0, x cyclic. Mesh `build_fields.py --wick-axis y --zpad 3`: the
+REV box (91 × 133 × 14, cells identical to the unpadded mesh) + 3 free layers (60 µm) below and above = 91 × 133 × 20
+= 242,060 cells (78,528 porous). Patches:
+- `inlet` (y = 0, box part): reservoir as `2D_bench` (`pOpenAir`: free faces total pressure 0, yarn faces air at 0 Pa;
+  α inletOutlet 0.99 on yarn faces, 1 on free faces);
+- `inletPad` (y = 0, padding part) and `outlet` (y = L): closed walls (U noSlip, p fixedFluxPressure, α zeroGradient,
+  phase velocities 0). The outlet plane cuts the half crossing yarn 9 along its centreline (77 % porous faces): open,
+  it would carry porous faces on an open boundary (unstable) and the open-outlet artefact once water arrives
+  (`2D_bench_long`); with top/bottom open, air does not need it;
+- `bottom`/`top`: faces of the padding, open to air (`pOpenAir`, α inletOutlet 0); `sideA`/`sideB`: cyclic in x.
+
+Initial state as `2D_bench` (`initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4`): yarns
+0.002 with the 0.2 mm ramp (holds the same water as a saturated 0.1 mm column), free box cells within 0.1 mm of the
+inlet full of water (1,645 cells), padding dry. `constant/transportProperties` = `2D_bench` (G + H + F′ + I, θ 60°);
+`system/controlDict` = `2D_bench` (Coats dt, stopGuard, liquidBalance, waterBudget) with endTime 10 ms and writes every
+0.5 ms (46 MB each). Scripts: `./Allpre` (20 s), `./run` (serial precompile, decomposePar scotch, mpirun with N from
+`caseSetup`, reconstructPar), `check.py` (per-write checks). Checked: box fields identical to the unpadded mesh; x and
+y planes exactly periodic (`check_periodicity.py`); padding dry, ramp along y. Not yet: `job.slurm` (cluster after a
+stable laptop setup).
+- **Cost (laptop, 2026-10-26):** s per step serial 2.18, 4 cores 1.35, 8 cores 1.55 (memory bound; `caseSetup` N 4);
+  dt at the Coats limit ~1.2e-7 s after 50 steps.
+- **Smoke test, old inlet** (scratch copy, 4 cores, 2026-10-26): **failed at 0.21 ms** (stopGuard, dt 1e-14 s). The dry
+  yarns drained the 0.1 mm gap column within 0.1 ms (free water 1,645 → 250 cell volumes; 112 of 290 free inlet cells
+  air), air entered through the open top/bottom and left through the reservoir face (9e-8 m³/s), α went to −0.025 in
+  air-filled free inlet cells and the Coats limit collapsed dt. Cause: the reservoir inlet let air through →
+  **water-only reservoir (solver change J, `be1a3ab`)**, `waterOnlyPatches (inlet); reservoirWaterPressure 0;
+  reservoirReferencePoint (0 0 0);` in `constant/transportProperties` since 2026-10-26.
+- **Smoke test, water-only inlet** (scratch copy, 4 cores, J, 0.5 ms): past 0.22 ms; at 0.2 ms α in [−6e-20, 1], max
+  |U| 0.98 m/s (old 2.85), water cells 0.44 m/s (old 1.73), yarn front (y-yarns, α > 0.1) 0.37 mm, mean porous S 0.105,
+  gap water 320 cell volumes (old 142; the column still drains into the yarns, slower), water lost through the open
+  top/bottom 1.1 cell volumes (from the initial column spreading into the padding), budget closed to 1e-13. Air
+  leaves through top/bottom, none through the inlet. Final state at 0.5 ms: below.
+- Before 2026-10-26 the dictionaries were older than `2D_bench` (no H/F′/I keywords, `activatePorousContactAngle 0`, no
+  `openFreeTotalPressure`, `timePrecision 6`, no `waterBudget`) and wicking was planned along x.
+- Parallel: E, G, F′, I consistent on processor porous/free faces; H fixed there by `0f6c6d4` (`NOTES_solver.md`;
+  `verification/parallel_H/`). No porous/free faces on the cyclic planes.
 
 ## Reference: Boubaker et al. 2026 (Compos. Part A 206, 109781)
 Same solver on a plain-weave E-glass µCT geometry (tows porous, inter-tow space free; K_VOID = 1 m² comes from there).
@@ -177,12 +228,14 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 ## Next steps
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
+**2026-10-26:** review before the REV setup; H found wrong on processor boundaries (fix tested on the bench, not
+committed); REV geometry facts measured (above); REV decisions put to the user (open). `verification/PLAN.md` still not run.
 1. **Verification: `verification/PLAN.md`, start there** (agreed 2026-10-13, nothing run yet): Study 1 equilibrium
    oscillation (EQ0m-dt first), 2a ablation of G/H/F′/I on the 15-cell slit, 2b face checks (bench, R2), 3 sensitivity
    (θ, K, pc0). Still to schedule after them: static meniscus at 4/8/15 cells (Δp vs 2σcosθ/w), kr variant on yarn/gap
    faces, `porous_Boundary` tutorial original vs E.
-2. **REV:** take the decisions above, write `run`/`job.slurm`, local smoke test, then mini01. Before: parallel/cyclic and a
-   small 3D check of H/F′/I.
+2. **REV:** take the decisions above, write `run`/`job.slurm`, local smoke test, then mini01. Before: the H processor fix
+   (decision pending); the 3D check of H/F′/I (edges, corners) comes with the REV smoke test.
 3. Bench extensions: 15-cell gap (REV median), gaps interrupted by porous crossings (yarn first, then gap: needs an empty
    gap to fill from a wet wall, probably a saturation-dependent θ), θ 75°, 5 ms runs.
 4. Later: tensor K (solver change), real K/pc/θ for polyester; report the impesFoam Todd bug upstream; a swept yarn mesh

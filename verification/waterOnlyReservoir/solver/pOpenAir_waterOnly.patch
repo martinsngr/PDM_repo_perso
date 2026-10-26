@@ -1,0 +1,85 @@
+diff --git a/meshing_strat_trial/tools/pOpenAir b/meshing_strat_trial/tools/pOpenAir
+index 785c9bf..63faabb 100644
+--- a/meshing_strat_trial/tools/pOpenAir
++++ b/meshing_strat_trial/tools/pOpenAir
+@@ -17,12 +17,26 @@
+           yarn cases (../trialWicking/1D_vertical_hybrid)
+         0: mixture at 0 Pa, p = 0, i.e. the value the solver itself reaches
+           across an interior porous/free face (mixture p continuous there)
++  Water-only reservoir (solver change J, of9-port): on a patch listed in
++  waterOnlyPatches (constant/transportProperties) no air crosses (the solver
++  zeroes the air mobility of its porous faces and closes its free faces next
++  to air-rich cells), and the reservoir water is at rest: hydrostatic,
++  p_w = reservoirWaterPressure + rho_water*(g & (Cf - reservoirReferencePoint))
++  (Pa, default 0, at the point default (0 0 0), e.g. on the bath surface), so
++  the patch can face any direction (bath below the sample, a vertical bath face
++  for horizontal wicking). Porous faces p = p_w + (1 - alpha)*pc
++  (p_w = p - (1 - alpha)*pc), free faces p = p_w (total pressure on inflow
++  faces with openFreeTotalPressure 1). openPorousAirZero is not used there.
+   pc: Van Genuchten with the solver's Se clipping (pcVanGenuchten.H).
+ \*---------------------------------------------------------------------------*/
+ 
+ type            codedFixedValue;
+ value           uniform 0;
+ name            pOpenAir;
++codeInclude
++#{
++    #include "uniformDimensionedFields.H"
++#};
+ code
+ #{
+     const fvPatchScalarField& alphap =
+@@ -50,6 +64,33 @@ code
+     const scalar Smax =
+         dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
+     const scalar n    = 1/(1 - m);
++    // water-only reservoir patch (change J)?
++    const wordReList waterOnlyNames
++    (
++        tp.lookupOrDefault<wordReList>("waterOnlyPatches", wordReList())
++    );
++    bool waterOnly = false;
++    forAll(waterOnlyNames, wi)
++    {
++        if (waterOnlyNames[wi].match(patch().name()))
++        {
++            waterOnly = true;
++        }
++    }
++    const scalar pRes =
++        tp.lookupOrDefault<scalar>("reservoirWaterPressure", 0);
++    // hydrostatic water pressure of the reservoir on each face (change J)
++    scalarField pw(alphap.size(), pRes);
++    if (waterOnly)
++    {
++        const vector xRef =
++            tp.lookupOrDefault<vector>("reservoirReferencePoint", Zero);
++        const scalar rhoW =
++            dimensionedScalar("rho", dimDensity, tp.subDict("wetting")).value();
++        const vector gv =
++            db().lookupObject<uniformDimensionedVectorField>("g").value();
++        pw += rhoW*(gv & (patch().Cf() - xRef));
++    }
+     scalarField pb(alphap.size(), 0);
+     forAll(pb, i)
+     {
+@@ -58,7 +99,18 @@ code
+             const scalar Se =
+                 min(max((alphap[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
+             const scalar pc = act*pc0*pow(pow(Se, -1/m) - 1, 1/n);
+-            pb[i] = -airZero*alphap[i]*pc;
++            pb[i] =
++                waterOnly
++              ? pw[i] + (1 - alphap[i])*pc
++              : -airZero*alphap[i]*pc;
++        }
++        else if (waterOnly)
++        {
++            pb[i] = pw[i];
++            if (freeTotal > 0 && phip[i] < 0)
++            {
++                pb[i] -= 0.5*rhop[i]*magSqr(Up[i]);
++            }
+         }
+         else if (freeTotal > 0 && phip[i] < 0)
+         {

@@ -1,0 +1,15 @@
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    location "system";
+    object decomposeParDict;
+}
+// processor boundary in the middle of the gap (z-cells 11|12, free/free faces only)
+numberOfSubdomains 2;
+method manual;
+manualCoeffs
+{
+    dataFile "cellDecomposition";
+}

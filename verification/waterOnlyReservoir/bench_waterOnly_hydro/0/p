@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Mixture pressure p_air - alpha*pc. Reservoir (inlet) and open-to-air
+// patches: shared coded BC ../../tools/pOpenAir (free faces 0; porous faces
+// per openPorousAirZero in constant/transportProperties). The internal value
+// is only the first guess of the pressure solve.
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+
+    "(inlet|outlet)"
+    {
+        #include "../../tools/pOpenAir"
+    }
+    "(top|bottom)"      // closed walls behind the yarn walls
+    {
+        type fixedFluxPressure;
+        value uniform 0;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,19 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+. ../tools/runTools.sh
+
+# hybridPorousInterFoam on the 2D bench, serial. Needs ./Allpre first (mesh,
+# eps, K, alpha.wetting). Deletes previous results (./clean), not the mesh.
+# Solver log in /tmp during the run (../tools/runTools.sh); LOG_EVERY=N keeps
+# every Nth step only.
+
+if [ ! -f constant/polyMesh/owner ] || [ ! -f 0/alpha.wetting ]; then
+    echo "ERROR: no mesh or no 0/alpha.wetting: run ./Allpre first."
+    exit 1
+fi
+./clean
+runTmpLog log.hybridPorousInterFoam hybridPorousInterFoam
+status=$?
+[ "$status" -eq 0 ] || echo "ERROR: hybridPorousInterFoam failed (see log.hybridPorousInterFoam)."
+exit $status

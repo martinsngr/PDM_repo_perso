@@ -16,7 +16,7 @@ Working notes, loaded for the whole repo:
 
 ## Solver
 - `hybridPorousInterFoam`, OpenFOAM 9, source `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8`, branch
-  `of9-port` (installed `b525086`: changes A–I, see `NOTES_solver.md`). Don't edit the solver from this repo: solver
+  `of9-port` (installed `be1a3ab`: changes A–J + H fix, see `NOTES_solver.md`). Don't edit the solver from this repo: solver
   changes go to that repo, one justified commit each, with `CHANGES_of9-port.md` updated.
 - Correctness is not validated: never claim results are right because a case runs.
 - `hybridPorousPimpleFoam` is not ported and does not build on OF9.
@@ -35,8 +35,8 @@ Working notes, loaded for the whole repo:
 ## Editing and git
 - Keep changes minimal, justified and traceable; list every change to case dictionaries.
 - Don't edit dictionaries with `foamDictionary -set` (it strips the comments): edit by hand or with sed/Python.
-- The repo is pushed to GitHub. Don't commit unless asked; keep results and logs out of commits (`.gitignore` files
-  at the root and in `meshing_strat_trial/`).
+- The repo is pushed to GitHub. Don't commit unless asked; keep results and logs out of commits (the root `.gitignore`,
+  the only one of the repo).
 
 ## OpenFOAM 9 notes
 - Source terms and constraints go in `constant/fvModels` / `system/fvConstraints`; there is no `fvOptions`.

@@ -1,0 +1,15 @@
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    location "system";
+    object decomposeParDict;
+}
+// processor boundary exactly on the lower porous/free surface (z = 0.16 mm)
+numberOfSubdomains 2;
+method manual;
+manualCoeffs
+{
+    dataFile "cellDecomposition";
+}

@@ -1,0 +1,5 @@
+#!/bin/bash
+# AC: installed hybridPorousInterFoam (b525086), 2 ms, see ../README.md
+cd "$(dirname "$0")"
+. ../../runTools.sh
+LOG_EVERY=10 runTmpLog log.AC hybridPorousInterFoam

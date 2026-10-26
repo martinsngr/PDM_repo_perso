@@ -1,0 +1,32 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+. ../tools/runTools.sh
+
+# hybridPorousInterFoam on the REV in parallel, N cores from caseSetup
+# (system/decomposeParDict: scotch). Needs ./Allpre first (mesh, eps, K,
+# alpha.wetting). Deletes previous results (./clean), not the mesh or 0/.
+# Solver log outside the workspace during the run (../tools/runTools.sh):
+# LOG_EVERY=100 keeps every 100th step (+ the last 400 lines in .tail), LOG_DIR
+# moves the temporary log (on a cluster: LOG_DIR=$PWD/logs).
+# The coded BC and function objects are compiled first, in serial (compiling
+# them inside mpirun aborts the run: MPI_ERR_TRUNCATE); that pass writes t = 0
+# rows to the csv files, removed here.
+
+N=$(foamDictionary -entry N -value caseSetup)
+if [ ! -f constant/polyMesh/owner ] || [ ! -f 0/alpha.wetting ]; then
+    echo "ERROR: no mesh or no 0/alpha.wetting: run ./Allpre first."
+    exit 1
+fi
+./clean
+runApplication -s precompile hybridPorousInterFoam -postProcess -time 0
+rm -f liquidBalance.csv waterBudget.csv
+runApplication decomposePar
+echo "Running hybridPorousInterFoam on $PWD using $N cores"
+runTmpLog log.hybridPorousInterFoam mpirun -np "$N" hybridPorousInterFoam -parallel
+status=$?
+runApplication reconstructPar
+if [ "$status" -ne 0 ]; then
+    echo "ERROR: hybridPorousInterFoam failed (see log.hybridPorousInterFoam)."
+    exit 1
+fi

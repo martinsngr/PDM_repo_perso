@@ -19,7 +19,10 @@ import numpy as np
 field = sys.argv[1] if len(sys.argv) > 1 else "fYarn"
 
 bm = open("system/blockMeshDict").read()
-n = tuple(int(v) for v in re.search(r"hex\s*\([\d\s]+\)\s*\((\d+)\s+(\d+)\s+(\d+)\)", bm).groups())
+# one block, or blocks stacked in z (build_fields.py --zpad): same cell order, x fastest, then y, then z
+blocks = re.findall(r"hex\s*\([\d\s]+\)\s*\((\d+)\s+(\d+)\s+(\d+)\)", bm)
+assert all(b[:2] == blocks[0][:2] for b in blocks), "blocks must be stacked in z"
+n = (int(blocks[0][0]), int(blocks[0][1]), sum(int(b[2]) for b in blocks))
 
 txt = open(f"0/{field}").read()
 body = txt.split("internalField", 1)[1]

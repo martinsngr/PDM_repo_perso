@@ -2,22 +2,28 @@
 cd "${0%/*}" || exit 1
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 
-# REV of the plain-weave fabric, from the TexGen geometry to the initial fields.
-# Overwrites the mesh and 0/; then the solver run (not written yet, see
-# ../../NOTES_cases.md "Next steps"). Python: $PY, else the repo .venv (numpy, trimesh).
+# REV of the plain-weave fabric, wicking along y: from the TexGen geometry to the
+# initial fields. Overwrites the mesh and 0/; then ./run. Setup decisions:
+# ../../NOTES_cases.md, REV case status (2026-10-26). Python: $PY, else the repo
+# .venv (numpy, trimesh).
 #
 #   geometry   Textiles/PW-22-15-0.4-0.5.stl (TexGen, funge.py), copy in
 #              constant/triSurface/; REV box in rev_domain.json (inspect_stl.py,
 #              rerun only if the STL changes: python inspect_stl.py <stl> 0.01)
-#   mesh       uniform hex mesh written by build_fields.py (system/blockMeshDict)
+#   mesh       uniform 20 um hex mesh by build_fields.py: the REV box (91 x 133
+#              x 14 cells) plus 3 free cell layers below and above it (--zpad 3,
+#              same cells in the box as without padding). Patches: inlet = y min
+#              of the box (reservoir), inletPad = y min of the padding (closed),
+#              outlet = y max (closed: end of the sample), sideA/sideB = cyclic
+#              in x, bottom/top = z faces of the padding (open to air)
 #   fields     eps, K (scalar 1e-11 in the yarns, binary cut cells), fYarn,
 #              yarnID by build_fields.py; alpha.wetting by ../tools/initFields.py
-#              (yarns dry with the 0.2 mm wetted ramp at the inlet, gaps pure air)
-#
-# Open setup decisions for the REV (../../NOTES_cases.md, REV case status): top/bottom open porous faces
-# (unstable in the 2D tests: close or pad with --zgap), water column in the gaps
-# at the inlet (initFields.py --free-fill), H/F'/I keywords and contact angle
-# in constant/transportProperties (as ../2D_bench).
+#              as ../2D_bench: yarns dry (0.002) with the 0.2 mm wetted ramp at
+#              the inlet, free cells pure air except a 0.1 mm water column in the
+#              free cells of the box at the inlet (the padding stays dry)
+#   BCs        0.orig: inlet = reservoir (free faces total pressure 0, yarn faces
+#              air at 0 Pa: ../tools/pOpenAir), top/bottom open to air (p 0),
+#              outlet and inletPad closed walls
 
 PY=${PY:-../../.venv/bin/python}
 [ -x "$PY" ] || PY=python3
@@ -27,11 +33,12 @@ rm -rf constant/polyMesh 0 system/blockMeshDict
 cp -r 0.orig 0
 rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCentres log.initFields
 
-"$PY" build_fields.py . --k-mode scalar --k-scalar 1e-11 --cut-cells binary > log.build_fields 2>&1 \
-    || { cat log.build_fields; exit 1; }
+"$PY" build_fields.py . --k-mode scalar --k-scalar 1e-11 --cut-cells binary --wick-axis y --zpad 3 \
+    > log.build_fields 2>&1 || { cat log.build_fields; exit 1; }
 runApplication blockMesh
 runApplication checkMesh
 runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
-"$PY" ../tools/initFields.py > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+"$PY" ../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 \
+    > log.initFields 2>&1 || { cat log.initFields; exit 1; }
 cat log.initFields
 rm -f 0/C 0/Cx 0/Cy 0/Cz

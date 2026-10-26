@@ -27,9 +27,18 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|outlet|top|bottom)"
+    // open: reservoir (inlet = fabric part of y = 0) and air beside the
+    // fabric (top, bottom: faces of the free padding layers)
+    "(inlet|top|bottom)"
     {
         #include "../../tools/pOpenAir"
+    }
+    // closed walls: end of the sample (outlet, y = L) and the padding part of
+    // the reservoir face (inletPad)
+    "(outlet|inletPad)"
+    {
+        type            fixedFluxPressure;
+        value           uniform 0;
     }
 }
 

@@ -1,0 +1,138 @@
+--- a/createPorousMediaFields.H
++++ b/createPorousMediaFields.H
+@@ -114,6 +114,38 @@
+     transportProperties.lookupOrDefault<scalar>("porousFreeNoSlip", 0)
+ );
+ 
++// Change J (opt-in waterOnlyPatches (<patch names>) in transportProperties):
++// reservoir patches that exchange water only, as the surface of a bath. On
++// their porous faces the air mobility is zero (updateVariables.H), so the
++// pressure equation carries the water Darcy flux only; on all their faces
++// the alpha flux is the total flux (alphaEqn.H); their free faces are closed
++// (zero flux) while the cell next to them is air-rich, alpha < 0.5, and open
++// both ways while it holds water (pEqn.H). No air enters or leaves through
++// them. The reservoir water pressure comes from the p boundary condition.
++// Without the keyword the solver is unchanged.
++const labelHashSet waterOnlyPatchIDs
++(
++    mesh.boundaryMesh().patchSet
++    (
++        transportProperties.lookupOrDefault<wordReList>
++        (
++            "waterOnlyPatches",
++            wordReList()
++        )
++    )
++);
++forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)
++{
++    if (mesh.boundaryMesh()[iter.key()].coupled())
++    {
++        FatalErrorInFunction
++            << "waterOnlyPatches: " << mesh.boundaryMesh()[iter.key()].name()
++            << " is a coupled patch" << exit(FatalError);
++    }
++    Info<< "waterOnlyPatches: " << mesh.boundaryMesh()[iter.key()].name()
++        << " exchanges water only (no air through it)" << endl;
++}
++
+ // Change G (opt-in): porous/free faces carry the porous two-phase fluxes,
+ // with pc = 0 in free cells and the harmonic face permeability (see
+ // porousFace.H). Without the keyword porousFace = Solidf: solver unchanged.
+--- a/updateVariables.H
++++ b/updateVariables.H
+@@ -21,6 +21,15 @@
+ kr2f = (1. - porousFace)*kr2f
+   + porousFace*upwind<scalar>(mesh, phiNonWettingUp).interpolate(kr2);
+ 
++// Change J: no air through the porous faces of the water-only reservoir
++// patches: zero air mobility, so the face carries the water Darcy flux only
++forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)
++{
++    const label patchi = iter.key();
++    kr2f.boundaryFieldRef()[patchi] *=
++        1. - porousFace.boundaryField()[patchi];
++}
++
+ // Updating Mobilities
+ M1 = k0*kr1/mu1;
+ L1 = rho1*k0*kr1/mu1; 	
+--- a/alphaEqn.H
++++ b/alphaEqn.H
+@@ -282,6 +282,18 @@
+             //)
+         );  
+ 
++        // Change J: the faces of the water-only reservoir patches carry
++        // water only, alpha flux = total flux (their porous faces have no
++        // air mobility, their free faces are closed next to air-rich cells,
++        // pEqn.H). Without it the alpha flux there is alpha_b*phi_b (the
++        // inflow carries 1 - alpha_b of air on porous faces).
++        forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)
++        {
++            const label patchi = iter.key();
++            talphaPhi1Un.ref().boundaryFieldRef()[patchi] =
++                phiCN().boundaryField()[patchi];
++        }
++
+         if (MULESCorr)
+         {
+             tmp<surfaceScalarField> talphaPhi1Corr(talphaPhi1Un() - alphaPhi10);
+--- a/pEqn.H
++++ b/pEqn.H
+@@ -57,13 +57,34 @@
+         )*mesh.magSf()
+       + Lf*(g & mesh.Sf())
+     );
+-    const surfaceScalarField rAUfD
++    surfaceScalarField rAUfD
+     (
+         "rAUfD",
+         (1. - DarcyFace)*rAUf + DarcyFace*Mf
+     );
+     phiHbyA = (1. - DarcyFace)*phiHbyA + DarcyFace*phiDarcyExplicit;
+ 
++    // Change J: free faces of the water-only reservoir patches next to an
++    // air-rich cell (alpha < 0.5) are closed (zero conductance and flux): the
++    // reservoir takes no air; next to water they stay open both ways
++    surfaceScalarField reservoirClosed("reservoirClosed", 0*DarcyFace);
++    forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)
++    {
++        const label patchi = iter.key();
++        const scalarField alphac
++        (
++            alpha1.boundaryField()[patchi].patchInternalField()
++        );
++        const fvsPatchScalarField& pfp = porousFace.boundaryField()[patchi];
++        fvsPatchScalarField& cp = reservoirClosed.boundaryFieldRef()[patchi];
++        forAll(cp, facei)
++        {
++            cp[facei] = (pfp[facei] < 0.5 && alphac[facei] < 0.5) ? 1 : 0;
++        }
++        phiHbyA.boundaryFieldRef()[patchi] *= 1. - cp;
++        rAUfD.boundaryFieldRef()[patchi] *= 1. - cp;
++    }
++
+     // Update the pressure BCs to ensure flux consistency
+     constrainPressure(p, U, phiHbyA, rAUfD, MRF);
+ 
+@@ -102,13 +123,16 @@
+             (
+                 porousFreeFluxForce*DarcyFace*(1. - Solidf)
+             );
++            // Change J: closed reservoir faces (zero flux) as F' faces, so
++            // that the reconstructed velocity carries their zero flux
+             U = HbyA + rAU()*fvc::reconstruct
+             (
+-                (1. - DarcyFace)*(phiG + phiPc)/rAUf
++                (1. - DarcyFace - reservoirClosed)*(phiG + phiPc)/rAUf
+               + (DarcyFace - pfD)*phiDarcyExplicit
+                /max(Mf, dimensionedScalar(Mf.dimensions(), vSmall))
+-              - (1. - pfD)*fvc::snGrad(p)*mesh.magSf()
+-              + pfD*(phi - (fvc::interpolate(HbyA) & mesh.Sf()))/rAUf
++              - (1. - pfD - reservoirClosed)*fvc::snGrad(p)*mesh.magSf()
++              + (pfD + reservoirClosed)
++               *(phi - (fvc::interpolate(HbyA) & mesh.Sf()))/rAUf
+             );
+             // cells with only Darcy faces: velocity of the Darcy flux
+             U = (1. - DarcyCell)*U + DarcyCell*fvc::reconstruct(phi);

@@ -19,18 +19,20 @@ application     hybridPorousInterFoam;
 startFrom       latestTime;
 startTime       0;
 stopAt          endTime;
-// 1D estimate (K 1e-11, pc0 5000): front x_f = 18 mm/sqrt(s)*sqrt(t), i.e. at
-// the outlet (1 mm) after ~3 ms
-endTime         5e-3;
+// REV, wicking along y over 2.67 mm (outlet closed). Estimates: yarn front
+// 18 mm/sqrt(s) (1D) -> 2.67 mm at ~22 ms; fed by the gaps as in ../2D_bench
+// (1.15 mm at 2 ms) -> ~11 ms. 10 ms = most of the length; set after the
+// smoke test (cost per simulated ms)
+endTime         0.01;
 deltaT          1e-8;
 writeControl    adjustableRunTime;
-writeInterval   2.5e-4;
+writeInterval   5e-04;  // ~60 MB per write (242k cells, ascii)
 purgeWrite      0;
 writeFormat     ascii;
 writePrecision  6;
 writeCompression off;
 timeFormat      general;
-timePrecision   6;
+timePrecision   12;
 runTimeModifiable yes;
 
 // Time step: solver limits on the total flux (free cells), then the
@@ -57,6 +59,7 @@ functions
     coatsTimeStep { #include "../../tools/coatsTimeStep" }
     liquidBalance { #include "../../tools/liquidBalance" }
     stopGuard     { #include "../../tools/stopGuard" }
+    waterBudget   { #include "../../tools/waterBudget" }
 }
 
 // ************************************************************************* //

@@ -129,7 +129,8 @@ def main():
     ap.add_argument("--free-fill", type=float, default=0.0,
                     help="free cells closer than this to the inlet plane [m] start full of water (initial "
                          "water column in the gaps: the VOF interface must start inside the domain, ../../NOTES_cases.md "
-                         "'Slit tests'); 0 = none")
+                         "'Slit tests'); only cells within the extent of the inlet patch across it (free padding "
+                         "beside a partial inlet stays dry); 0 = none")
     ap.add_argument("--free-water-above", type=float, default=None,
                     help="free cells whose centre has z >= this value [m] start full of water (alpha 1)")
     a = ap.parse_args()
@@ -168,7 +169,15 @@ def main():
     if a.free_water_above is not None:
         alpha[(~porous) & (C[:, 2] >= a.free_water_above)] = 1.0
     if a.free_fill > 0:
-        alpha[(~porous) & (dist < a.free_fill)] = 1.0
+        # only across the extent of the inlet patch (cell centres of its face cells, with a round-off
+        # tolerance): with a partial inlet (REV with free padding layers and a closed 'inletPad' patch)
+        # the padding beside it stays dry; for a full inlet every cell qualifies
+        tr = [i for i in range(3) if i != ax]
+        tol = 1e-9 * (hi - lo)
+        lo_t = C[cells_in][:, tr].min(axis=0) - tol
+        hi_t = C[cells_in][:, tr].max(axis=0) + tol
+        across = np.all((C[:, tr] >= lo_t) & (C[:, tr] <= hi_t), axis=1)
+        alpha[(~porous) & (dist < a.free_fill) & across] = 1.0
 
     inlet_value = np.where(porous[cells_in], a.s_in, a.free_in)
 

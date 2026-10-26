@@ -1,0 +1,5 @@
+#!/bin/bash
+# r1_zoom: r = 1 (5 x 172 x 3 cells), dt 1e-7, hybridPorousInterFoam_be54696
+cd "$(dirname "$0")"
+. ../../runTools.sh
+runTmpLog log.r1_zoom hybridPorousInterFoam_be54696

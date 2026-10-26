@@ -44,8 +44,21 @@ OpenFOAM API calls (fvOptions -> fvModels/fvConstraints, the CorrectPhi signatur
 - `scanOddEven.py` → `oddEvenScan.png`: local-extremum scan of every saturation field (eq_BC as positive control,
   1D and yarn wicking runs with their impesFoam twins).
 - `inlet_eps1e-8/`: the `+ 0.001` → `+ 1e-8` inlet test (patch, log, fields, README).
+- `solver_failures/`: the failure behind each change A–I, one figure each from copies of the original runs
+  (README there: runs, binaries, limits).
 - `bench_ddtCorr/` + `benchDdtCorr.py`: is change B needed? (5 × 172 × 3 bench: ddtCorr, inertia, pressure-solver
   tolerance; case, variant patch, logs, figures).
+- `bench_refinement/` (2026-10-15): original solver on the strip bench refined ×2 (not a resolution effect); mode
+  shape (`modeShape.py`); Python model of the original/A transport with optional momentum path (`darcyModel.py`).
+- `bench_noB/` (2026-10-15): installed solver with and without `darcyFaceMaxDa` on the strip bench (B needed).
+- `slit_freeSurface/` (2026-10-15): slit capillary rise, real walls vs Bosanquet, stock interFoam, porous walls
+  (G + H + F′ + I) vs real walls, permeable walls, 20 vs 10 µm; `slitVerification.py` → `summary.md`,
+  `slit_verification.png` (from the runs in `meshing_strat_trial/slit_test/`, no new runs).
+- `parallel_H/` (2026-10-26): changes H, F′, I with a yarn surface on a processor boundary (2D bench split on the
+  lower wall surface; control split mid-gap): H wrong there, one-line fix tested and committed (`0f6c6d4`).
+- `waterOnlyReservoir/` (2026-10-26): change J, a reservoir patch that exchanges water only: regressions, 1D column vs
+  the similarity solution, 2D bench (vertical and horizontal wicking), REV smoke test (`README.md`, `waterOnly1D.py`,
+  `benchCompare.py`).
 
 ## Results
 

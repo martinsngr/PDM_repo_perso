@@ -1,0 +1,5 @@
+#!/bin/bash
+# r2_dt2.5e-8: r = 2 (10 x 344 x 6 cells), dt 2.5e-8, hybridPorousInterFoam_be54696
+cd "$(dirname "$0")"
+. ../../runTools.sh
+runTmpLog log.r2_dt2.5e-8 hybridPorousInterFoam_be54696
