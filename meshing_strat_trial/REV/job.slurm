@@ -1,8 +1,8 @@
 #!/bin/bash
 # SLURM job of the REV (wicking along y, water-only reservoir, saturated rows) on mini01.
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.
-# Needs on mini01: the repo .venv with numpy, scipy, trimesh, rtree (python3 -m venv .venv && .venv/bin/pip install
-# numpy scipy trimesh rtree, at the repo root) and the solver of9-port be1a3ab or later (pull, wmake libso in
+# Needs on the cluster (mini03): the repo .venv with numpy, scipy, trimesh, rtree (python3 -m venv .venv && .venv/bin/pip install
+# numpy scipy trimesh==5.1.0 rtree embreex, at the repo root; without embreex the mesh build takes > 1 h) and the solver of9-port be1a3ab or later (pull, wmake libso in
 # libraries/porousInterfaceProperties, wmake in the solver).
 # Submit from this folder with sbatch job.slurm after checking the load with squeue; never ./run there.
 #SBATCH --job-name=REVwick

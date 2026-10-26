@@ -183,8 +183,16 @@ inlet full of water (1,645 cells), padding dry. `constant/transportProperties` =
 `system/controlDict` = `2D_bench` (Coats dt, stopGuard, liquidBalance, waterBudget) with endTime 10 ms and writes every
 0.5 ms (46 MB each). Scripts: `./Allpre` (20 s), `./run` (serial precompile, decomposePar scotch, mpirun with N from
 `caseSetup`, reconstructPar), `check.py` (per-write checks). Checked: box fields identical to the unpadded mesh; x and
-y planes exactly periodic (`check_periodicity.py`); padding dry, ramp along y. `job.slurm` (2026-10-26): 10 ms on mini01, 16 cores, saturated rows (`Allpre`: `--sat-height 1e-4`); the mesh
-and 0/ are built on the laptop and copied (git-ignored); `run` stops if the solver ignores `waterOnlyPatches`.
+y planes exactly periodic (`check_periodicity.py`); padding dry, ramp along y. `job.slurm` (2026-10-26): 10 ms on mini03, 16 cores, saturated rows (`Allpre`: `--sat-height 1e-4`); the mesh
+and 0/ are built by the job itself (`./Allpre`; mini03 repo `.venv`: numpy scipy trimesh==5.1.0 rtree embreex; without
+embreex the mesh build takes > 1 h instead of 7 s; the job checks the cell counts 78,528 / 163,532); `run` stops if the
+solver ignores `waterOnlyPatches`.
+- **Cluster run (mini03, job 3051, started 2026-10-26 ~15:25, 16 cores, solver `c3dbf48` built there, 10 ms):** cost
+  ~1,900 s per simulated ms (1.89 ms after 3,590 s; laptop 4 cores: 11,600 s/ms) → end ~20:30–21:00. Clean to 1.9 ms (no
+  stop). **α overshoot in episodes:** max α per 0.2 ms window 1.001, 1.007, 1.016, 1.022, 1.023 (0.8–1.0 ms), then 1.007,
+  1.009, 1.013, 1.016, 1.003 (1.8–2.0 ms): builds up ~0.6–0.8 ms then collapses, bounded; > 1.01 on 282 steps by
+  1.9 ms. The laptop's 4-core run of the same case peaked at 1.0017 to 0.5 ms → possibly decomposition-sensitive.
+  Results: `meshing_strat_trial/REV/` on mini03 (reconstructPar at the end; solver log in `logs/REV.*/`).
 - **Cost (laptop, 2026-10-26):** s per step serial 2.18, 4 cores 1.35, 8 cores 1.55 (memory bound; `caseSetup` N 4);
   dt at the Coats limit ~1.2e-7 s after 50 steps.
 - **Smoke test, old inlet** (scratch copy, 4 cores, 2026-10-26): **failed at 0.21 ms** (stopGuard, dt 1e-14 s). The dry
@@ -241,6 +249,12 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 ## Next steps
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
+**Resume here (2026-10-27):** analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
+(yarn front, gap water, gap rise, |U|, budget, losses); locate the α > 1 cells at the writes near the overshoot peaks
+(0.5, 1.0, 1.5 ms: next to the reservoir → boundary water flux of J; next to processor boundaries → decomposition);
+short 4- vs 16-core comparison on mini03 if it looks decomposition-related; check the capillary-valve hypothesis (gap
+water front stuck at ~0.15 mm = top of the half crossing yarn on the inlet plane). Decide then on longer/production
+runs. Git: both repos pushed (thesis `ac70ec3`, solver `c3dbf48`); laptop scratch runs in /tmp are disposable.
 **2026-10-26:** review before the REV setup; H found wrong on processor boundaries (fix tested on the bench, not
 committed); REV geometry facts measured (above); REV decisions put to the user (open). `verification/PLAN.md` still not run.
 1. **Verification: `verification/PLAN.md`, start there** (agreed 2026-10-13, nothing run yet): Study 1 equilibrium
