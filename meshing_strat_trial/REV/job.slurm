@@ -1,8 +1,8 @@
 #!/bin/bash
 # SLURM job of the REV (wicking along y, water-only reservoir, saturated rows) on mini01.
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.
-# Needs on mini01: the repo .venv with numpy, scipy, trimesh (python3 -m venv .venv && .venv/bin/pip install
-# numpy scipy trimesh, at the repo root) and the solver of9-port be1a3ab or later (pull, wmake libso in
+# Needs on mini01: the repo .venv with numpy, scipy, trimesh, rtree (python3 -m venv .venv && .venv/bin/pip install
+# numpy scipy trimesh rtree, at the repo root) and the solver of9-port be1a3ab or later (pull, wmake libso in
 # libraries/porousInterfaceProperties, wmake in the solver).
 # Submit from this folder with sbatch job.slurm after checking the load with squeue; never ./run there.
 #SBATCH --job-name=REVwick
@@ -31,8 +31,8 @@ if [ "$N" -ne "${SLURM_NTASKS}" ]; then
     echo "ERROR: N = $N in caseSetup but --ntasks = ${SLURM_NTASKS}"
     exit 1
 fi
-if ! ../../.venv/bin/python -c "import numpy, trimesh" 2>/dev/null; then
-    echo "ERROR: no repo .venv with numpy and trimesh (see the top of this file)."
+if ! ../../.venv/bin/python -c "import numpy, trimesh, rtree" 2>/dev/null; then
+    echo "ERROR: no repo .venv with numpy, trimesh and rtree (see the top of this file)."
     exit 1
 fi
 
