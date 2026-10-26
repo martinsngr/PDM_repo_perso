@@ -18,9 +18,10 @@ cd "${0%/*}" || exit 1
 #              in x, bottom/top = z faces of the padding (open to air)
 #   fields     eps, K (scalar 1e-11 in the yarns, binary cut cells), fYarn,
 #              yarnID by build_fields.py; alpha.wetting by ../tools/initFields.py
-#              as ../2D_bench: yarns dry (0.002) with the 0.2 mm wetted ramp at
-#              the inlet, free cells pure air except a 0.1 mm water column in the
-#              free cells of the box at the inlet (the padding stays dry)
+#              yarns saturated (0.99) over the first 0.1 mm (--sat-height), then
+#              the 0.2 mm ramp to dry (0.002), free cells pure air except a 0.1 mm
+#              water column in the free cells of the box at the inlet (padding dry):
+#              the most stable start of the 2026-10-26 smoke tests (NOTES_cases.md)
 #   BCs        0.orig: inlet = reservoir (free faces total pressure 0, yarn faces
 #              air at 0 Pa: ../tools/pOpenAir), top/bottom open to air (p 0),
 #              outlet and inletPad closed walls
@@ -38,7 +39,7 @@ rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCent
 runApplication blockMesh
 runApplication checkMesh
 runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
-"$PY" ../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 \
+"$PY" ../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 --sat-height 1e-4 \
     > log.initFields 2>&1 || { cat log.initFields; exit 1; }
 cat log.initFields
 rm -f 0/C 0/Cx 0/Cy 0/Cz

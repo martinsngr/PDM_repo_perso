@@ -75,3 +75,13 @@ keyword gives the same numbers.
   0.001 in α (hydrostatic difference across the slit ~2 Pa).
 - **Installed build** (of9-port + J, `wmake` of the same sources): bench run bit-identical to the scratch build
   (`bench_waterOnly_hydro`, 440 files, water budget).
+
+**REV smoke test** (scratch copy of `meshing_strat_trial/REV`, 4 cores, inlet water at 0 Pa): reached 0.5 ms (the old
+inlet failed at 0.21 ms). α in [−4e-20, 1.0004] at the writes, budget closed to 7e-14, no air through the inlet, max
+|U| 0.7–1.0 m/s from 0.2 to 0.45 ms (old inlet 2.3–2.8 m/s). Yarn front 0.51 mm at 0.5 ms; the gaps hold 244 cell
+volumes of water (from 1,645) and barely rise. Open: α overshoots up to 1.009 on 132 steps from 0.26 ms, and a local
+4.5 m/s spike at a gap interface at 0.5 ms (two cells next to the x-periodic plane). Not from the inlet; needs ≥ 1 ms.
+
+**REV with saturated rows** (`initFields.py --sat-height 1e-4`): reached 0.5 ms with no spike, budget closed to 6e-14,
+max |U| ≤ 1.2 m/s at the writes; gaps keep ~20 % more water (296 vs 244 cell volumes) but still do not rise; α > 1 on
+363 steps (peak 1.0017).

@@ -72,3 +72,6 @@ verification/**/check.png
 verification/**/check_summary.md
 # copies of the original runs behind each solver change (results)
 verification/solver_failures/**/cases/
+
+# solver logs of cluster runs during the run (LOG_DIR=logs, runTools.sh)
+meshing_strat_trial/REV/logs/

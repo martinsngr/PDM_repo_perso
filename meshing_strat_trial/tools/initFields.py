@@ -114,6 +114,9 @@ def main():
     ap.add_argument("case", nargs="?", default=".")
     ap.add_argument("--inlet", default="inlet", help="reservoir patch")
     ap.add_argument("--ramp", type=float, default=2e-4, help="wetted ramp length [m], 0 = no ramp")
+    ap.add_argument("--sat-height", type=float, default=0.0,
+                    help="porous cells closer than this to the inlet plane [m] start at S_IN (saturated rows, e.g. "
+                         "as high as the --free-fill column); the ramp starts above them; 0 = none (default)")
     ap.add_argument("--s-in", type=float, default=0.99, help="reservoir saturation of porous faces")
     ap.add_argument("--s-dry", type=float, default=0.002, help="initial (dry) saturation")
     ap.add_argument("--free-dry", type=float, default=0.0,
@@ -158,11 +161,14 @@ def main():
 
     alpha = np.where(porous, a.s_dry, a.free_dry)
     if a.ramp > 0:
-        band = np.floor(dist / (a.ramp / N_BANDS)).astype(int)
-        ramp = porous & (band < N_BANDS)
+        band = np.floor((dist - a.sat_height) / (a.ramp / N_BANDS)).astype(int)
+        ramp = porous & (band >= 0) & (band < N_BANDS)
         alpha[ramp] = a.s_in - (a.s_in - a.s_dry) * (band[ramp] + 0.5) / N_BANDS
     else:                                             # --ramp 0: sharp start, wet inlet face only
         ramp = np.zeros(ncells, dtype=bool)
+
+    if a.sat_height > 0:
+        alpha[porous & (dist < a.sat_height)] = a.s_in
 
     if a.porous_value is not None:
         alpha[porous] = a.porous_value
@@ -188,6 +194,7 @@ def main():
                              + (f", porous uniform {a.porous_value}" if a.porous_value is not None else "")
                              + (f", free water for z >= {a.free_water_above}" if a.free_water_above is not None else "")
                              + (f", free water column {a.free_fill:g} m from '{a.inlet}'" if a.free_fill > 0 else "")
+                             + (f", porous saturated {a.sat_height:g} m from '{a.inlet}'" if a.sat_height > 0 else "")
                              + (f", closed {a.closed_patch}" if a.closed_patch else ""))
     txt += f"internalField   {scalar_list(alpha)};\n\nboundaryField\n{{\n"
     for name, typ, nf, sf in patches:

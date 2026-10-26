@@ -183,8 +183,8 @@ inlet full of water (1,645 cells), padding dry. `constant/transportProperties` =
 `system/controlDict` = `2D_bench` (Coats dt, stopGuard, liquidBalance, waterBudget) with endTime 10 ms and writes every
 0.5 ms (46 MB each). Scripts: `./Allpre` (20 s), `./run` (serial precompile, decomposePar scotch, mpirun with N from
 `caseSetup`, reconstructPar), `check.py` (per-write checks). Checked: box fields identical to the unpadded mesh; x and
-y planes exactly periodic (`check_periodicity.py`); padding dry, ramp along y. Not yet: `job.slurm` (cluster after a
-stable laptop setup).
+y planes exactly periodic (`check_periodicity.py`); padding dry, ramp along y. `job.slurm` (2026-10-26): 10 ms on mini01, 16 cores, saturated rows (`Allpre`: `--sat-height 1e-4`); the mesh
+and 0/ are built on the laptop and copied (git-ignored); `run` stops if the solver ignores `waterOnlyPatches`.
 - **Cost (laptop, 2026-10-26):** s per step serial 2.18, 4 cores 1.35, 8 cores 1.55 (memory bound; `caseSetup` N 4);
   dt at the Coats limit ~1.2e-7 s after 50 steps.
 - **Smoke test, old inlet** (scratch copy, 4 cores, 2026-10-26): **failed at 0.21 ms** (stopGuard, dt 1e-14 s). The dry
@@ -197,7 +197,20 @@ stable laptop setup).
   |U| 0.98 m/s (old 2.85), water cells 0.44 m/s (old 1.73), yarn front (y-yarns, α > 0.1) 0.37 mm, mean porous S 0.105,
   gap water 320 cell volumes (old 142; the column still drains into the yarns, slower), water lost through the open
   top/bottom 1.1 cell volumes (from the initial column spreading into the padding), budget closed to 1e-13. Air
-  leaves through top/bottom, none through the inlet. Final state at 0.5 ms: below.
+  leaves through top/bottom, none through the inlet. **Reached 0.5 ms** (6,250 s on 4 cores, ~4,000 steps, dt
+  1.1–1.3e-7 s): yarn front (y-yarns) 0.17 → 0.51 mm, mean porous S 0.058 → 0.127, gap water 1,645 → 244 cell volumes
+  (gap water top 0.15 mm: the gaps barely rise, the yarns drain them), water lost through top/bottom 1.7 cell volumes,
+  budget closed to 7e-14, max |U| 0.7–1.0 m/s until 0.45 ms. **Warning signs:** α overshoots above 1 on 132 steps from
+  0.26 ms (peak 1.009, back to 1 between episodes; one yarn cell at 1.0004 at 0.5 ms) and at 0.5 ms a local spike of
+  4.5 m/s in two gap cells at an interface (y 0.17 mm, next to the x-periodic plane). Needs a longer run (≥ 1 ms) to
+  tell whether it grows.
+- **Smoke test, saturated rows** (2026-10-26, same as above + `initFields.py --sat-height 1e-4`: yarns at 0.99 over the
+  first 0.1 mm, ramp above, gaps full over the same 0.1 mm): reached 0.5 ms (5,790 s, 4 cores), no stopGuard, budget
+  closed to 6e-14, max |U| 0.7–1.2 m/s at the writes (brief 1.9–2.2 m/s at 0.25 / 0.4 ms in a gap cell near the
+  inlet), no 4.5 m/s spike at 0.5 ms. Yarn front 0.55 mm at 0.5 ms (previous run 0.51), mean porous S 0.136 (0.127),
+  gap water 296 cell volumes (244), gap water front 0.15 mm (same: the gaps still do not rise), water lost through
+  top/bottom 1.2 cell volumes (1.7). α > 1 on 363 steps (from step 1; peak 1.0017, ≤ 1.0000 at the writes); net water
+  out through the inlet early (−2.4e-12 m³ at 0.2 ms, trapped air in the saturated rows), back to inflow by 0.5 ms.
 - Before 2026-10-26 the dictionaries were older than `2D_bench` (no H/F′/I keywords, `activatePorousContactAngle 0`, no
   `openFreeTotalPressure`, `timePrecision 6`, no `waterBudget`) and wicking was planned along x.
 - Parallel: E, G, F′, I consistent on processor porous/free faces; H fixed there by `0f6c6d4` (`NOTES_solver.md`;
