@@ -14,12 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Darcy phase velocity (0 in free cells: Solid*M*(...) in
-// updateDarcyVelocities.H). zeroGradient on every open patch: then
-// correctUBc.H keeps the pressure-equation flux and alphaEqn.H has no relative
-// flux on the patch. A fixedValue here (the 1D outlet had Uwetting fixed 0)
-// makes correctUBc.H impose (Uwetting + UnonWetting).Sf on the whole patch,
-// which closes its free-fluid faces (both velocities are 0 there).
+// Darcy velocity of the air, recomputed by the solver from p and alpha every
+// step (0 in the gaps): output only. Not fixedValue on an open patch: there
+// correctUBc.H would replace the face flux by (Uwetting + UnonWetting).Sf.
 
 dimensions      [0 1 -1 0 0 0 0];
 
@@ -29,16 +26,9 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    "(inlet|top|bottom)"
+    ".*"
     {
         type            zeroGradient;
-    }
-    // closed walls: U is noSlip there, so correctUBc.H leaves the patch
-    // alone; fixedValue 0 as on the walls of ../2D_bench
-    "(outlet|inletPad)"
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
     }
 }
 

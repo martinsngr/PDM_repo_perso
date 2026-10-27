@@ -14,10 +14,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Mixture pressure p_air - alpha*pc. Reservoir (inlet) and open-to-air
-// patches: shared coded BC ../../tools/pOpenAir (free faces 0; porous faces
-// per openPorousAirZero in constant/transportProperties). The internal value
-// is only the first guess of the pressure solve.
+// Pressure: p_air - alpha*pc in the yarns, the fluid pressure in the gaps
+// (pc = 0 there). Outside the fabric everything is at rest at 0 Pa: the bath
+// (inlet) and the air (top, bottom). totalPressure p0 0: p = 0 where fluid
+// leaves, -0.5*rho*|U|^2 where it enters. The yarn faces of the inlet are
+// saturated (alpha 1, 0/alpha.wetting), so p there is the bath water pressure.
+// No pressure difference is imposed: capillarity drives the flow, against
+// gravity. The internal value is only the first guess of the pressure solve.
 
 dimensions      [1 -1 -2 0 0 0 0];
 
@@ -27,14 +30,14 @@ boundaryField
 {
     #includeEtc "caseDicts/setConstraintTypes"
 
-    // open: reservoir (inlet = fabric part of y = 0) and air beside the
-    // fabric (top, bottom: faces of the free padding layers)
+    // open: bath (inlet, y = 0) and air (top, bottom: faces of the padding)
     "(inlet|top|bottom)"
     {
-        #include "../../tools/pOpenAir"
+        type            totalPressure;
+        p0              uniform 0;
     }
     // closed walls: end of the sample (outlet, y = L) and the padding part of
-    // the reservoir face (inletPad)
+    // the bath face (inletPad)
     "(outlet|inletPad)"
     {
         type            fixedFluxPressure;

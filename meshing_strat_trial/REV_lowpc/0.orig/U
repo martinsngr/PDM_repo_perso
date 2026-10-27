@@ -14,8 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Total velocity. Open patches: inflow from the normal flux, outflow
-// zeroGradient (as the 1D inlet).
+// Total velocity, at rest at the start. Open patches:
+// pressureInletOutletVelocity, the usual partner of totalPressure in 0/p
+// (zeroGradient where fluid leaves, normal to the patch where it enters).
 
 dimensions      [0 1 -1 0 0 0 0];
 

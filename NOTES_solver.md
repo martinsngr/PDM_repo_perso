@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-10-26. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-10-27. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -35,8 +35,11 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   nothing, bit-identical). Porous + free fluid (2D bench, REV): additionally `porousFreeDarcyFaces on`,
   `activatePorousContactAngle 1`, `theta0`, `porousContactAngleWallLike 1`, `porousFreeFluxForce 1`,
   `porousFreeNoSlip 1` (G + H + F′ + I validated together, not meant separately) and free cells initialised as pure air.
-  Reservoir patches: `waterOnlyPatches (inlet)` with `reservoirWaterPressure`/`reservoirReferencePoint` (J; REV since
-  2026-10-26; the 1D, single-yarn, bench and slit cases still use the old inlet).
+  Reservoir patches: `waterOnlyPatches (inlet)` (J; REV since 2026-10-26; the 1D, single-yarn, bench and slit cases
+  still use the old inlet). Bath pressure from the p BC: in the REV since 2026-10-27 the standard `totalPressure` 0
+  with α 1 on all inlet faces (then p = water pressure on the yarn faces; `verification/standardOpenBC`); the coded
+  `tools/pOpenAir` (`reservoirWaterPressure`/`reservoirReferencePoint`) only where the bath surface is away from the
+  patch (e.g. a vertical bath face) or the inlet keeps α 0.99.
 - **Installed (laptop, 2026-10-26, afternoon):** `hybridPorousInterFoam` = `be1a3ab` (A–J with the H fix), built from
   the tested sources, bit-identical to the tested scratch build (bench); `hybridPorousInterFoam_b525086` = A–I (with the
   shared library: H fix included). Not pushed (mini01 needs push, pull, rebuild). Morning step: `hybridPorousInterFoam` =
@@ -261,6 +264,85 @@ the earlier numbers here came from terminal output and were partly rounded).
   2 ms numbers identical (2026-10-26, `verification/waterOnlyReservoir/`); `tools/pOpenAir` without the keyword: same
   numbers.
 
+## Planned: diagonal tensor K (decided with the user 2026-10-27, not implemented)
+
+Yarn-aligned permeability K = Kperp·I + (Kpar − Kperp)·t t, as `build_fields.py --k-mode tensor` already writes it
+(volTensorField `0/K`, Kpar/Kperp from Gebart with `VF_YARN`, `R_FIBRE`, `PACKING`). The REV studies it is for and
+their estimates: `NOTES_cases.md`, REV case status. **Decisions:** K diagonal in the mesh axes only (`ORIENTATION
+"axis"`: t = x or y exactly); **harmonic** face value of the normal components on all porous faces; one commit in the
+solver repo with `CHANGES_of9-port.md` updated (letter to assign: "K" would clash with the permeability).
+
+**Why diagonal is simple and exact here:** since A every porous flux is a two-point flux k0f·snGrad·|Sf|
+(`phiWetting`/`phiNonWetting` in `alphaEqn.H`; `phiDarcyExplicit`, the p Laplacian with `rAUfD = Mf` and F's
+reconstruct in `pEqn.H`), the gravity term is Lf·(g·Sf). On an axis-aligned Cartesian mesh with diagonal K the exact
+face flux is (n·K·n)·snGrad·|Sf| and (K·g)·Sf = (n·K·n)(g·Sf): replacing k0f by the normal component of K is the whole
+flux change; `alphaEqn.H` and `pEqn.H` stay as they are.
+
+Where K enters (solver `c3dbf48`, installed `be1a3ab`; checked 2026-10-27) and what changes:
+- `createPorousMediaFields.H:3` `volScalarField K` (read from the time folder, AUTO_WRITE), `:16` k0 = K, `:17` k0f =
+  interpolate(k0) (linear: `default linear` in the cases). Read the field class: volScalarField → old code untouched
+  (bit-identical); volTensorField → k0f = 1/(w/Knn_P + (1 − w)/Knn_N) with Knn = n·K·n of each cell, on internal and
+  coupled faces. Free cells K_VOID·I; k0f on free/free faces acts only through the (negligible) drag.
+- G's harmonic block (`createPorousMediaFields.H:163–205`, porous/free faces, internal and coupled): same formula
+  with the normal components (the general rule above includes it).
+- Darcy-face test `Daf = k0f·deltaCoeffs²` (`:221`, boundary factor 0.25): unchanged, now with the normal component
+  (Kpar 4.2e-12 at 20 µm: Da 0.011 < `darcyFaceMaxDa` 0.1).
+- `updateVariables.H`: face mobilities from k0f (`:41` on) unchanged; `MfLinear` (`:13`), `Dragf = 1/MfLinear`,
+  `Drag = average(Dragf)·Solid` (`:49–50`) then average the inverse normal mobilities of the faces: no change needed.
+  Cell mobilities M1, M2, M (k0·kr/μ) enter `PcCoeff` (`:64`) only as M1/M (K cancels): any scalar k0 (e.g. tr K/3).
+- `updateDarcyVelocities.H` Uwetting/UnonWetting = Solid·M1·(…): (K & (…))·kr/μ. Used by Ur, `correctUBc.H` on
+  patches with a fixed Uwetting, and the written fields.
+- `UEqn.H:12` `fvm::Sp(Drag, U)` takes a scalar only: acceptable because with G every face of a porous cell is a
+  Darcy face, U of Darcy cells is overwritten by reconstruct(φ), and the drag enters only through rAU/HbyA
+  interpolated on porous/free faces (F′) and porous cells next to non-Darcy boundary faces. Estimate at the REV dt
+  (1.25e-7 s): inertia ρ/(ε·dt) ≈ 1.6e10 vs μ/K ≈ 1e8 (water, 1e-11) and 1.1e9 (Kperp 9.2e-13).
+- Guards (fatal errors with a tensor K): off-diagonal components above 1e-6 of the largest diagonal one; a face normal
+  not along x, y or z; a porous face that is not a Darcy face (the momentum path would need a tensor drag).
+- Libraries: no K (`porousModels`: kr and pc only; `porousInterfaceProperties`: none).
+- Output: K is AUTO_WRITE, a tensor K is written at every write (9 components; REV ~10 MB per write, estimate):
+  consider NO_WRITE for the tensor.
+
+Outside the solver:
+- `meshing_strat_trial/tools/coatsTimeStep` reads `lookupObject<volScalarField>("K")` (lines 46–47): fatal with a
+  tensor K. Its capillary sum already uses the solver's `k0f` (then the normal component); the gravity part
+  `K[i]·(ρa − ρb)·sumSfg[i]` (line 146) → `surfaceSum(k0f·|Sf·g|)` as in anisoImpesFoam's `CoatsNo.H`. Keep the old
+  expression for a scalar K (bit-identical).
+- `build_fields.py` sets Kpar/Kperp only through Gebart (`VF_YARN`, `R_FIBRE`): add `--k-par`/`--k-perp` for the REV
+  study (a). `ORIENTATION "texgen"` gives off-diagonal terms (rejected by the guard). `Allpre` of `REV/` calls
+  `--k-mode scalar --k-scalar 1e-11`.
+- `pOpenAir`, `liquidBalance`, `waterBudget`, `stopGuard` and the Python scripts other than `build_fields.py` do not
+  read K.
+
+**Harmonic vs linear (decided: harmonic).** Same Knn on both sides (inside a yarn; the 3,221 warp/weft z-contacts of
+the REV, Kperp on both sides): same value, except that the harmonic of two equal values can differ from K by an ulp
+(apply it only where the two values differ to keep isotropic cases bit-identical). Different Knn: the 1,236 warp/weft
+x/y contacts of the REV (Kpar | Kperp; Gebart: harmonic 1.5e-12, linear 2.6e-12); harmonic = resistances in series.
+Now: linear on porous/porous faces (uniform K: the same), harmonic on porous/free faces (G). Face counts:
+`NOTES_cases.md`, REV geometry.
+
+**Full tensor (off-diagonal, `ORIENTATION "texgen"`, crimp-following): not planned.** OpenFOAM's tensor Laplacian
+(`fvm::laplacian(-Mf, p)` in anisoImpesFoam) takes the normal part implicitly and the cross part with interpolated
+cell gradients (`fvc::dotInterpolate(SfGammaCorr, fvc::grad(p))`, `gaussLaplacianScheme.C:117`), and anisoImpesFoam's
+capillary flux is `interpolate(dpcdS·grad(Sb))` (`updateSbProperties.H:22`): the averaged-gradient stencil A removed.
+The cross terms would also be needed consistently in phiWetting, phiNonWetting, phiDarcyExplicit and the p equation
+(φ = φW + φNW for B), in the upwinded kr (C) and on G's porous/free faces (harmonic of a full tensor undefined); no
+MPFA in OpenFOAM. With "axis" the crimp is a staircase in z whose steps pass z-faces at Kperp (penalty not
+quantified, crimp angle not measured). Boubaker et al. 2026 used a diagonal Gebart tensor per tow; their data
+availability statement offers data on request, nothing about the code.
+
+Checks after the change (predictions written before the runs):
+1. Scalar K file: bit-identical (1D column 0.03 s vs the stored `verification/wicking1D/ABC`; 2D bench 2 ms).
+2. Tensor K = 1e-11·I: same as 1 (bit-identical with the harmonic applied only where the values differ).
+3. 1D column with a diagonal K, column along x, y and z: front 18.04·√(K_axis/1e-11) mm/√s (the similarity solution
+   scales with √K at fixed pc0); the transverse components have no effect.
+4. 2D anisotropic spreading (inlet on part of an edge, K_xx ≠ K_yy) vs anisoImpesFoam: with a diagonal K its
+   cross-term correction is exactly zero on axis faces (SfGammaCorr = 0), differences only from its interpolated
+   capillary stencil; front aspect ratio → √(K_xx/K_yy) at late times.
+5. K jump in series (two layers of different Knn along a water-filled column, steady pressure-driven flow,
+   capillarity off; to design): flux = Δp/(μ·Σ L_i/K_i), exact with harmonic faces.
+6. 2D bench with anisotropic walls (Kpar along the slit, Kperp across): `check.py` passes; split bench parallel =
+   serial.
+
 ## Open issues
 
 Solver behaviour:
@@ -282,6 +364,11 @@ Solver behaviour:
   lets air through (1 % air on inflow, air vent at air-filled free inlet cells, water short circuit through the yarn
   inlet faces): **J** (opt-in) makes it water-only. With J: a drained free reservoir face does not refill (no meniscus
   on a boundary face); the 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
+- Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
+  `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face
+  values = boundary values). At the bath the yarn faces sit almost in equilibrium (net drive 7–16 Pa REV, 25–30 Pa
+  bench), so this term (0–80 Pa, depending on α_b and the first cell) moves the yarn-face inflow by 10–20 %; local,
+  no measurable effect on fronts, saturation or uptake. Not changed.
 - Not tested: non-uniform meshes (G, H, I), cyclic porous/free faces with H/F′/I (none in the REV), 3D processor faces
   (planar 2D test only, 2026-10-26), 3D edges/corners and staircased surfaces, `momentumPredictor` on, harmonic K set at
   start-up only (no dynamic meshes). Runs > 5 ms: the 2D bench to 20 ms is stable (2026-10-15, `NOTES_cases.md`).

@@ -8,10 +8,11 @@
 #SBATCH --job-name=REVwick
 #SBATCH --partition=global
 #SBATCH --nodes=1
-#SBATCH --ntasks=16
+#SBATCH --ntasks=8
 #SBATCH --mem=16G
 #SBATCH --time=72:00:00
-# (10 ms; laptop 4 cores: 0.5 ms in 1.6 h; cost on mini01 not measured yet: check the log after an hour)
+# (50 ms on 8 cores; job 3051: 10 ms in 20,440 s on 16 cores, ~85k steps -> estimate 30-55 h here, REV_lowpc ~3x
+# less (dt ~3x larger in its smoke test); check the log after an hour)
 #SBATCH --output=Log_%x_%j.log
 #SBATCH --error=Err_%x_%j.err
 #SBATCH --mail-user=martin.sinegre@gmail.com

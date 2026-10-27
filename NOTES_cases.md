@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-26.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-27.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -19,12 +19,12 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `trialWicking/singleYarn_vertical_hybrid/` | Yarn twin of `1D_vertical_hybrid` (lateral wall closed). 0.1 s: mini03 11.9 h |
 | `trialWicking/wickingFront.ipynb` | Front analysis of the 1D cases (front at S = 0.1 vs √t, profiles, p_air/p_water) |
 | `meshing_strat_trial/REV/` | **The REV in one folder:** TexGen geometry (`Textiles/`, `funge.py`), `inspect_stl.py` (REV box → `rev_domain.json`, `--zgap`), `build_fields.py` (mesh + eps, K, fYarn, yarnID), `check_periodicity.py`, `meshing.pvsm`, solver dictionaries, `Allpre` (geometry → mesh → fields → initial α). Run scripts not written yet |
-| `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 (2026-10-27) |
+| `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 and θ0 40° (2026-10-27) |
 | `meshing_strat_trial/2D_bench/` | **The 2D bench:** thick-wall slit (yarn wall 8 cells \| gap 8 \| yarn wall 8), G + H + F′ + I on; `Allpre`, `run`, `check.py` |
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
 | `verification/` (repo root) | All verification: paper tutorials, 1D similarity solution, ddtCorr bench, inlet test (moved from `trialWicking/verification/` 2026-10-13; results in `NOTES_solver.md`), and **`PLAN.md`: the planned studies 1–3** |
-| `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (open-patch p BC), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
+| `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (coded open-patch p BC of the 2D bench and slit cases; `REV/` and `REV_lowpc/` use `totalPressure` since 2026-10-27), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
 
 ## Common setup and rules
 
@@ -110,6 +110,10 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
   the REV: cells ≥ 3 cells from the nearest yarn cell and from the top/bottom planes along x, only ≥ 2 along y (the
   in-plane gaps between the y-yarns are narrower). **The gaps form a continuous but tortuous network** (over and
   under the crossing yarns), not isolated pockets.
+- **Faces that a yarn-aligned tensor K would change** (REV mesh with `--zpad 3`, `0/yarnID`, measured 2026-10-27): of
+  the 984 porous inlet faces 665 belong to the half crossing yarn 5 (an x-yarn: K_yy = Kperp), 319 to the y-yarns
+  0–4 (K_yy = Kpar); 4,457 porous/porous warp/weft contact faces (yarns 0–4 against 5–9): 3,221 z-faces (Kperp on
+  both sides), 860 x-faces and 376 y-faces (Kpar on one side, Kperp on the other).
 
 ### Gap vs yarn wicking (estimates)
 Viscous Washburn h²/t = σw cosθ/(3μ) for a slit: w 160 µm θ 60° → 44 mm/√s, w 300 µm θ 75° → 43, θ 85° → 25; yarn
@@ -170,13 +174,16 @@ Solidf-bug figures in `debug_faceDump/`.
 yarns 5–9 crossing), gravity −y, reservoir at y = 0, x cyclic. Mesh `build_fields.py --wick-axis y --zpad 3`: the
 REV box (91 × 133 × 14, cells identical to the unpadded mesh) + 3 free layers (60 µm) below and above = 91 × 133 × 20
 = 242,060 cells (78,528 porous). Patches:
-- `inlet` (y = 0, box part): reservoir as `2D_bench` (`pOpenAir`: free faces total pressure 0, yarn faces air at 0 Pa;
-  α inletOutlet 0.99 on yarn faces, 1 on free faces);
-- `inletPad` (y = 0, padding part) and `outlet` (y = L): closed walls (U noSlip, p fixedFluxPressure, α zeroGradient,
-  phase velocities 0). The outlet plane cuts the half crossing yarn 9 along its centreline (77 % porous faces): open,
+- `inlet` (y = 0, box part): the bath, water-only (J). Since 2026-10-27 standard BCs (`verification/standardOpenBC`):
+  p `totalPressure` 0 (bath at rest at 0 Pa), α inletOutlet 1 on all faces (`initFields.py --porous-in 1`: the yarn
+  faces are saturated by the bath, so p = 0 there is the water pressure). Before (job 3051, smoke tests): coded
+  `pOpenAir` (gap faces total pressure 0, yarn faces water at 0 Pa, p = (1 − α)·pc) with α 0.99 on the yarn faces;
+- `inletPad` (y = 0, padding part) and `outlet` (y = L): closed walls (U noSlip, p fixedFluxPressure, α zeroGradient;
+  phase velocities zeroGradient on every patch, output only). The outlet plane cuts the half crossing yarn 9 along its centreline (77 % porous faces): open,
   it would carry porous faces on an open boundary (unstable) and the open-outlet artefact once water arrives
   (`2D_bench_long`); with top/bottom open, air does not need it;
-- `bottom`/`top`: faces of the padding, open to air (`pOpenAir`, α inletOutlet 0); `sideA`/`sideB`: cyclic in x.
+- `bottom`/`top`: faces of the padding, open to air (p `totalPressure` 0 since 2026-10-27, before `pOpenAir`: same
+  numbers; α inletOutlet 0); `sideA`/`sideB`: cyclic in x.
 
 Initial state as `2D_bench` (`initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4`): yarns
 0.002 with the 0.2 mm ramp (holds the same water as a saturated 0.1 mm column), free box cells within 0.1 mm of the
@@ -195,7 +202,9 @@ solver ignores `waterOnlyPatches`.
   1.9 ms. The laptop's 4-core run of the same case peaked at 1.0017 to 0.5 ms → possibly decomposition-sensitive.
   Results: `meshing_strat_trial/REV/` on mini03 (reconstructPar at the end; solver log in `logs/REV.*/`).
 - **Job 3051 analysed (2026-10-27, copy in `~/PDM_results/REV_run3051`, `check.py` over the 20 writes):** reached
-  10 ms, no stopGuard, 20,440 s on 16 cores (~85k steps, dt 1.0e-8 to 1.3e-7 s). Budget closed (imbalance 1.5e-20 m³,
+  10 ms, no stopGuard, 20,440 s on 16 cores (~85k steps, dt 1.0e-8 to 1.3e-7 s; in the 850 sampled log steps dt
+  is set by the Coats limit on 792 (1.25e-7 s), by dSmax on 58; dSmax limit mostly 3.7–6.6e-7 s, capillary-wave
+  limit 1.5e-6 s). Budget closed (imbalance 1.5e-20 m³,
   1e-10 of the water); water lost through top/bottom 10.2 cell volumes; padding dry; α min −2e-20.
   - **Yarn front (y-yarns, α > 0.1):** 0.27 → 0.69 / 1.13 / 1.63 mm at 1 / 4 / 10 ms; fit (t ≥ 2 ms)
     front = 13.9 mm/√s · √t + 0.24 mm, exponent of (front − 0.27 mm) vs t 0.52: diffusive. 1D reference 18 mm/√s
@@ -216,7 +225,10 @@ solver ignores `waterOnlyPatches`.
     all on processor faces), 3.0 / 5.1 / 3.3 m/s at 6.5 / 7 / 8 ms (air-side porous/free interface cells near yarn 5,
     not on processor faces). Water-cell |U| 0.6–0.9 m/s throughout.
 - **`REV_lowpc/` (2026-10-27): REV with Van Genuchten pc0 1000 Pa, m 0.4** (sharper pc drop with S; only change in
-  `constant/transportProperties`, job name `REVlowpc`). VG pc/pc0 at the dry start S 0.002: 1.1e4 (m 0.5: 500).
+  `constant/transportProperties`, job name `REVlowpc`; that file also has theta0 40°, REV 60°, committed with it in
+  `dbb7b0a`, noted 2026-10-27). VG pc/pc0 at the dry start S 0.002: 1.1e4 (m 0.5: 500). Same standard open-patch BCs
+  as `REV/` since 2026-10-27 evening (files identical to `REV/` except pc0, m, θ, job name; scratch copy built by
+  `./Allpre` and run 20 steps: J active, α in [−7e-20, 1.00001]); the smoke test below used the old BCs.
   **Smoke test, 0.2 ms** (scratch copy, 4 cores, writes every 0.05 ms): no stopGuard, 600 steps, dt 3.7–4.0e-7 s
   (REV ~1.2e-7), 850 s = ~4,250 s per ms (REV laptop 11,600); budget closed to 3e-24 m³; max α 1.00008 (≤ 1.001 on
   every step); max |U| 1.3–1.9 m/s (water cells up to 1.5 m/s at 0.1 ms; REV 0.7–1.0). Yarn front 0.27 → 0.37 mm,
@@ -225,6 +237,31 @@ solver ignores `waterOnlyPatches`.
   −0.4e-12 m³ per 0.05 ms); the yarns took ≈ 290 cell volumes, so most of the drained gap column went back to the
   reservoir (REV saturated-rows smoke: −2.4e-12 m³ at 0.2 ms, inflow again by 0.5 ms). Water in the padding near the
   inlet: 232 cells α > 0.05 at 0.05 ms, 16 at 0.2 ms; lost through top/bottom 0.8 cell volumes. Cause not checked.
+- **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
+  "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
+  harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
+  4.2e-12, Kperp 9.2e-13 m², ratio 4.6 (quad: 3.9e-12 / 7.3e-13), both below the current 1e-11. Two studies, one
+  change each, pc0 kept at 5000 Pa (Leverett pc0 ∝ √(ε/K) has no single K for a tensor; following it with Kpar would
+  give pc0 ×1.5 and a front ×0.81 instead of ×0.65): **(a) anisotropy alone**, Kpar 1e-11, Kperp 1e-11/4.6 = 2.2e-12
+  (needs `--k-par`/`--k-perp` in `build_fields.py`); **(b) Gebart magnitudes**. Reference: job 3051 (scalar 1e-11);
+  its results stay valid as the isotropic case (the scalar path of the solver stays as it is).
+  **Estimates for (b), not run:**
+  - yarn front ∝ √K at fixed pc0: ×0.65 (1D 18.0 → 11.7 mm/√s; REV 13.9 → ~9 mm/√s); the same front 2.4× later (~1.1
+    mm at 10 ms instead of 1.63, where job 3051 was at ~4 ms);
+  - reservoir feed: 665 of the 984 porous inlet faces are in yarn 5 (K_yy = Kperp, ×0.09 of now), 319 in the y-yarns
+    (Kpar); the α overshoot of job 3051 sits in yarn 5 at the inlet: effect on it not predictable;
+  - warp/weft transfer: 3,221 of the 4,457 contact faces are z-faces with Kperp on both sides (×0.09): yarns 6 and 7
+    wet later and draw relatively less water. If the crossing-yarn sink explains REV 13.9 vs 1D 18 mm/√s (hypothesis),
+    the REV/1D ratio moves towards 1 (also in (a): a test of that hypothesis);
+  - across a yarn's thickness (120 µm): D ≈ K·pc0/(μ·ε) gives ~1.6 ms instead of ~0.14 ms, so the saturation is no
+    longer uniform across a yarn during the run (add a thickness profile to `check.py`);
+  - gaps: drained by the yarns through porous/free faces at ~2·Knn: slower drain (job 3051: 1,645 → 268 cell volumes
+    by 1 ms); the capillary valve at y ≈ 0.18 mm is set by geometry and θ, not by K: expected to hold;
+  - dt: the Coats face-K sum of a y-yarn cell 2Kpar + 4Kperp = 0.2× now → Coats dt ×5, then the dSmax limit
+    (3.7–6.6e-7 s in job 3051) and capillary waves (1.5e-6 s) take over: dt ×3–5, ~400–650 s per simulated ms on 16
+    cores (job 3051: 1,900); with 2.4× the time for the same front, ~1.2–2× cheaper per front distance.
+  **Estimates for (a):** y-yarn along-axis rate unchanged; inlet faces of yarn 5, z-contacts and the gap drain through
+  x/z yarn faces ×0.22; Coats sum 2·1e-11 + 4·2.2e-12 = 0.48× now → dt ~×2.
 - **Cost (laptop, 2026-10-26):** s per step serial 2.18, 4 cores 1.35, 8 cores 1.55 (memory bound; `caseSetup` N 4);
   dt at the Coats limit ~1.2e-7 s after 50 steps.
 - **Smoke test, old inlet** (scratch copy, 4 cores, 2026-10-26): **failed at 0.21 ms** (stopGuard, dt 1e-14 s). The dry
@@ -261,7 +298,7 @@ Same solver on a plain-weave E-glass µCT geometry (tows porous, inter-tow space
 They replaced MULES by isoAdvector after an unstable porous/free interface; contact angle 90° assigned at the interface;
 mild pc (VG pc0 1000 Pa, m 0.8 "for stability": α·pc ~10 Pa vs our ~5 kPa); flow pressure-driven (ΔP 50 kPa), no pure
 spontaneous wicking; mould walls top/bottom, cyclic sides; 131 × 101 × 53 µm cells, 4–6 days on 32 cores; tensor K per
-tow (diagonal Gebart; solver and data on request). They see artificially fast flow in the free layer near the upper
+tow (diagonal Gebart; data availability statement: data on request, nothing about the solver, checked 2026-10-27). They see artificially fast flow in the free layer near the upper
 surface (race-tracking, as our open edge layers could). Post-processing to reuse: x_f² vs t,
 K_unsat = (x_f²/t)·μ(1 − Vf)/(2 P_in).
 
@@ -281,7 +318,21 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 ## Next steps
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
-**2026-10-27: job 3051 analysed (REV case status above): runs to 10 ms, valve confirmed, α overshoot grows to 1.05 inside the saturated half yarn 5, not decomposition-related. Next: why porous α > 1 in saturated cells (reservoir-fed yarn 5, J?); decide before longer runs.** Previous plan: analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
+**2026-10-27: job 3051 analysed (REV case status above): runs to 10 ms, valve confirmed, α overshoot grows to 1.05 inside the saturated half yarn 5, not decomposition-related. Next: why porous α > 1 in saturated cells (reservoir-fed yarn 5, J?); decide before longer runs.** **2026-10-27 (later): diagonal tensor K with harmonic faces decided, written down only
+(`NOTES_solver.md` "Planned: diagonal tensor K"; REV studies (a)/(b) and estimates in REV case status).**
+**2026-10-27 (evening): REV open patches on standard OpenFOAM BCs** (agreed with the user: adapt the setup after
+the tests; α 1 = the announced default, kept after `REV_B0`; `verification/standardOpenBC/README.md`): p `totalPressure` 0 on inlet/top/bottom instead of the coded `pOpenAir`, α 1
+on all inlet faces (`initFields.py --porous-in 1`), `Uwetting`/`UnonWetting` zeroGradient, the four `pOpenAir`
+keywords removed from `transportProperties` (not committed). Measured: top/bottom and phase velocities bit-identical
+(bench 2 ms; REV 0.05 ms, 4 cores); inlet: no integral change (REV 0.1 ms: fronts identical, porous S within 1e-4,
+water within 0.06 %; bench 2 ms: meniscus and wall front identical; 1D uptake −0.24 %), but the yarn-face inflow of the
+inlet moves (REV −16 → −2 % over 0.1 ms, bench −12 % at 2 ms): the yarn faces sit almost in equilibrium with the bath
+(net drive 7–30 Pa), so the discrete product term (α_b − α_c)(pc_b − pc_c) of the boundary flux shows (α_b 0.99 with
+the standard BC: no closer). Not tested: effect on the α > 1 overshoot inside yarn 5 at the inlet (from ~0.3 ms): watch
+it in the next long run (mini03, needs commit, push, pull). Job 3051 used the old BCs; `REV_lowpc/` aligned the
+same evening (20-step start checked). Both jobs set to 8 cores (`caseSetup` N 8, `--ntasks=8`) and endTime 50 ms
+(5× job 3051; estimate 30–55 h for REV, ~3× less for REV_lowpc; walltime 72 h kept; ~100 writes of ~46 MB each).
+Previous plan: analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
 (yarn front, gap water, gap rise, |U|, budget, losses); locate the α > 1 cells at the writes near the overshoot peaks
 (0.5, 1.0, 1.5 ms: next to the reservoir → boundary water flux of J; next to processor boundaries → decomposition);
 short 4- vs 16-core comparison on mini03 if it looks decomposition-related; check the capillary-valve hypothesis (gap
@@ -297,12 +348,18 @@ committed); REV geometry facts measured (above); REV decisions put to the user (
    (decision pending); the 3D check of H/F′/I (edges, corners) comes with the REV smoke test.
 3. Bench extensions: 15-cell gap (REV median), gaps interrupted by porous crossings (yarn first, then gap: needs an empty
    gap to fill from a wet wall, probably a saturation-dependent θ), θ 75°, 5 ms runs.
-4. Later: tensor K (solver change), real K/pc/θ for polyester; report the impesFoam Todd bug upstream; a swept yarn mesh
+4. Later: tensor K (diagonal, harmonic faces: decided 2026-10-27, plan and checks in `NOTES_solver.md`, REV studies
+   (a)/(b) in REV case status; not started), real K/pc/θ for polyester; report the impesFoam Todd bug upstream; a swept yarn mesh
    (~100 µm axial cells) for cm-long samples comparable with experiments.
 5. Tidy: move the intermediate slit runs (`B_/H_/HF_/I_/J_/N_/R_/V_`) to `slit_test/old_runs/` (proposed, not done);
    delete the obsolete scratch build `hybridPorousInterFoamH`.
 
 ## Pitfalls met
+- **Check the standard OpenFOAM BCs before coding one** (lesson of 2026-10-27, `verification/standardOpenBC`): the
+  REV's coded `pOpenAir` re-implemented `totalPressure` on its free faces (bit-identical), and its yarn-face branch
+  existed only because the inlet kept α 0.99 (an impesFoam NaN workaround; the hybrid clips Se): with α 1 at the bath
+  `totalPressure` is exact. It grew by accretion and was copied from the 2D bench without review. List the standard
+  candidates and the choices of the other fields that make one exact; re-check coded pieces inherited by a new case.
 - `foamDictionary -set` rewrites the whole file and strips the comments: edit dictionaries by hand or with sed.
 - `timePrecision 6` gives equal time names for ~1e-12 s steps: use 12 for step-by-step writes.
 - A `clean` pattern `[0-9].*` also deletes `0.orig`: `clean` matches names made only of digits, `.`, `e`, `+`, `-`.

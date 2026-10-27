@@ -1,0 +1,249 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    location        "system";
+    object          controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         0.03;
+
+deltaT          1e-08;
+
+writeControl    adjustableRunTime;
+
+writeInterval   0.001;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+
+maxCo           0.75;
+
+maxAlphaCo      1;
+
+maxDeltaT       3e-07;
+
+CoatsMaxCo      0.5;
+
+dSmax           0.01;
+
+maxDeltaTCoats  0.001;
+
+minDeltaTCoats  0;
+
+functions
+{
+    coatsTimeStep
+    {
+        type            coded;
+        libs            ( "libutilityFunctionObjects.so" );
+        name            coatsTimeStep;
+        executeControl  timeStep;
+        writeControl    none;
+        codeInclude     #{
+            #include "fvc.H"
+            #include "uniformDimensionedFields.H"
+        #};
+        codeExecute     #{
+            const Time& runTime = mesh().time();
+            const dictionary& cd = runTime.controlDict();
+            const scalar coatsMax = cd.lookupOrDefault<scalar>("CoatsMaxCo", 0.5);
+            const scalar dSmax = cd.lookupOrDefault<scalar>("dSmax", 0.01);
+            const scalar dtMax = cd.lookupOrDefault<scalar>("maxDeltaTCoats", 1e-3);
+            const scalar dtMin = cd.lookupOrDefault<scalar>("minDeltaTCoats", 0);
+
+            const volScalarField& alpha =
+                mesh().lookupObject<volScalarField>("alpha.wetting");
+            const volScalarField& eps =
+                mesh().lookupObject<volScalarField>("eps");
+            const volScalarField& K =
+                mesh().lookupObject<volScalarField>("K");
+            const surfaceScalarField& phi =
+                mesh().lookupObject<surfaceScalarField>("phi");
+            const uniformDimensionedVectorField& g =
+                mesh().lookupObject<uniformDimensionedVectorField>("g");
+
+            const dictionary& tp =
+                mesh().lookupObject<IOdictionary>("transportProperties");
+            const dictionary& wet = tp.subDict("wetting");
+            const dictionary& non = tp.subDict("nonWetting");
+            const scalar rhob = dimensionedScalar("rho", dimDensity, wet).value();
+            const scalar rhoa = dimensionedScalar("rho", dimDensity, non).value();
+            const scalar mub =
+                rhob*dimensionedScalar("nu", dimViscosity, wet).value();
+            const scalar mua =
+                rhoa*dimensionedScalar("nu", dimViscosity, non).value();
+            const scalar Mmu = mub/mua;
+
+            const scalar act = readScalar(tp.lookup("activateCapillarity"));
+            const scalar Smin =
+                dimensionedScalar(tp.lookup("alpha.wettingmin")).value();
+            const scalar Smax =
+                dimensionedScalar(tp.lookup("alpha.wettingmax")).value();
+            const scalar nkr =
+                readScalar(tp.subDict("BrooksAndCoreyCoeffs").lookup("n"));
+            const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
+            const scalar pc0 = dimensionedScalar(vg.lookup("pc0")).value();
+            const scalar m = readScalar(vg.lookup("m"));
+            const scalar Sminpc =
+                dimensionedScalar(vg.lookup("alpha.wettingminpc")).value();
+            const scalar Smaxpc =
+                dimensionedScalar(vg.lookup("alpha.wettingmaxpc")).value();
+            const scalar nvg = 1/(1 - m);
+
+            const scalarField sumKA
+            (
+                fvc::surfaceSum
+                (
+                    fvc::interpolate(K)*mesh().magSf()/mag(mesh().delta())
+                )().primitiveField()
+            );
+            const scalarField sumPhi
+            (
+                fvc::surfaceSum(mag(phi))().primitiveField()
+            );
+            const scalarField sumSfg
+            (
+                fvc::surfaceSum(mag(mesh().Sf() & g))().primitiveField()
+            );
+
+            const scalar dt = runTime.deltaTValue();
+            const scalarField& V = mesh().V();
+
+            scalar CFLmax = 0;
+            scalar dSdtMax = 0;
+            forAll(V, i)
+            {
+                const scalar Se =
+                    min(max((alpha[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
+                const scalar kra = pow(1 - Se, nkr);
+                const scalar krb = pow(Se, nkr);
+                const scalar dkra = -nkr*pow(1 - Se, nkr - 1)/(Smax - Smin);
+                const scalar dkrb = nkr*pow(Se, nkr - 1)/(Smax - Smin);
+                const scalar den = Mmu*sqr(kra) + 2*kra*krb + sqr(krb)/Mmu;
+
+                const scalar Sepc =
+                    min
+                    (
+                        max((alpha[i] - Sminpc)/(Smaxpc - Sminpc), 1e-4),
+                        1 - 1e-4
+                    );
+                const scalar dpcdS =
+                    act*(1/(nvg*m))*(pc0/(Smaxpc - Sminpc))
+                   *pow(pow(Sepc, -1/m) - 1, 1/nvg - 1)*pow(Sepc, -(1 + m)/m);
+
+                // flow, gravity and capillary parts of the Coats CFL
+                const scalar CFL =
+                    (dt/eps[i])
+                   *(
+                        (dkrb*kra - dkra*krb)/den*sumPhi[i]
+                      - K[i]*(rhoa - rhob)*sumSfg[i]
+                       *(sqr(kra)*dkrb/mua + sqr(krb)*dkra/mub)/den
+                      + 2*dpcdS*sumKA[i]*kra*krb/(mub*kra + mua*krb)
+                    )/V[i];
+
+                CFLmax = max(CFLmax, CFL);
+                dSdtMax =
+                    max(dSdtMax, mag(alpha[i] - alpha.oldTime()[i])/dt);
+            }
+            reduce(CFLmax, maxOp<scalar>());
+            reduce(dSdtMax, maxOp<scalar>());
+
+            const scalar dtCoats = dt*coatsMax/(CFLmax + small);
+            const scalar dtForS = dSmax/(dSdtMax + small);
+            const scalar limit =
+                max(min(min(dtCoats, dtForS), dtMax), dtMin);
+
+            const_cast<dictionary&>(cd).set("maxDeltaT", limit);
+
+            Info<< "Coats CFL Number max: " << CFLmax
+                << "  maxDeltaT = " << limit << endl;
+        #};
+    }
+    liquidBalance
+    {
+        type            coded;
+        libs            ( "libutilityFunctionObjects.so" );
+        name            liquidBalance;
+        writeControl    writeTime;
+        codeInclude     #{
+            #include <fstream>
+        #};
+        codeWrite       #{
+            const volScalarField& alpha =
+                mesh().lookupObject<volScalarField>("alpha.wetting");
+            const volScalarField& eps =
+                mesh().lookupObject<volScalarField>("eps");
+            const dictionary& wetting =
+                mesh().lookupObject<IOdictionary>("transportProperties")
+               .subDict("wetting");
+            const dimensionedScalar rho("rho", dimDensity, wetting);
+
+            // m3
+            const scalar V =
+                gSum(eps.primitiveField()*alpha.primitiveField()*mesh().V());
+            const scalar meanSaturation =
+                gSum(alpha.primitiveField()*mesh().V())/gSum(mesh().V());
+
+            if (Pstream::master())
+            {
+                const fileName file(mesh().time().globalPath()/"liquidBalance.csv");
+                const bool header = !isFile(file);
+
+                // on a restart, the start time is already in the file
+                if
+                (
+                   !header
+                 && mesh().time().timeIndex() == mesh().time().startTimeIndex()
+                )
+                {
+                    return false;
+                }
+
+                std::ofstream os(file.c_str(), std::ios::app);
+                if (header)
+                {
+                    os  << "time,totalLiquidVolume_mL,totalLiquidMass_g,"
+                        << "meanSaturation\n";
+                }
+                os  << mesh().time().timeName() << ","
+                    << V*1e6 << ","
+                    << rho.value()*V*1e3 << ","
+                    << meanSaturation << "\n";
+            }
+        #};
+    }
+}
+
+
+// ************************************************************************* //

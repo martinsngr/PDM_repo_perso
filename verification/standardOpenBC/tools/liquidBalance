@@ -1,0 +1,73 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Shared liquid-balance function object, included in system/controlDict:
+      functions { liquidBalance { #include "../../tools/liquidBalance" } }
+
+  Writes liquidBalance.csv at every write time. First four columns as the
+  trialWicking cases (impesFoam fork format): liquid volume
+  sum(eps*alpha*V) in mL, liquid mass in g, volume-weighted mean saturation
+  sum(alpha*V)/sum(V). Then the split between the yarns (porous cells,
+  Solid = 1) and the free fluid (gaps and air around the fabric):
+  porousLiquid_mL, freeLiquid_mL, and the mean saturation of the porous
+  cells sum(alpha*V)/sum(V) over Solid = 1.
+\*---------------------------------------------------------------------------*/
+
+type            coded;
+libs            ("libutilityFunctionObjects.so");
+name            liquidBalance;
+writeControl    writeTime;
+codeInclude
+#{
+    #include <fstream>
+#};
+codeWrite
+#{
+    const volScalarField& alpha =
+        mesh().lookupObject<volScalarField>("alpha.wetting");
+    const volScalarField& eps =
+        mesh().lookupObject<volScalarField>("eps");
+    const volScalarField& Solid =
+        mesh().lookupObject<volScalarField>("Solid");
+    const dictionary& wetting =
+        mesh().lookupObject<IOdictionary>("transportProperties")
+       .subDict("wetting");
+    const dimensionedScalar rho("rho", dimDensity, wetting);
+    const scalarField& a = alpha.primitiveField();
+    const scalarField& s = Solid.primitiveField();
+    const scalarField& V = mesh().V();
+    // m3
+    const scalar Vl = gSum(eps.primitiveField()*a*V);
+    const scalar VlPorous = gSum(s*eps.primitiveField()*a*V);
+    const scalar meanSaturation = gSum(a*V)/gSum(V);
+    const scalar meanSaturationPorous =
+        gSum(s*a*V)/max(gSum(s*V), small);
+    if (Pstream::master())
+    {
+        const fileName file(mesh().time().globalPath()/"liquidBalance.csv");
+        const bool header = !isFile(file);
+        // on a restart, the start time is already in the file
+        if
+        (
+           !header
+         && mesh().time().timeIndex() == mesh().time().startTimeIndex()
+        )
+        {
+            return false;
+        }
+        std::ofstream os(file.c_str(), std::ios::app);
+        if (header)
+        {
+            os  << "time,totalLiquidVolume_mL,totalLiquidMass_g,"
+                << "meanSaturation,porousLiquid_mL,freeLiquid_mL,"
+                << "meanSaturationPorous\n";
+        }
+        os  << mesh().time().timeName() << ","
+            << Vl*1e6 << ","
+            << rho.value()*Vl*1e3 << ","
+            << meanSaturation << ","
+            << VlPorous*1e6 << ","
+            << (Vl - VlPorous)*1e6 << ","
+            << meanSaturationPorous << "\n";
+    }
+#};
+
+// ************************************************************************* //

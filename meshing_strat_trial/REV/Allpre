@@ -22,9 +22,11 @@ cd "${0%/*}" || exit 1
 #              the 0.2 mm ramp to dry (0.002), free cells pure air except a 0.1 mm
 #              water column in the free cells of the box at the inlet (padding dry):
 #              the most stable start of the 2026-10-26 smoke tests (NOTES_cases.md)
-#   BCs        0.orig: inlet = reservoir (free faces total pressure 0, yarn faces
-#              air at 0 Pa: ../tools/pOpenAir), top/bottom open to air (p 0),
-#              outlet and inletPad closed walls
+#   BCs        0.orig: inlet = bath, top/bottom = air, both at rest at 0 Pa (p
+#              totalPressure); outlet and inletPad closed walls. alpha.wetting
+#              (initFields.py): water enters through the inlet at alpha 1, also
+#              on the yarn faces (--porous-in 1: saturated by the bath, so p = 0
+#              there is the bath water pressure); air through top/bottom
 
 PY=${PY:-../../.venv/bin/python}
 [ -x "$PY" ] || PY=python3
@@ -39,7 +41,7 @@ rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCent
 runApplication blockMesh
 runApplication checkMesh
 runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
-"$PY" ../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 --sat-height 1e-4 \
+"$PY" ../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 --sat-height 1e-4 --porous-in 1 \
     > log.initFields 2>&1 || { cat log.initFields; exit 1; }
 cat log.initFields
 rm -f 0/C 0/Cx 0/Cy 0/Cz

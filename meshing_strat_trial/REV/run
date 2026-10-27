@@ -9,7 +9,7 @@ cd "${0%/*}" || exit 1
 # Solver log outside the workspace during the run (../tools/runTools.sh):
 # LOG_EVERY=100 keeps every 100th step (+ the last 400 lines in .tail), LOG_DIR
 # moves the temporary log (on a cluster: LOG_DIR=$PWD/logs).
-# The coded BC and function objects are compiled first, in serial (compiling
+# The coded function objects are compiled first, in serial (compiling
 # them inside mpirun aborts the run: MPI_ERR_TRUNCATE); that pass writes t = 0
 # rows to the csv files, removed here.
 

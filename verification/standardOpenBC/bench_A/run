@@ -1,0 +1,5 @@
+#!/bin/sh
+# 2D bench (copy of ../../../meshing_strat_trial/2D_bench inputs, 0/ as written by its Allpre), solver $HPIF
+cd "${0%/*}" || exit 1
+. ../../runTools.sh
+runTmpLog log.hybridPorousInterFoam ${HPIF:?set HPIF to the solver binary}

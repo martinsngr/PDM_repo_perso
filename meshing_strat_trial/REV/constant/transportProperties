@@ -67,17 +67,6 @@ darcyFaceMaxDa  0.1;
 // log reports it). Free cells must start as pure air (tools/initFields.py).
 porousFreeDarcyFaces on;
 
-// p BC of the porous faces of the open patches (../tools/pOpenAir):
-// 1 = air at 0 Pa (p = -alpha*pc, as the 1D / single-yarn cases; consistent with
-//     the interior porous/free faces under porousFreeDarcyFaces),
-// 0 = mixture at 0 Pa (p = 0; what the solver did at interior porous/free faces
-//     before change G, kept for comparison)
-openPorousAirZero 1;
-
-// Free faces of the open patches (../tools/pOpenAir): 0 = static p = 0 (default),
-// 1 = total pressure 0 on inflow faces, p = -0.5*rho*|U|^2 (reservoir at rest).
-openFreeTotalPressure 1;
-
 alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;
 alpha.wettingmax           alpha.wettingmax [0  0  0 0 0 0 0] 0.999;
 
@@ -112,12 +101,9 @@ porousFreeNoSlip 1;
 // Reservoir (inlet) that exchanges water only, as a bath (solver change J,
 // of9-port be1a3ab; ../../verification/waterOnlyReservoir): no air through the
 // inlet (no air mobility on its yarn faces, gap faces closed next to air-rich
-// cells), reservoir water hydrostatic at 0 Pa on the reference point (the inlet
-// plane y = 0 here; ../tools/pOpenAir). Without it the old inlet let air out and
-// the REV smoke test failed at 0.21 ms (dt collapse, negative alpha in the gap
-// inlet cells).
+// cells). The bath pressure comes from 0/p (totalPressure 0). Without J the old
+// inlet let air out and the REV smoke test failed at 0.21 ms (dt collapse,
+// negative alpha in the gap inlet cells).
 waterOnlyPatches (inlet);
-reservoirWaterPressure 0;
-reservoirReferencePoint (0 0 0);
 
 // ************************************************************************* //
