@@ -76,6 +76,6 @@ verification/solver_failures/**/cases/
 # solver logs of cluster runs during the run (LOG_DIR=logs, runTools.sh)
 meshing_strat_trial/REV/logs/
 
-# run outputs
+
 meshing_strat_trial/*/waterBudget.csv
 **/system/fluid/
