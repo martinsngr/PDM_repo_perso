@@ -19,6 +19,7 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `trialWicking/singleYarn_vertical_hybrid/` | Yarn twin of `1D_vertical_hybrid` (lateral wall closed). 0.1 s: mini03 11.9 h |
 | `trialWicking/wickingFront.ipynb` | Front analysis of the 1D cases (front at S = 0.1 vs √t, profiles, p_air/p_water) |
 | `meshing_strat_trial/REV/` | **The REV in one folder:** TexGen geometry (`Textiles/`, `funge.py`), `inspect_stl.py` (REV box → `rev_domain.json`, `--zgap`), `build_fields.py` (mesh + eps, K, fYarn, yarnID), `check_periodicity.py`, `meshing.pvsm`, solver dictionaries, `Allpre` (geometry → mesh → fields → initial α). Run scripts not written yet |
+| `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 (2026-10-27) |
 | `meshing_strat_trial/2D_bench/` | **The 2D bench:** thick-wall slit (yarn wall 8 cells \| gap 8 \| yarn wall 8), G + H + F′ + I on; `Allpre`, `run`, `check.py` |
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
@@ -193,6 +194,37 @@ solver ignores `waterOnlyPatches`.
   1.009, 1.013, 1.016, 1.003 (1.8–2.0 ms): builds up ~0.6–0.8 ms then collapses, bounded; > 1.01 on 282 steps by
   1.9 ms. The laptop's 4-core run of the same case peaked at 1.0017 to 0.5 ms → possibly decomposition-sensitive.
   Results: `meshing_strat_trial/REV/` on mini03 (reconstructPar at the end; solver log in `logs/REV.*/`).
+- **Job 3051 analysed (2026-10-27, copy in `~/PDM_results/REV_run3051`, `check.py` over the 20 writes):** reached
+  10 ms, no stopGuard, 20,440 s on 16 cores (~85k steps, dt 1.0e-8 to 1.3e-7 s). Budget closed (imbalance 1.5e-20 m³,
+  1e-10 of the water); water lost through top/bottom 10.2 cell volumes; padding dry; α min −2e-20.
+  - **Yarn front (y-yarns, α > 0.1):** 0.27 → 0.69 / 1.13 / 1.63 mm at 1 / 4 / 10 ms; fit (t ≥ 2 ms)
+    front = 13.9 mm/√s · √t + 0.24 mm, exponent of (front − 0.27 mm) vs t 0.52: diffusive. 1D reference 18 mm/√s
+    (hypotheses for the lower rate, not tested: water drawn into crossing yarns and gaps, crimped path). Profile
+    diffuse: S 0.98 at the inlet, 0.72 at 0.9 mm, 0.1 at 1.6 mm (10 ms). Mean porous S 0.096 → 0.411.
+  - **Crossing yarns** wet as the y-yarn front reaches them: yarn 6 (y 0.50–0.84 mm) from ~1 ms, yarn 7 (1.16–1.50)
+    from ~5.5 ms.
+  - **Gaps: capillary valve confirmed.** Gap water never passes y 0.18–0.19 mm, i.e. the first row above the half
+    crossing yarn 5 (y 0–0.16 mm); at 10 ms row y 0.16–0.18 holds 37 water cells, the next row 1 of 943 free cells.
+    Gap water drains 1,645 → 268 cell volumes by 1 ms, then refills slowly to 383, piling up in rows y 0.10–0.18 mm.
+  - **α overshoot grows:** in the sampled log steps (every 100th) max α > 1.001 on 11–37 % of steps per ms to 4 ms,
+    68–86 % at 4–7 ms, 99–100 % after 7 ms; peaks 1.014 (0–1 ms), 1.020 (3–4), **1.051 (8–9 ms)**. At the writes the
+    cells above 1.0005 (≤ 9) are almost all porous, inside the half yarn 5 at the inlet (y 0–0.16 mm, mostly not on
+    the porous/free interface), saturated region. **Not decomposition-related:** scotch decomposition regenerated
+    locally (`decomposePar -cellDist`, processor sizes and shared faces identical to the job's); 13 % of cells touch a
+    processor face, overshoot cells hit one at about that rate. Next to the reservoir only once (y 0–0.02 mm, 5.5 ms).
+  - **Velocity spikes** at single writes: 7.3 m/s at 1 ms (4 air-side interface cells near yarns 2/5, y 0.10–0.16 mm,
+    all on processor faces), 3.0 / 5.1 / 3.3 m/s at 6.5 / 7 / 8 ms (air-side porous/free interface cells near yarn 5,
+    not on processor faces). Water-cell |U| 0.6–0.9 m/s throughout.
+- **`REV_lowpc/` (2026-10-27): REV with Van Genuchten pc0 1000 Pa, m 0.4** (sharper pc drop with S; only change in
+  `constant/transportProperties`, job name `REVlowpc`). VG pc/pc0 at the dry start S 0.002: 1.1e4 (m 0.5: 500).
+  **Smoke test, 0.2 ms** (scratch copy, 4 cores, writes every 0.05 ms): no stopGuard, 600 steps, dt 3.7–4.0e-7 s
+  (REV ~1.2e-7), 850 s = ~4,250 s per ms (REV laptop 11,600); budget closed to 3e-24 m³; max α 1.00008 (≤ 1.001 on
+  every step); max |U| 1.3–1.9 m/s (water cells up to 1.5 m/s at 0.1 ms; REV 0.7–1.0). Yarn front 0.27 → 0.37 mm,
+  mean porous S 0.096 → 0.103, gap water 1,645 → 626 cell volumes (gap water front 0.15 mm). **Water flows back out
+  through the reservoir face:** net inflow −5.8e-12 m³ (≈ 725 cell volumes) by 0.2 ms, slowing (−1.5 / −2.8 / −1.2 /
+  −0.4e-12 m³ per 0.05 ms); the yarns took ≈ 290 cell volumes, so most of the drained gap column went back to the
+  reservoir (REV saturated-rows smoke: −2.4e-12 m³ at 0.2 ms, inflow again by 0.5 ms). Water in the padding near the
+  inlet: 232 cells α > 0.05 at 0.05 ms, 16 at 0.2 ms; lost through top/bottom 0.8 cell volumes. Cause not checked.
 - **Cost (laptop, 2026-10-26):** s per step serial 2.18, 4 cores 1.35, 8 cores 1.55 (memory bound; `caseSetup` N 4);
   dt at the Coats limit ~1.2e-7 s after 50 steps.
 - **Smoke test, old inlet** (scratch copy, 4 cores, 2026-10-26): **failed at 0.21 ms** (stopGuard, dt 1e-14 s). The dry
@@ -249,7 +281,7 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 ## Next steps
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
-**Resume here (2026-10-27):** analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
+**2026-10-27: job 3051 analysed (REV case status above): runs to 10 ms, valve confirmed, α overshoot grows to 1.05 inside the saturated half yarn 5, not decomposition-related. Next: why porous α > 1 in saturated cells (reservoir-fed yarn 5, J?); decide before longer runs.** Previous plan: analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
 (yarn front, gap water, gap rise, |U|, budget, losses); locate the α > 1 cells at the writes near the overshoot peaks
 (0.5, 1.0, 1.5 ms: next to the reservoir → boundary water flux of J; next to processor boundaries → decomposition);
 short 4- vs 16-core comparison on mini03 if it looks decomposition-related; check the capillary-valve hypothesis (gap
