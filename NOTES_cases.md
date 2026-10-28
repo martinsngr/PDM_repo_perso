@@ -224,6 +224,12 @@ solver ignores `waterOnlyPatches`.
   - **Velocity spikes** at single writes: 7.3 m/s at 1 ms (4 air-side interface cells near yarns 2/5, y 0.10–0.16 mm,
     all on processor faces), 3.0 / 5.1 / 3.3 m/s at 6.5 / 7 / 8 ms (air-side porous/free interface cells near yarn 5,
     not on processor faces). Water-cell |U| 0.6–0.9 m/s throughout.
+- **Job 3055 (mini03, REV unchanged, 8 cores, endTime 50 ms, started 2026-10-27; overwrote the 3051 results on mini03):**
+  4,390 s per simulated ms (3051 on 16 cores: 2,040), dt 1.26e-7 s at the Coats limit as in 3051, ~8,700 steps/ms.
+  Live full log at 5.65 ms: max α per ms 1.046 / 1.042 / **1.092** / 1.022 / 1.086 / 1.056 (0–5 ms), above 1.001 on
+  33,538 of 49,109 steps (68 %). 3051 (16 cores, full live log) stayed ≤ 1.023 to 2 ms: **the overshoot amplitude
+  depends on the decomposition** (or on run-to-run differences), although at the 3051 writes the overshoot cells were
+  not on processor faces. Episodic, back to ~1.005 between peaks; not monotonic over 0–5 ms.
 - **`REV_lowpc/` (2026-10-27): REV with Van Genuchten pc0 1000 Pa, m 0.4** (sharper pc drop with S; only change in
   `constant/transportProperties`, job name `REVlowpc`; that file also has theta0 40°, REV 60°, committed with it in
   `dbb7b0a`, noted 2026-10-27). VG pc/pc0 at the dry start S 0.002: 1.1e4 (m 0.5: 500). Same standard open-patch BCs
@@ -332,6 +338,8 @@ the standard BC: no closer). Not tested: effect on the α > 1 overshoot inside y
 it in the next long run (mini03, needs commit, push, pull). Job 3051 used the old BCs; `REV_lowpc/` aligned the
 same evening (20-step start checked). Both jobs set to 8 cores (`caseSetup` N 8, `--ntasks=8`) and endTime 50 ms
 (5× job 3051; estimate 30–55 h for REV, ~3× less for REV_lowpc; walltime 72 h kept; ~100 writes of ~46 MB each).
+Committed and pulled on mini03 (`f2f31f6`); submitted 2026-10-27 evening: **job 3055 (REV) and 3056 (REV_lowpc)**,
+pending (node full: 44 of 48 cores taken by other users' jobs, limits 6 d, 15 d and unlimited).
 Previous plan: analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
 (yarn front, gap water, gap rise, |U|, budget, losses); locate the α > 1 cells at the writes near the overshoot peaks
 (0.5, 1.0, 1.5 ms: next to the reservoir → boundary water flux of J; next to processor boundaries → decomposition);
