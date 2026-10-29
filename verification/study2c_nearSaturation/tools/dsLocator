@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Diagnostic of study2c_nearSaturation (2026-10-29; first written for the REV_lowpc blow-up): every step, the porous
+  cell with the largest |d alpha|/dt (the cell that sets the dSmax limit of
+  coatsTimeStep) and the free cell with the largest |U|, with their centres,
+  alpha, old alpha and |U|. One line each, from the processor holding the max:
+      dsLoc <t> <dt> <dSdt> <x y z> <alpha> <alpha0> <|U|>
+      uLoc  <t> <dt> <|U|> <x y z> <alpha> <alpha0>
+\*---------------------------------------------------------------------------*/
+
+type            coded;
+libs            ("libutilityFunctionObjects.so");
+name            dsLocator;
+executeControl  timeStep;
+writeControl    timeStep;
+codeExecute
+#{
+    if (!mesh().foundObject<volScalarField>("alpha.wetting"))
+    {
+        return true;
+    }
+    const volScalarField& a = mesh().lookupObject<volScalarField>("alpha.wetting");
+    const volScalarField& Solid = mesh().lookupObject<volScalarField>("Solid");
+    const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+    const scalarField& a0 = a.oldTime().primitiveField();
+    const vectorField& C = mesh().C().primitiveField();
+    const scalar dt = mesh().time().deltaTValue();
+    scalar dmax = -1, umax = -1;
+    label id = -1, iu = -1;
+    forAll(a, i)
+    {
+        if (Solid[i] >= 0.5)
+        {
+            const scalar d = mag(a[i] - a0[i])/dt;
+            if (d > dmax) { dmax = d; id = i; }
+        }
+        else
+        {
+            const scalar m = mag(U[i]);
+            if (m > umax) { umax = m; iu = i; }
+        }
+    }
+    const scalar gd = returnReduce(dmax, maxOp<scalar>());
+    const scalar gu = returnReduce(umax, maxOp<scalar>());
+    const word t = mesh().time().timeName();
+    if (id >= 0 && dmax == gd)
+    {
+        Pout<< "dsLoc " << t << " " << dt << " " << dmax << " " << C[id].x()
+            << " " << C[id].y() << " " << C[id].z() << " " << a[id] << " "
+            << a0[id] << " " << mag(U[id]) << endl;
+    }
+    if (iu >= 0 && umax == gu)
+    {
+        Pout<< "uLoc " << t << " " << dt << " " << umax << " " << C[iu].x()
+            << " " << C[iu].y() << " " << C[iu].z() << " " << a[iu] << " "
+            << a0[iu] << endl;
+    }
+#};
+
+// ************************************************************************* //

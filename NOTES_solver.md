@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-10-27. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-10-29. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -51,6 +51,12 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   `b525086` checked bit-identical to the tested build (keywords on) and to `1b007d8` (keywords off). Backups: `_1b007d8` (A–G), `_c3a2e6e` (A–C + E), `_b995db5` (A–C), `_be54696` (port).
   The libraries are shared by all binaries (H keeps the class layout and is inactive without its keyword).
   `hybridPorousInterFoamH` + libraries `...H` = obsolete scratch build, can be deleted.
+- **Scratch diagnostic binaries (2026-10-29, Study 2c, `$FOAM_USER_APPBIN`, built from `be1a3ab` sources, each
+  bit-identical to the installed solver with its keyword off; patches in `verification/study2c_nearSaturation/solver/`):**
+  `hybridPorousInterFoam_K1` (`porousFreeKrPorous`: both kr of porous/free faces from the porous cell; changes the
+  gap–yarn water exchange, not a fix), `_K2` (`porousFreeKrAirPorous`: the air kr only; **the fix chosen by the user,
+  not committed yet**), `_G2` (`porousFreeVofPc`, sharp band α > 1e-3: fails), `_G2b` (`porousFreeVofPc` with an
+  α ramp: works, stiff exchange episodes; alternative in reserve). Delete K1 and G2 once K2 is committed.
 - **Build:** `wmake libso` in `OpenFoamV8/libraries/porousInterfaceProperties` (H), `wmake` in
   `OpenFoamV8/solvers/hybridPorousInterFoam`. Every machine rebuilds after a pull (**mini01: pull, then both**).
   Keep the old binary first: `cp $FOAM_USER_APPBIN/hybridPorousInterFoam $FOAM_USER_APPBIN/hybridPorousInterFoam_<hash>`.
@@ -343,9 +349,64 @@ Checks after the change (predictions written before the runs):
 6. 2D bench with anisotropic walls (Kpar along the slit, Kperp across): `check.py` passes; split bench parallel =
    serial.
 
+### Study 2c — coupling next to a nearly saturated yarn wall (`verification/study2c_nearSaturation/`, 2026-10-29)
+From the REV_lowpc diagnosis (`NOTES_cases.md`). 2D bench `standardOpenBC/bench_B` (G + H + F′ + I, J, θ 60°), walls
+pre-saturated at S_w, gap meniscus suction 450 Pa; solver `be1a3ab`. **Predictions (before the runs):** N0 (low pc,
+S_w 0.91, wall pc 448 Pa ≈ suction) reproduces the fast currents (> 5 m/s on ≥ 10 % of the steps after 0.2 ms, dt
+dips, smeared cells ≥ 3× N2); N1 (low pc, 0.97, 214 Pa) as N0 or stronger, walls feed the gap; N2 (low pc, 0.5,
+2.5 kPa) and N3 (base pc, 0.91, 2.26 kPa) calm (≤ 1.5 m/s); **N4 (base pc, 0.995, 448 Pa) decides**: like N0 if
+the near-equilibrium state is the trigger, calm if the low-pc curve itself is. Decision table and phases 2
+(G/H/F′/I/θ ablations) and 3 (kr of yarn/gap faces, scratch variants) in the study README.
+**Results phase 1 (2026-10-29): no run reproduces** (max free |U| 1.07–1.28 m/s after 0.2 ms in all five, no step
+above 5 m/s, budgets ≤ 1.6e-14 of the water); N0, N1 predictions fail, N2/N3 calm in velocity (dt dips from the
+Coats limit while the walls imbibe), N4 not informative. The near-equilibrium state alone (flat 2D wall, uniform
+saturation, 8-cell gap) is not enough; candidates left: saturation gradient along the wall, θ 40°, gap width, 3D
+edges/corners, gap water from below, dt.
+**Phase 1b predictions (before the runs):** N5 (wall S profile of the REV flank, 0.98 → 0.1 over 0.97 mm)
+reproduces; N6 (θ 40°, S_w 0.84), N7 (4-cell gap, S_w 0.78) and N8 (dt ≤ 2.5e-7 s) calm.
+**Results phase 1b:** all four calm (per-step max free |U| 0.99–1.54 m/s); N5 fails its prediction. **None of
+nine 2D configurations reproduces**: the trigger needs the 3D REV geometry. Phase 1c predictions (truncated REV,
+y < 0.7 mm, 91 × 35 × 20 cells): T0 (low pc, θ 60°) reproduces the full-REV `lowpc_t60` (~8 m/s at 0.4–0.5 ms);
+T1 (base pc, θ 60°) calm (≤ 1.5 m/s).
+**Results phase 1c:** T0 reproduces the full REV to 2 digits (every step > 5 m/s from 0.40 ms). Onset at 0.395 ms in
+one free cell with 3 yarn faces, (1.668, 0.231, 0.060) mm: at 0.5 ms (α 0.28, p 517 Pa) air enters from its 3 free
+faces (+1.6 to +4.9 m/s, against the pressure difference) and leaves through its 3 yarn faces into 55–61 % water-filled
+yarn at 3–5 m/s Darcy velocity; cell pressure and through-flow grow together. Hypothesis (not tested): feedback of
+surface tension in the corner pocket, air mobility of the yarn/gap faces taken from the gap cell (C), and F′ (cell
+velocity from the Darcy fluxes, carried onto the free faces). Phase 2 predictions: F′ off calm; θ 90° weaker; I off
+unchanged; G off and H off inconclusive.
+**Results phases 2–3 (cut REV):** base pc calm (0.72 m/s at 0.5 ms, corner cell dry); F′ off: generic spurious air
+currents (1,500–2,150 cells > 1 m/s) but the corner cell still pumps air, steady (±1–2 m/s, p 227 Pa): F′ amplifies
+×2–3, surface tension drives (air enters against Δp); K1 (both kr from the yarn): gaps drain faster, corner stays
+dry, inconclusive for the leak; K2 (air kr only): running. Code: the surface-tension force is dropped on every Darcy
+face (`pEqn.H:38/:65`), and with G the Darcy faces use the free cell's VOF pressure as both phase pressures.
+**Variant G2 (planned, predictions in the study README):** pc = −σκ in free interface cells (same mixture form as the
+yarns); prediction: corner pump removed on the cut REV, bench regression within 5 %.
+**Results phases 3–4 (2026-10-29, scratch binaries, patches in `verification/study2c_nearSaturation/solver/`, all
+bit-identical to `be1a3ab` with the keyword off):** K2 (air kr of yarn/gap faces from the yarn): pump no longer
+grows (steady, decaying 1.5–2.6 m/s to 1 ms, corner pressure still 416 Pa), gap water within 3 %, bench identical,
+no dt dips. G2 (pc = −σκ for α > 1e-3): fails (cells with a trace of water get a meaningless curvature that pulls
+water out of wet yarn: dt 1–6e-8 s). G2b (pc = −w(α)σκ, w 0 below α 0.05, 1 for 0.15–0.85): pump removed (corner
+p −13 Pa, max free |U| 1.1 m/s at 0.45–0.5 ms), bench all checks pass (meniscus +1 cell), gap water within 7 %, but
+stiff water-exchange episodes at gap menisci touching yarns (dt dips on 17 % of the steps). Decision on a solver
+change: with the user.
+**2026-10-29: the user chose K2.** Phase 5 predictions (cut REV at θ 40°, the 3059 configuration): baseline T11
+reproduces 3059 (> 5 m/s by 0.5 ms, more gap water); with K2 (T12, 2 ms) per-step max free |U| ≤ 3 m/s after 0.2 ms,
+no stopGuard, gap water within 10 % of T11.
+**Results phase 5 (final):** T11 = job 3059 (gap water 1,461 cells and y-yarn front 0.511 mm at 1 ms in both, fast
+currents to 14 m/s, every step > 5 m/s from 0.5 ms). T12 (K2) to 2 ms: no step above 5 m/s, steady 1.3–1.6 m/s from
+0.6 ms, gap water within 3 % of T11, dt median 3.9e-7 s (T11 2.7e-7), no dips; transients of 3.3–3.5 m/s at 0.4–0.55
+ms. K2 regressions: 1D bit-identical, slit (K 1e-20) U/p/φ bit-identical, bench identical numbers. **K2 suppresses
+the REV_lowpc failure mode; next: solver commit (with the user) and full-REV validation on mini03.**
+
 ## Open issues
 
 Solver behaviour:
+- **Air pump in free cells with several porous/free Darcy faces (found 2026-10-29, Study 2c):** surface tension raises
+  the pressure of a partly filled free cell (concave staircase corner of a yarn surface), its Darcy faces drop the
+  surface-tension force (`pEqn.H:38/:65`) and, with G, take its VOF pressure as both phase pressures; the air leaves
+  into the yarn with the gap cell's air mobility (C), F′ amplifies. Cause of the REV_lowpc failure (job 3059). Fix K2
+  (air kr from the porous cell) tested, commit pending (user). The phase-pressure inconsistency itself (G2b) remains.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic

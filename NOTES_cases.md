@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-27.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-29.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -230,6 +230,25 @@ solver ignores `waterOnlyPatches`.
   33,538 of 49,109 steps (68 %). 3051 (16 cores, full live log) stayed ≤ 1.023 to 2 ms: **the overshoot amplitude
   depends on the decomposition** (or on run-to-run differences), although at the 3051 writes the overshoot cells were
   not on processor faces. Episodic, back to ~1.005 between peaks; not monotonic over 0–5 ms.
+  **mini03 crashed 2026-10-28 ~15:04** (rebooted ~15:37): the solver log stopped at t = 11.066 ms (last write 11.0 ms;
+  NUL bytes in the log), no solver process left but squeue still showed 3055 running (also the other users' 3048 and
+  3053, dead since the reboot, holding 36 CPUs). 3055 cancelled; **job 3058 = restart from 11.0 ms** with
+  `REV/job_restart.slurm` (no `Allpre`/`clean`/`decomposePar`, same 8-core decomposition; a last write with missing,
+  cut or NUL-containing files goes to `processor*/<t>.incomplete`; NUL check added after `800cb20`, the version on
+  mini03 may lack it). Running at 11.083 ms the same afternoon. Full log of 3055 unfiltered in `logs/REV.eW8Mmo/`
+  (89 MB, `grep -a`), restart log in `logs/REV.S65Z44/`. `waterBudget.csv`: the restart adds a second 0.011 row; inflows restart from 0 there, imbalance offset −3.4e-16 m³ (2e-6 of the water) from then on.
+  **Never resubmit `job.slurm` to continue a run** (`Allpre` → `clean` deletes `processor*/`).
+  **3055 + 3058 to 30.5 ms (copy `~/PDM_results/REV_run3055_3058`, 15 writes reconstructed locally, 2026-10-29):**
+  0–10 ms = 3051 (y-yarn front 1.634 mm at 10 ms in both, mean porous S 0.410 vs 0.411, gap water 394 vs 383
+  cells): the 2026-10-27 BC change has no integral effect to 10 ms. Restart continuous (front 1.714 → 1.754 mm,
+  S 0.429 → 0.439 from 11 to 11.5 ms). y-yarn front at the closed end (2.657 mm) between 25 and 30 ms (fit of 3051:
+  ~31 ms); mean porous S 0.70 and min porous α 0.15 at 30.5 ms. Budget closed after the restart (offset 1.78e-15 m³,
+  7.9e-6 of the water, constant 11.5–30.5 ms); padding dry; ~12 cell volumes lost through top/bottom. Max α per ms
+  1.02–1.09 to 11 ms, 1.014–1.046 at 11–20 ms, 1.004–1.010 after 20 ms; free Courant ≤ 0.06. dt < 5e-8 s on 1.8 % of
+  the steps to 11 ms, 0.4 % after (location not checked). **Gaps:** valve held to ~12 ms; from 15 ms 2–4 free cells
+  hold water at y 1.23–1.43 mm on both flanks of yarn 2 (x 0.77 and 1.05 mm, z 0.04 mm, next to crossing yarn 7);
+  the fastest free cells (3.5 / 4.8 m/s at 15 / 20 ms, 1.3 m/s at 30.5 ms) are partly filled cells there with 2–3
+  porous neighbours: the REV_lowpc pattern, weaker, appearing once the yarns are near saturation.
 - **`REV_lowpc/` (2026-10-27): REV with Van Genuchten pc0 1000 Pa, m 0.4** (sharper pc drop with S; only change in
   `constant/transportProperties`, job name `REVlowpc`; that file also has theta0 40°, REV 60°, committed with it in
   `dbb7b0a`, noted 2026-10-27). VG pc/pc0 at the dry start S 0.002: 1.1e4 (m 0.5: 500). Same standard open-patch BCs
@@ -243,6 +262,60 @@ solver ignores `waterOnlyPatches`.
   −0.4e-12 m³ per 0.05 ms); the yarns took ≈ 290 cell volumes, so most of the drained gap column went back to the
   reservoir (REV saturated-rows smoke: −2.4e-12 m³ at 0.2 ms, inflow again by 0.5 ms). Water in the padding near the
   inlet: 232 cells α > 0.05 at 0.05 ms, 16 at 0.2 ms; lost through top/bottom 0.8 cell volumes. Cause not checked.
+  **Job 3059 (mini03, 8 cores, 50 ms planned, 2026-10-28 16:04–20:17): diverged at 6.553 ms** (stopGuard, dt
+  1.3e-24; SLURM `COMPLETED`, reconstructed; copy in `~/PDM_results/REV_lowpc_run3059`). Measured (sampled log,
+  `.tail`, `check.py`): dt 2–4e-7 s at the Coats limit, max α ≤ 1.003, free Courant ≤ 0.36 up to 6.548 ms; then in
+  ~20 steps dt ×0.65 per step at a free Courant pinned at ~1.17 (a velocity growing ~1.5× per step, ~30 → ~10^3 →
+  ~10^6 m/s), Coats and dSmax limits falling with it (porous cells involved), α stays in [0, 1.003]; the last two
+  p solves diverge (continuity errors 63, 5e39). The final write is garbage everywhere (largest in the saturated
+  yarn 0 at the inlet row, p −3e72: end stage, not the origin); the onset lies between the 6.5 ms write and 6.548 ms.
+  **Before the onset, against job 3051 (REV, same mesh and BCs):** max |U| free cells 7–16 m/s from 0.5 ms, rising
+  (3051: 0.8, rare spikes 3–7), porous 3–11 m/s (3051: ~0.2); water-filled free cells 0.5–2.0 m/s (0.75); cells
+  |U| > 1 m/s: 318 at 1 ms, 579 at 6.5 ms. **Most fast cells are air** (seen by the user in ParaView, counted
+  2026-10-29): of the free cells above 1 m/s, α ≤ 0.01 for 225 of 300 at 1 ms and 372 of 514 at 6.5 ms, about half
+  without a yarn neighbour, the others next to partly wet yarn (mean α of the yarn neighbours 0.51 / 0.39). Only the
+  fastest few are partly filled cells (α 0.03–0.35, 2–3 yarn faces; 8 of 18 above 5 m/s at 1 ms, 14 of 43 at 6.5
+  ms), y 0.27–0.63 mm around crossing yarns 5/6, mirror pairs across x = 0.91 mm. In the truncated REV (study 2c, T0,
+  0.5 ms) 34 of the 38 fast air cells lie within 3 cells of the one pumping corner pair: the air stream that feeds
+  it (`verification/study2c_nearSaturation/README.md`). In 3059 itself the fast air cells lie within 3 / 6 cells of a
+  partly filled free cell with ≥ 2 yarn faces for 142 / 225 of 225 (1 ms), 114 / 176 of 193 (3.5 ms), 278 / 359 of
+  372 (6.5 ms); the rest (13–17 cells, 1.0–1.2 m/s, no yarn neighbour) sit in the bottom padding layer next to the
+  inlet (z −0.12 mm, y 0.01–0.11 mm), where the gap water spread into the padding (θ 40°): a second, mild group, not
+  checked further. Gap water grows 1,645 → 2,611 cell volumes and passes
+  the 3051 valve (top 0.25 mm; 3051: drained to ~300, top 0.17 mm); ~530 padding cells wet (3051: 0); lost through
+  top/bottom 411 cell volumes by 6.5 ms (3051: 10 by 10 ms); budget closed (imbalance 1.6e-19 m³). y-yarn front
+  0.51 / 0.79 / 0.97 mm at 1 / 4 / 6.5 ms (3051: 0.69 / 1.13 / 1.35), mean porous S 0.204 at 6.5 ms (3051: 0.335).
+  VG with these inputs: pc lower than REV only above S ≈ 0.04 (S 0.5: 2.5 vs 8.7 kPa; S 0.9: 0.5 vs 2.4 kPa) and
+  higher at the dry end (S 0.002: 11 vs 2.5 MPa). Three changes at once (pc0, m, θ 60 → 40°): the cause of the fast
+  interface currents cannot be attributed from this run. Not checked: the origin cell of the divergence (needs
+  writes between 6.5 and 6.553 ms).
+  **Diagnosis (2026-10-29, laptop scratch runs, solver `be1a3ab`, 8 cores):**
+  - Restart of 3059 from the 6.5 ms write (6-digit fields): no divergence to 7.2 ms (3,224 steps), dt dips in
+    episodes every ~0.12 ms (6.508, 6.639, 6.748, 6.875, 7.000, 7.126 ms; dt down to 1–2e-8 s, all recovered). The
+    6.553 ms collapse was one such episode that did not recover; the restart took another path.
+  - Locator function object (largest porous |dα/dt| and largest free |U| per step): both episodes of 7.0–7.2 ms sit
+    at the flank of yarn 2 (yarn cells x 0.769 mm, y 0.23–0.33, z 0.02–0.08 mm): the surface cells drain from α 0.94
+    to 0.76–0.80 in ~4 µs (|dα/dt| up to 9.6e5 1/s), refill between episodes; the free cells beside them (x 0.749 mm)
+    α 0.06–0.22 at 20–30 m/s; pure-air free cells up to 59 m/s elsewhere. In the writes the gap
+    beside that flank holds a diffuse band of α 0.05–0.6 (4 cells wide, ~8 tall, from y 0.19 mm, growing from 1 ms);
+    in 3051 the same cells are air (α ≤ 0.02) and the yarn flank is wetter (α 0.94–0.98 vs 0.83–0.97).
+  - Exchange across the 39,406 internal porous/free faces (alphaPhi0): 3059 net yarn → gap +1.1 to +1.8e-9 m³/s
+    (outflow faces: yarn S median 0.96–0.97), gross out 2.0–2.6e-8 and in −1.9 to −2.5e-8 m³/s; 3051 net mostly
+    gap → yarn, gross ~0.5e-8.
+  - One-change variants to 0.5 ms (0.5 ms write; baseline = REV with the current BCs, job 3055):
+    REV 0 free cells with |U| > 1 m/s, max 0.77 m/s, gap water 289 cells (3051, old BCs: 0, 0.76, 293);
+    `REV_t40` (θ 40° only) 7 cells, max 2.5 m/s (locator: 4–17 m/s spikes per 0.05 ms), gap water 1,004, valve
+    holds (0.17 mm); `lowpc_t60` (pc0 1000, m 0.4 only) 56 cells, max 8.5 m/s (rising from 1.4 at 0.1–0.2 ms), gap
+    water 395, valve holds; 3059 (both) 155 cells, max 7.9 m/s, gap water 1,228. **The low pc is the main trigger of
+    the fast currents; θ 40° keeps more water in the gaps and adds to them.**
+  - VG (pc = pc0·(Se^(−1/m) − 1)^(1−m), Se = S/0.999, solver `pcVanGenuchten.H`): the gap meniscus suction
+    2σcosθ/w (0.37–0.69 kPa at θ 40°, 300–160 µm) equals the yarn pc at S ≈ 0.84–0.92 here, at S ≈ 0.99–0.997 in
+    REV. Fibre-bundle estimate pc ≈ (4/d_f)·V_f/(1 − V_f)·σcosθ (Ahn, Seferis & Berg 1991; d_f 15 µm, V_f 0.5)
+    ≈ 19 kPa·cosθ, i.e. 20–40× the gap suction at any θ: REV pc0 5000 Pa is the physical order, REV_lowpc is weaker
+    than a fibre bundle at moderate S.
+  - Hypothesis (not tested): the porous/free coupling (G pc jump driven by the free-cell pressure of a smeared VOF
+    interface, kr on yarn/gap faces from the gap cell α, H on a wet surface) is unstable where a nearly saturated
+    yarn (pc ≈ meniscus suction) faces a partly filled gap cell. Scripts and runs: laptop scratchpad (disposable).
 - **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
   "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
   harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
@@ -322,6 +395,42 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
   sink models (Pillai).
 
 ## Next steps
+**2026-10-29 (end of day): REV_lowpc failure explained, fix K2 chosen and tested — START HERE.**
+- **Mechanism** (`verification/study2c_nearSaturation/README.md`, `NOTES_solver.md` Study 2c): a free cell in a
+  concave staircase corner of a yarn surface (3–5 yarn faces; ~4,300 such cells in the REV) collects water when the
+  yarn pc is low; surface tension raises its pressure, its Darcy faces let air out into the yarn with the gap cell's
+  air mobility (C upwinds kr by each phase's flux), F′ amplifies: an air pump (corner cell 517 Pa, 3–5 m/s), dt-dip
+  episodes, and in job 3059 the blow-up at 6.553 ms. Not reproducible on the flat 2D bench (9 configurations);
+  reproduced exactly on a truncated REV (first 0.7 mm, 64k cells, ~20 min per 0.5 ms on 4 cores, `makeREVcut.sh`).
+- **Fix chosen by the user: K2** (on porous/free Darcy faces the air kr from the porous cell; water kr unchanged;
+  scratch binary `hybridPorousInterFoam_K2`, keyword `porousFreeKrAirPorous on`, patch
+  `verification/study2c_nearSaturation/solver/K2_porousFreeKrAirPorous.patch`). Passed: cut REV θ 60° (pump no longer
+  grows, 1 ms) and **θ 40° = the job 3059 configuration (T12: steady 1.3–1.6 m/s to 2 ms, no step above 5 m/s, gap
+  water within 3 % of the unfixed T11 = 3059)**; regressions: 1D bit-identical, slit K 1e-20 U/p/φ bit-identical,
+  2D bench identical numbers (all 10 checks); keyword off: bit-identical to `be1a3ab`. Alternative kept in reserve:
+  G2b (VOF capillary pressure in free interface cells: removes the pressure build-up, but stiff exchange episodes).
+- **Decisions pending (user):** (1) commit K2 in the solver repo: proposed change letter **L** (K clashes with the
+  permeability), keyword `porousFreeAirKrPorous` (default off), `CHANGES_of9-port.md` entry with the study's evidence,
+  rebuild the installed binary (back up the current one first), push; (2) commit this repo (study folder, notes).
+- **Then:** mini03 pull + `wmake` the solver; validation jobs (sbatch): REV_lowpc (θ 40°, as 3059) with K2 past
+  6.5 ms (≥ 10 ms); base REV with K2 past 15 ms (the weaker corner pattern of job 3058 from 15 ms, at y 1.2–1.5 mm next
+  to yarn 2 / crossing yarn 7) vs job 3058.
+- **Still running on mini03:** job 3058 (REV, base pc, restart of 3055 from 11 ms, endTime 50 ms; healthy to 30.5 ms:
+  copy `~/PDM_results/REV_run3055_3058`). Fetch and check at the end (`check.py`, the corner pattern after 15 ms).
+- **Local files:** results copies in `~/PDM_results/` (REV_run3051, REV_lowpc_run3059, REV_run3055_3058 to 30.5 ms,
+  study2c_logs; `tools` symlink for paraFoam); scratch binaries `hybridPorousInterFoam_K1/_K2/_G2/_G2b` in
+  `$FOAM_USER_APPBIN` (diagnostic; sources were in the session scratchpad, the patches are in the study's `solver/`;
+  delete K1/G2 once K2 is committed).
+- **Physics points discussed 2026-10-29 (not tested):** pc0 5000 Pa (m 0.5) is the physical order for the yarn
+  (fibre-bundle estimate ≈ 19 kPa·cosθ for d_f 15 µm, V_f 0.5, i.e. 20–40× the gap meniscus suction at any θ);
+  REV_lowpc (pc0 1000, m 0.4) is a stress test, not a physical case. With realistic pc the gaps fill behind the yarn
+  front (yarns near saturation), in well-connected gaps, and past crossings when θ allows. Characterisation (user's
+  next step): the upward–horizontal–downward wicking test (Simile & Beckham) gives fabric-level K–S–pc, i.e. yarns +
+  gaps together: use it as validation of the REV, and a yarn-only test (or bundle) for the yarn inputs; θ needs a
+  fully wetting reference liquid; H needs the apparent angle on the yarn surface: Young angle (Wilhelmy) on a dry
+  surface, Cassie wet-surface angle (≈ 48–54° for θ_Y 70–80°, φ_s 0.5) on a wet one: bracket both in Study 3.
+
+**Earlier entries:**
 **State 2026-10-13:** solver `b525086` installed and pushed (mini01: pull, rebuild library and solver); `2D_bench` is the
 thick-wall slit with all checks passing; `REV/` prepared up to `Allpre`; 1D and single yarn unchanged with the new solver.
 **2026-10-27: job 3051 analysed (REV case status above): runs to 10 ms, valve confirmed, α overshoot grows to 1.05 inside the saturated half yarn 5, not decomposition-related. Next: why porous α > 1 in saturated cells (reservoir-fed yarn 5, J?); decide before longer runs.** **2026-10-27 (later): diagonal tensor K with harmonic faces decided, written down only
@@ -340,6 +449,12 @@ same evening (20-step start checked). Both jobs set to 8 cores (`caseSetup` N 8,
 (5× job 3051; estimate 30–55 h for REV, ~3× less for REV_lowpc; walltime 72 h kept; ~100 writes of ~46 MB each).
 Committed and pulled on mini03 (`f2f31f6`); submitted 2026-10-27 evening: **job 3055 (REV) and 3056 (REV_lowpc)**,
 pending (node full: 44 of 48 cores taken by other users' jobs, limits 6 d, 15 d and unlimited).
+**2026-10-28: mini03 crashed (~15:04) during job 3055 at 11.07 ms; restarted from 11.0 ms as job 3058
+(`REV/job_restart.slurm`, running). 3056 (never started) cancelled and resubmitted unchanged as 3059 (REV_lowpc,
+fresh start, `job.slurm`); both running on 8 cores the same afternoon.** **2026-10-29: 3059 diverged at 6.553 ms** (fast interface currents at
+partly wet yarn surfaces from 0.5 ms, gap water past the valve, water out through top/bottom; REV_lowpc entry). **Diagnosed 2026-10-29: low pc is the main trigger (one-change
+variants), θ 40° adds; same pattern, weaker, in the REV run from 15 ms; 3058 healthy to 30.5 ms. Next: isolate the
+coupling term on a small case (near-saturated porous wall next to a partly filled gap).**
 Previous plan: analyse the 10 ms REV run on mini03 (job 3051): `check.py` table over all writes
 (yarn front, gap water, gap rise, |U|, budget, losses); locate the α > 1 cells at the writes near the overshoot peaks
 (0.5, 1.0, 1.5 ms: next to the reservoir → boundary water flux of J; next to processor boundaries → decomposition);
@@ -378,3 +493,6 @@ committed); REV geometry facts measured (above); REV decisions put to the user (
 - Never edit a script while background runs read it (two runs died on a half-read `makeVariant.sh`): run from a frozen copy.
 - Compiling coded BCs/function objects inside `mpirun` aborts (`MPI_ERR_TRUNCATE`): precompile serially.
 - A sed replacement containing the delimiter character (`#`) silently fails: use Python or another delimiter.
+- Case copies outside the repo (`~/PDM_results/<case>`): `system/controlDict` includes `../../tools/<functionObject>`,
+  so `paraFoam`/`foamListTimes` stop with "Cannot open include file" unless `../../tools` exists: symlink
+  `~/PDM_results/tools` → `meshing_strat_trial/tools` (made 2026-10-29, serves every copy at that depth).

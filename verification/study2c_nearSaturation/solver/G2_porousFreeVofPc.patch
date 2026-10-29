@@ -1,0 +1,39 @@
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (of9-port be1a3ab)
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (study2c variant G2)
+@@ -60,6 +60,29 @@
+ {
+     pc *= Solid;
+     dPcdS *= Solid;
++
++    // Study 2c variant G2 (verification/study2c_nearSaturation, scratch build
++    // only): free cells inside the interface band (alphaMin < alpha <
++    // 1 - alphaMin) carry the VOF capillary pressure pc = -sigma*K (K =
++    // -div(nHat), p_water - p_air = sigma*K), in the same mixture form as the
++    // porous cells (p = p_air - alpha*pc): the porous/free Darcy faces then use
++    // the air and water pressures of the free cell instead of its VOF
++    // pressure for both. Keyword porousFreeVofPc (default off: solver
++    // unchanged), porousFreeVofPcAlphaMin (default 1e-3).
++    if (transportProperties.lookupOrDefault<Switch>("porousFreeVofPc", false))
++    {
++        const scalar aMin =
++            transportProperties.lookupOrDefault<scalar>
++            (
++                "porousFreeVofPcAlphaMin",
++                1e-3
++            );
++        const volScalarField band
++        (
++            (1. - Solid)*pos(alpha1 - aMin)*pos(1. - aMin - alpha1)
++        );
++        pc -= band*mixture.sigmaK();
++    }
+ }
+ PcCoeff = (  
+ 	-pc
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files	2026-09-28 12:29:01.899060094 +0200
++++ /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/5dfa0b10-5241-4767-a745-7c38ef3d2a50/scratchpad/hpif_G2/hybridPorousInterFoam/Make/files	2026-10-29 15:37:46.100652567 +0100
+@@ -1,3 +1,3 @@
+ hybridPorousInterFoam.C
+ 
+-EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam
++EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam_G2

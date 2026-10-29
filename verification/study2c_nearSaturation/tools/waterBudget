@@ -1,0 +1,108 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Shared water-budget function object, included in system/controlDict:
+      functions { waterBudget { #include "../../tools/waterBudget" } }
+
+  At every time step: cumulative water volume that entered through each
+  boundary patch, from the alpha equation's own water flux
+  (alphaPhi0.wetting, volumetric water flux per face, the flux MULES used
+  in eps*d(alpha)/dt + div(alphaPhi) = 0) times deltaT. At every write
+  time, a row of waterBudget.csv:
+      time, water volume sum(eps*alpha*V) [m3], cumulative inflow per patch
+      [m3] (positive = into the domain), total inflow, imbalance
+      = water(t) - water(t0) - total inflow (should stay near 0).
+  Coupled patches (cyclic, processor) are skipped (internal exchanges).
+  Without alphaPhi0.wetting (e.g. 'hybridPorousInterFoam -postProcess', the
+  serial precompile of the parallel runs) the step is skipped instead of
+  aborting (2026-10-26).
+\*---------------------------------------------------------------------------*/
+
+type            coded;
+libs            ("libutilityFunctionObjects.so");
+name            waterBudget;
+executeControl  timeStep;
+writeControl    writeTime;
+codeInclude
+#{
+    #include <fstream>
+    #include "scalarField.H"
+#};
+codeData
+#{
+    Foam::scalarField cumIn_;
+    Foam::scalar water0_ = -1;
+#};
+codeExecute
+#{
+    if (!mesh().foundObject<surfaceScalarField>("alphaPhi0.wetting"))
+    {
+        return true;
+    }
+    const surfaceScalarField& aPhi =
+        mesh().lookupObject<surfaceScalarField>("alphaPhi0.wetting");
+    const scalar dt = mesh().time().deltaTValue();
+    const label nP = mesh().boundary().size();
+    if (cumIn_.size() != nP)
+    {
+        cumIn_.setSize(nP, 0);
+    }
+    forAll(mesh().boundary(), patchi)
+    {
+        if (!mesh().boundary()[patchi].coupled())
+        {
+            cumIn_[patchi] -=
+                dt*gSum(aPhi.boundaryField()[patchi]);   // outward flux > 0
+        }
+    }
+#};
+codeWrite
+#{
+    const volScalarField& alpha =
+        mesh().lookupObject<volScalarField>("alpha.wetting");
+    const volScalarField& eps =
+        mesh().lookupObject<volScalarField>("eps");
+    const scalar water =
+        gSum(eps.primitiveField()*alpha.primitiveField()*mesh().V());
+    if (water0_ < 0)
+    {
+        water0_ = water;
+    }
+    const label nP = mesh().boundary().size();
+    if (cumIn_.size() != nP)
+    {
+        cumIn_.setSize(nP, 0);
+    }
+    scalar total = 0;
+    forAll(cumIn_, patchi)
+    {
+        total += cumIn_[patchi];
+    }
+    if (Pstream::master())
+    {
+        const fileName file(mesh().time().globalPath()/"waterBudget.csv");
+        const bool header = !isFile(file);
+        std::ofstream os(file.c_str(), std::ios::app);
+        if (header)
+        {
+            os  << "time,water_m3";
+            forAll(mesh().boundary(), patchi)
+            {
+                if (!mesh().boundary()[patchi].coupled())
+                {
+                    os  << ",in_" << mesh().boundary()[patchi].name();
+                }
+            }
+            os  << ",in_total,imbalance\n";
+        }
+        os  << mesh().time().timeName() << "," << water;
+        forAll(mesh().boundary(), patchi)
+        {
+            if (!mesh().boundary()[patchi].coupled())
+            {
+                os  << "," << cumIn_[patchi];
+            }
+        }
+        os  << "," << total << "," << water - water0_ - total << "\n";
+    }
+#};
+
+// ************************************************************************* //

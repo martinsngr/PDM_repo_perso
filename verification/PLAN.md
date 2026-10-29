@@ -3,6 +3,10 @@
 Studies 1, 2a, 2b, 3 proposed by the independent review and agreed with the user, plus additions (EQ0m-dt). Status:
 **prepared, not started.** Start the next session here; run one study at a time and stop after each for review.
 
+**Added 2026-10-29: Study 2c** (`study2c_nearSaturation/`, not in the original plan): the porous/free coupling next
+to a nearly saturated yarn, from the REV_lowpc failure; phases 1–5 run (2D bench, truncated REV, ablations, variants
+K1/K2/G2/G2b); K2 chosen by the user. Results and predictions in its README and in `../NOTES_solver.md`.
+
 ## Rules (from the review, agreed)
 - Do not modify the installed solver. Variants are built under a new name in a scratch area, **with the patch saved
   in the study folder** (`verification/<study>/solver/`).

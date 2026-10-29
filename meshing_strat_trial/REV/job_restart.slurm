@@ -43,7 +43,8 @@ fi
 times() { ls processor0 | grep -E '^[0-9.e+-]+$' | sort -g -r; }
 
 # a write is complete if every processor has it with the same number of files as processor0
-# and every file ends with the OpenFOAM footer line
+# and every file ends with the OpenFOAM footer line and holds no NUL byte (a node crash can leave
+# zero-filled blocks in files written just before it: the log of job 3055 had some, 2026-10-28)
 complete()
 {
     _n=$(find "processor0/$1" -type f | wc -l)
@@ -52,6 +53,7 @@ complete()
         [ "$(find "$p/$1" -type f | wc -l)" -eq "$_n" ] || return 1
         for f in $(find "$p/$1" -type f); do
             tail -c 200 "$f" | grep -q '\*\*\*\*\*\* //' || return 1
+            [ "$(tr -d '\000' < "$f" | wc -c)" -eq "$(wc -c < "$f")" ] || return 1
         done
     done
 }

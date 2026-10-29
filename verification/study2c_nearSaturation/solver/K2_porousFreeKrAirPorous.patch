@@ -1,0 +1,55 @@
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (of9-port be1a3ab)
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (study2c variant K2)
+@@ -21,6 +21,45 @@
+ kr2f = (1. - porousFace)*kr2f
+   + porousFace*upwind<scalar>(mesh, phiNonWettingUp).interpolate(kr2);
+ 
++// Study 2c variant K2 (verification/study2c_nearSaturation, scratch build only):
++// on porous/free Darcy faces (porousFace 1, Solidf 0) the air kr from the porous
++// cell instead of the upstream cell of the air flux (C); the water kr stays
++// upwinded. Air entering a yarn from a gap cell gets the yarn's air mobility.
++// Keyword porousFreeKrAirPorous (default off: solver unchanged).
++if (transportProperties.lookupOrDefault<Switch>("porousFreeKrAirPorous", false))
++{
++    const labelUList& own = mesh.owner();
++    const labelUList& nei = mesh.neighbour();
++    forAll(nei, facei)
++    {
++        if (porousFace[facei] > 0.5 && Solidf[facei] < 0.5)
++        {
++            const label c = Solid[own[facei]] > 0.5 ? own[facei] : nei[facei];
++            kr2f[facei] = kr2[c];
++        }
++    }
++    forAll(kr2f.boundaryField(), patchi)
++    {
++        if (!mesh.boundary()[patchi].coupled())
++        {
++            continue;
++        }
++        const fvsPatchScalarField& pfp = porousFace.boundaryField()[patchi];
++        const fvsPatchScalarField& sfp = Solidf.boundaryField()[patchi];
++        const scalarField SolidI(Solid.boundaryField()[patchi].patchInternalField());
++        const scalarField kr2I(kr2.boundaryField()[patchi].patchInternalField());
++        const scalarField kr2N(kr2.boundaryField()[patchi].patchNeighbourField());
++        fvsPatchScalarField& k2 = kr2f.boundaryFieldRef()[patchi];
++        forAll(pfp, i)
++        {
++            if (pfp[i] > 0.5 && sfp[i] < 0.5)
++            {
++                k2[i] = SolidI[i] > 0.5 ? kr2I[i] : kr2N[i];
++            }
++        }
++    }
++}
++
+ // Change J: no air through the porous faces of the water-only reservoir
+ // patches: zero air mobility, so the face carries the water Darcy flux only
+ forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files	2026-09-28 12:29:01.899060094 +0200
++++ /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/5dfa0b10-5241-4767-a745-7c38ef3d2a50/scratchpad/hpif_K2/hybridPorousInterFoam/Make/files	2026-10-29 15:14:19.451542957 +0100
+@@ -1,3 +1,3 @@
+ hybridPorousInterFoam.C
+ 
+-EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam
++EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam_K2

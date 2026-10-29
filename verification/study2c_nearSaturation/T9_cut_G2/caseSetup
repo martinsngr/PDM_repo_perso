@@ -1,0 +1,5 @@
+// REV case settings read by ./run and system/decomposeParDict (foamDictionary -entry N -value caseSetup).
+// Number of cores of the parallel run; on a cluster it must equal --ntasks of the job.
+// 4 on the laptop (2026-10-26, 242k cells, s per step: serial 2.18, 4 cores 1.35, 8 cores 1.55: memory bound);
+// 8 on mini01 since 2026-10-27 (two jobs side by side; job 3051 used 16; job.slurm --ntasks must match).
+N 4;

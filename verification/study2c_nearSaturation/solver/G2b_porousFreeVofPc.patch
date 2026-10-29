@@ -1,0 +1,50 @@
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (of9-port be1a3ab)
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H (study2c variant G2b)
+@@ -60,6 +60,40 @@
+ {
+     pc *= Solid;
+     dPcdS *= Solid;
++
++    // Study 2c variant G2b (verification/study2c_nearSaturation, scratch build
++    // only): free cells with an interface carry the VOF capillary pressure
++    // pc = -w(alpha)*sigma*K (K = -div(nHat), p_water - p_air = sigma*K), in the
++    // same mixture form as the porous cells (p = p_air - alpha*pc): the
++    // porous/free Darcy faces then use the air and water pressures of the free
++    // cell instead of its VOF pressure for both. Weight w = 0 below alphaMin and
++    // above 1 - alphaMin, 1 between alphaMin + ramp and 1 - alphaMin - ramp
++    // (linear ramps): in cells holding a trace of one phase the curvature is
++    // meaningless (G2 with a sharp band at 1e-3 pulled water out of wet yarn
++    // cells). Keywords porousFreeVofPc (default off: solver unchanged),
++    // porousFreeVofPcAlphaMin (0.05), porousFreeVofPcAlphaRamp (0.1).
++    if (transportProperties.lookupOrDefault<Switch>("porousFreeVofPc", false))
++    {
++        const scalar aMin =
++            transportProperties.lookupOrDefault<scalar>
++            (
++                "porousFreeVofPcAlphaMin",
++                0.05
++            );
++        const scalar aRamp =
++            transportProperties.lookupOrDefault<scalar>
++            (
++                "porousFreeVofPcAlphaRamp",
++                0.1
++            );
++        const volScalarField w
++        (
++            (1. - Solid)
++           *min(max((alpha1 - aMin)/aRamp, scalar(0)), scalar(1))
++           *min(max((1. - aMin - alpha1)/aRamp, scalar(0)), scalar(1))
++        );
++        pc -= w*mixture.sigmaK();
++    }
+ }
+ PcCoeff = (  
+ 	-pc
+--- /home/martin_sng/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files	2026-09-28 12:29:01.899060094 +0200
++++ /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/5dfa0b10-5241-4767-a745-7c38ef3d2a50/scratchpad/hpif_G2b/hybridPorousInterFoam/Make/files	2026-10-29 16:00:26.203279826 +0100
+@@ -1,3 +1,3 @@
+ hybridPorousInterFoam.C
+ 
+-EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam
++EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam_G2b

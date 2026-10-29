@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  Shared stop guard, included in system/controlDict:
+      functions { stopGuard { #include "../../tools/stopGuard" } }
+
+  Writes the fields and ends the run when
+    - the step count reaches maxSteps (controlDict, default: no limit), or
+    - deltaT falls below minDeltaTStop (controlDict, default 0 = off): a
+      collapsed time step (e.g. the dSmax limit going to 1e-30 s) would
+      otherwise produce millions of useless steps and a huge log.
+  The reason is printed in the log ("stopGuard: ...").
+\*---------------------------------------------------------------------------*/
+
+type            coded;
+libs            ("libutilityFunctionObjects.so");
+name            stopGuard;
+executeControl  timeStep;
+writeControl    none;
+codeExecute
+#{
+    Time& runTime = const_cast<Time&>(mesh().time());
+    const dictionary& cd = runTime.controlDict();
+    const label maxSteps = cd.lookupOrDefault<label>("maxSteps", -1);
+    const scalar dtStop = cd.lookupOrDefault<scalar>("minDeltaTStop", 0);
+    const label steps = runTime.timeIndex() - runTime.startTimeIndex();
+    if (maxSteps > 0 && steps >= maxSteps)
+    {
+        Info<< "stopGuard: " << steps << " steps reached (maxSteps)" << endl;
+        runTime.writeAndEnd();
+    }
+    else if (runTime.deltaTValue() < dtStop)
+    {
+        Info<< "stopGuard: deltaT " << runTime.deltaTValue()
+            << " < minDeltaTStop " << dtStop << endl;
+        runTime.writeAndEnd();
+    }
+#};
+
+// ************************************************************************* //

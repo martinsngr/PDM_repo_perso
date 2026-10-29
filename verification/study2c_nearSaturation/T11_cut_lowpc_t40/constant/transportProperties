@@ -1,0 +1,109 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Same fluids and porous-medium models as the wicking cases in ../trialWicking
+// (singleYarn_vertical_hybrid): water / air, Brooks-Corey kr n = 3, Van
+// Genuchten pc0 5000 Pa, m 0.5 (here pc0 1000 Pa, m 0.4: REV_lowpc). Yarn K 1e-11 m2, eps 0.5 come from 0/K, 0/eps
+// (setup values, not calibrated). REV: copy of ../2D_bench (2026-10-26), with
+// the same contact angle and free-fluid keywords (validated on the slit and
+// the bench, ../../NOTES_solver.md "Verification").
+
+phases (wetting nonWetting);
+
+// water: mu 1e-3 Pa.s
+wetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 1e-6;
+    rho             [1 -3 0 0 0 0 0] 1000;
+}
+
+// air: mu 1.76e-5 Pa.s
+nonWetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 1.76e-5;
+    rho             [1 -3 0 0 0 0 0] 1;
+}
+
+// surface tension of the free-fluid interface (gaps, eps > 0.99)
+sigma            [1 0 -2 0 0 0 0]  0.072;
+
+// Contact angle of the free interface on the yarn surfaces
+// (porousInterfaceProperties.C). Solver default: model off
+// (activatePorousContactAngle 0), theta0 90 deg when on. Bench: on, 60 deg
+// (validated angle of the slit tests; real polyester value not known, dry
+// ~70-80 deg). Applied as a wall on the yarn surfaces with
+// porousContactAngleWallLike (change H, below).
+activatePorousContactAngle 1;
+theta0                     40;
+
+activateCapillarity     1;
+
+// Darcy total flux in porous faces with K/dx^2 below this value (solver
+// changes B, ../../NOTES_solver.md). Yarn faces here:
+// 1e-11/(20 um)^2 = 0.025 -> Darcy faces. Free faces are not (K_VOID = 1 m2);
+// porous/free faces are with porousFreeDarcyFaces (harmonic K, see below).
+darcyFaceMaxDa  0.1;
+
+// Change G (of9-port 1b007d8): porous/free faces as two-phase Darcy faces, i.e.
+// the capillary pressure jump at the yarn surface (air pressure continuous next
+// to air-filled gaps, water pressure next to wet gaps). Needs the porous/free
+// faces to be Darcy faces (here K_f/dx^2 = 2e-11/(20 um)^2 = 0.05 < 0.1; the
+// log reports it). Free cells must start as pure air (tools/initFields.py).
+porousFreeDarcyFaces on;
+
+alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;
+alpha.wettingmax           alpha.wettingmax [0  0  0 0 0 0 0] 0.999;
+
+relativePermeabilityModel  BrooksAndCorey;
+capillarityModel           VanGenuchten;
+
+BrooksAndCoreyCoeffs
+{
+    n 3;
+}
+
+VanGenuchtenCoeffs
+{
+    alpha.wettingminpc alpha.wettingminpc [0 0 0 0 0 0 0] 0;
+    alpha.wettingmaxpc alpha.wettingmaxpc [0 0 0 0 0 0 0] 0.999;
+    pc0 pc0 [1 -1 -2 0 0 0 0] 1000;
+    m 0.4;
+}
+
+// Free fluid next to the yarn surfaces (opt-in changes H, F', I of of9-port
+// b525086, ../../NOTES_solver.md): with them, impermeable
+// porous walls give the capillary rise of real walls within 2 %; without them
+// -35 to +60 % and spurious currents of 30-70 m/s (slit tests).
+// H : contact angle applied on the porous/free faces only, as a wall (the
+//     interface normal ignores the porous saturation)
+porousContactAngleWallLike 1;
+// F': velocity of gap cells next to the yarn carries the face flux
+porousFreeFluxForce 1;
+// I : no-slip at the yarn surface (free-side viscosity, half-cell distance)
+porousFreeNoSlip 1;
+
+// Reservoir (inlet) that exchanges water only, as a bath (solver change J,
+// of9-port be1a3ab; ../../verification/waterOnlyReservoir): no air through the
+// inlet (no air mobility on its yarn faces, gap faces closed next to air-rich
+// cells). The bath pressure comes from 0/p (totalPressure 0). Without J the old
+// inlet let air out and the REV smoke test failed at 0.21 ms (dt collapse,
+// negative alpha in the gap inlet cells).
+waterOnlyPatches (inlet);
+
+// ************************************************************************* //

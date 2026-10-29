@@ -1,0 +1,64 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+// 2 ms (validated length): gap meniscus ~0.8 mm, wall front ~1.15 mm; the walls
+// end at 1.94 mm (wall front there after roughly 5-6 ms)
+endTime         0.002;
+deltaT          1e-8;
+writeControl    adjustableRunTime;
+writeInterval   5e-05;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   12;
+runTimeModifiable yes;
+
+// Time step: solver limits on the total flux (free cells), then the
+// coatsTimeStep function object (porous cells + capillary waves) overwrites
+// maxDeltaT every step; setDeltaT.H grows dt by at most 1.2x per step.
+// Values as ../../trialWicking/singleYarn_vertical_hybrid.
+adjustTimeStep  yes;
+maxCo           0.75;
+maxAlphaCo      1;
+maxDeltaT       3e-8;   // first-step cap only
+CoatsMaxCo      0.5;
+dSmax           0.01;
+maxDeltaTCoats  2.5e-7;
+minDeltaTCoats  0;
+CapillaryMaxCo  0.5;
+
+// Stop guard (../../tools/stopGuard): write and end after maxSteps steps
+// (-1: no limit) or when deltaT < minDeltaTStop (collapsed time step).
+maxSteps        -1;
+minDeltaTStop   1e-14;
+
+functions
+{
+    coatsTimeStep { #include "../../tools/coatsTimeStep" }
+    liquidBalance { #include "../../tools/liquidBalance" }
+    stopGuard     { #include "../../tools/stopGuard" }
+    waterBudget   { #include "../../tools/waterBudget" }
+    dsLocator     { #include "../../tools/dsLocator" }
+}
+
+// ************************************************************************* //
