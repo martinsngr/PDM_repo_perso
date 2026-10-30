@@ -27,6 +27,12 @@ if grep -q "^waterOnlyPatches" constant/transportProperties \
     echo "ERROR: this hybridPorousInterFoam ignores waterOnlyPatches (older than of9-port be1a3ab): pull and rebuild."
     exit 1
 fi
+# change L needs of9-port 8a97d02 or later: an older solver ignores the keyword silently
+if grep -Eq "^porousFreeAirKrPorous[[:space:]]+on" constant/transportProperties \
+&& ! grep -q "^porousFreeAirKrPorous:" log.hybridPorousInterFoam.precompile; then
+    echo "ERROR: this hybridPorousInterFoam ignores porousFreeAirKrPorous (older than of9-port 8a97d02): pull and rebuild."
+    exit 1
+fi
 runApplication decomposePar
 echo "Running hybridPorousInterFoam on $PWD using $N cores"
 runTmpLog log.hybridPorousInterFoam mpirun -np "$N" hybridPorousInterFoam -parallel

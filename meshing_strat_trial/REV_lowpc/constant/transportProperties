@@ -106,4 +106,9 @@ porousFreeNoSlip 1;
 // negative alpha in the gap inlet cells).
 waterOnlyPatches (inlet);
 
+// Change L (of9-port 8a97d02, 2026-10-30): air kr of the porous/free Darcy faces from
+// the porous cell. Without it this case diverged at 6.553 ms (job 3059: air pump in
+// staircase corners of the yarn surfaces, ../../verification/study2c_nearSaturation).
+porousFreeAirKrPorous on;
+
 // ************************************************************************* //

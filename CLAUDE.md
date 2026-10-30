@@ -16,7 +16,7 @@ Working notes, loaded for the whole repo:
 
 ## Solver
 - `hybridPorousInterFoam`, OpenFOAM 9, source `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8`, branch
-  `of9-port` (installed `be1a3ab`: changes A–J + H fix, see `NOTES_solver.md`). Don't edit the solver from this repo: solver
+  `of9-port` (installed `8a97d02`: changes A–L + H fix, see `NOTES_solver.md`). Don't edit the solver from this repo: solver
   changes go to that repo, one justified commit each, with `CHANGES_of9-port.md` updated.
 - Correctness is not validated: never claim results are right because a case runs.
 - `hybridPorousPimpleFoam` is not ported and does not build on OF9.

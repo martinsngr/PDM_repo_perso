@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-29.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-10-30.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -395,7 +395,19 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
   sink models (Pillai).
 
 ## Next steps
-**2026-10-29 (end of day): REV_lowpc failure explained, fix K2 chosen and tested — START HERE.**
+**2026-10-30 — START HERE.** L committed in the solver repo (`8a97d02`, docs `97f3b35`), installed on the laptop.
+- **REV_lowpc = L validation (decided with the user):** only changes from job 3059: `porousFreeAirKrPorous on` in
+  `constant/transportProperties`, `endTime` 10 ms, `caseSetup` N 4 and `job.slurm` `--ntasks=4` (next to the new case on
+  mini03), `job.slurm` `--no-requeue`; `run` stops if the binary ignores the keyword; `job_restart.slurm` added (= `REV/`).
+  Its submission overwrites the 3059 results on mini03 (local copy `~/PDM_results/REV_lowpc_run3059`).
+- **Screening for the new case (user: can the solver carry gap water rising significantly? the yarn may lead):**
+  `verification/study2d_gapRise/`, cut REV, K 1e-12: S1 VG 5000 / 0.5 θ 40°, S2 θ 30°, S3 VG 1000 / 0.4; the chosen set
+  goes to the full REV as `meshing_strat_trial/REV_gapflow/` (copy of `REV_lowpc`, 8 cores).
+- **Job 3058 (REV, restart of 3055):** the user plans to stop it (arbitrary values, stability question answered to 30.5 ms).
+  squeue showed it and 3060 at the same 3:17:34 on 2026-10-30, though 3058 started on 10-28: restarted about then, cause
+  not checked.
+
+**2026-10-29 (end of day): REV_lowpc failure explained, fix K2 chosen and tested.**
 - **Mechanism** (`verification/study2c_nearSaturation/README.md`, `NOTES_solver.md` Study 2c): a free cell in a
   concave staircase corner of a yarn surface (3–5 yarn faces; ~4,300 such cells in the REV) collects water when the
   yarn pc is low; surface tension raises its pressure, its Darcy faces let air out into the yarn with the gap cell's

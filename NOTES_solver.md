@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-10-29. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-10-30. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -27,9 +27,10 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
 | I | `b525086` | `porousFreeNoSlip 1` | off | no-slip at porous/free Darcy faces (2·μ_free, half-cell distance; never below the old coupling) | free cells next to yarns |
 | H fix | `0f6c6d4` | (with H) | — | library: processor patch values of the α modified by H refreshed (H was undone on processor boundaries, 2026-10-26) | porous/free faces on processor boundaries |
 | J | `be1a3ab` | `waterOnlyPatches (<patches>)` | none | reservoir patches exchange water only: no air mobility on their porous faces, α flux = total flux, free faces closed next to air-rich cells (α < 0.5); water pressure from the p BC (`tools/pOpenAir`: hydrostatic, `reservoirWaterPressure` at `reservoirReferencePoint`) | reservoir (inlet) patches |
+| L | `8a97d02` | `porousFreeAirKrPorous on` | off | air kr of porous/free Darcy faces from the porous cell instead of the upstream cell of the air flux; the log reports it (`run` of `REV_lowpc` stops if a binary ignores the keyword) | porous/free faces |
 
 (No D: the inlet treatment was investigated, never a change; J is the inlet change of 2026-10-26.) Docs commits
-`d1c688a`, `3234fbf`, `8b35cc4`, `1a79db9`, `f9d5e41`, `c3dbf48`.
+`d1c688a`, `3234fbf`, `8b35cc4`, `1a79db9`, `f9d5e41`, `c3dbf48`, `97f3b35`.
 
 - **Which keywords:** cases without free cells (1D, single yarn): `darcyFaceMaxDa 0.1` (A, C, E, F act; G–I change
   nothing, bit-identical). Porous + free fluid (2D bench, REV): additionally `porousFreeDarcyFaces on`,
@@ -40,7 +41,10 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   with α 1 on all inlet faces (then p = water pressure on the yarn faces; `verification/standardOpenBC`); the coded
   `tools/pOpenAir` (`reservoirWaterPressure`/`reservoirReferencePoint`) only where the bath surface is away from the
   patch (e.g. a vertical bath face) or the inlet keeps α 0.99.
-- **Installed (laptop, 2026-10-26, afternoon):** `hybridPorousInterFoam` = `be1a3ab` (A–J with the H fix), built from
+- **Installed (laptop, 2026-10-30):** `hybridPorousInterFoam` = `8a97d02` (A–L with the H fix), previous binary kept as
+  `hybridPorousInterFoam_be1a3ab`. Keyword on: bit-identical to the K2 scratch binary (cut REV, T12 configuration, 150
+  steps, 4 cores). Keyword off: bit-identical to `be1a3ab` (cut REV 100 steps, 4 cores; 2D bench 90 steps, serial).
+- **Before (laptop, 2026-10-26, afternoon):** `hybridPorousInterFoam` = `be1a3ab` (A–J with the H fix), built from
   the tested sources, bit-identical to the tested scratch build (bench); `hybridPorousInterFoam_b525086` = A–I (with the
   shared library: H fix included). Not pushed (mini01 needs push, pull, rebuild). Morning step: `hybridPorousInterFoam` =
   `b525086` build (A–I) with the library
@@ -54,9 +58,8 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
 - **Scratch diagnostic binaries (2026-10-29, Study 2c, `$FOAM_USER_APPBIN`, built from `be1a3ab` sources, each
   bit-identical to the installed solver with its keyword off; patches in `verification/study2c_nearSaturation/solver/`):**
   `hybridPorousInterFoam_K1` (`porousFreeKrPorous`: both kr of porous/free faces from the porous cell; changes the
-  gap–yarn water exchange, not a fix), `_K2` (`porousFreeKrAirPorous`: the air kr only; **the fix chosen by the user,
-  not committed yet**), `_G2` (`porousFreeVofPc`, sharp band α > 1e-3: fails), `_G2b` (`porousFreeVofPc` with an
-  α ramp: works, stiff exchange episodes; alternative in reserve). Delete K1 and G2 once K2 is committed.
+  gap–yarn water exchange, not a fix), `_K2` (`porousFreeKrAirPorous`: the air kr only; **committed as L, `8a97d02`, 2026-10-30**), `_G2` (`porousFreeVofPc`, sharp band α > 1e-3: fails), `_G2b` (`porousFreeVofPc` with an
+  α ramp: works, stiff exchange episodes; alternative in reserve). K1 and G2 can be deleted.
 - **Build:** `wmake libso` in `OpenFoamV8/libraries/porousInterfaceProperties` (H), `wmake` in
   `OpenFoamV8/solvers/hybridPorousInterFoam`. Every machine rebuilds after a pull (**mini01: pull, then both**).
   Keep the old binary first: `cp $FOAM_USER_APPBIN/hybridPorousInterFoam $FOAM_USER_APPBIN/hybridPorousInterFoam_<hash>`.
@@ -399,14 +402,23 @@ currents to 14 m/s, every step > 5 m/s from 0.5 ms). T12 (K2) to 2 ms: no step a
 ms. K2 regressions: 1D bit-identical, slit (K 1e-20) U/p/φ bit-identical, bench identical numbers. **K2 suppresses
 the REV_lowpc failure mode; next: solver commit (with the user) and full-REV validation on mini03.**
 
+### Study 2d — can the solver carry free water rising in the gaps? (`verification/study2d_gapRise/`, 2026-10-30)
+Asked by the user: REV_lowpc with L is stable but the gap water stays low (T12: top 0.231 mm at 2 ms, yarn front 0.632 mm).
+Cut REV of study 2c, solver `8a97d02` (A–L), 3 ms. S1 K 1e-12, VG 5000 / 0.5, θ 40°; S2 as S1 with θ 30°; S3 as S1 with VG
+1000 / 0.4. **Predictions (before the runs):** all stable (no step above 5 m/s after 0.2 ms, ≤ 3 m/s from 0.6 ms); S1 dt
+median 5e-7 to 1.25e-6 s, y-yarn front 0.45–0.55 mm at 3 ms, gap water at 1 ms ≥ T12 (1,505 cells), gap top ≥ 0.30 mm at
+3 ms, more likely below 0.5 mm than above; S2 gap top ≥ S1 + 0.04 mm; S3 yarn front 0.35–0.45 mm, gap water ≥ 1.2 × S1, gap
+top ≥ S1. **Success: gap top ≥ 0.5 mm by 3 ms, stable.** Decision table in the study README.
+
 ## Open issues
 
 Solver behaviour:
 - **Air pump in free cells with several porous/free Darcy faces (found 2026-10-29, Study 2c):** surface tension raises
   the pressure of a partly filled free cell (concave staircase corner of a yarn surface), its Darcy faces drop the
   surface-tension force (`pEqn.H:38/:65`) and, with G, take its VOF pressure as both phase pressures; the air leaves
-  into the yarn with the gap cell's air mobility (C), F′ amplifies. Cause of the REV_lowpc failure (job 3059). Fix K2
-  (air kr from the porous cell) tested, commit pending (user). The phase-pressure inconsistency itself (G2b) remains.
+  into the yarn with the gap cell's air mobility (C), F′ amplifies. Cause of the REV_lowpc failure (job 3059). Fix L
+  (`8a97d02`, air kr from the porous cell, study variant K2) weakens the leak; full-REV validation planned on mini03
+  (2026-10-30). The phase-pressure inconsistency itself (G2b) remains.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic

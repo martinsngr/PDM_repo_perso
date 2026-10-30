@@ -21,8 +21,8 @@ startTime       0;
 stopAt          endTime;
 // REV, wicking along y over 2.67 mm (outlet closed). Job 3051 (10 ms): y-yarn
 // front 1.63 mm, fit 13.9 mm/sqrt(s) -> the closed end (2.67 mm) at ~31 ms.
-// 50 ms (2026-10-27, 5x job 3051): the yarns reach the end and keep filling
-endTime         0.05;
+// 10 ms (2026-10-30): validation of change L past the divergence of job 3059 (6.553 ms)
+endTime         0.01;
 deltaT          1e-8;
 writeControl    adjustableRunTime;
 writeInterval   5e-04;  // ~60 MB per write (242k cells, ascii)

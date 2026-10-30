@@ -74,8 +74,10 @@ verification/**/check_summary.md
 verification/solver_failures/**/cases/
 
 # solver logs of cluster runs during the run (LOG_DIR=logs, runTools.sh)
-meshing_strat_trial/REV/logs/
+meshing_strat_trial/*/logs/
 
 
 meshing_strat_trial/*/waterBudget.csv
 **/system/fluid/
+# study 2d: run folders, rebuilt by its makeCases.sh
+verification/study2d_gapRise/S[0-9]*/

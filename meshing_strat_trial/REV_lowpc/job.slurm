@@ -1,18 +1,20 @@
 #!/bin/bash
-# SLURM job of REV_lowpc (REV with Van Genuchten pc0 1000 Pa, m 0.4; wicking along y, water-only reservoir, saturated rows) on mini01.
+# SLURM job of REV_lowpc (REV with Van Genuchten pc0 1000 Pa, m 0.4, theta 40 deg; wicking along y, water-only reservoir,
+# saturated rows) on mini03, with change L: validation past the divergence of job 3059 (6.553 ms).
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.
 # Needs on the cluster (mini03): the repo .venv with numpy, scipy, trimesh, rtree (python3 -m venv .venv && .venv/bin/pip install
-# numpy scipy trimesh==5.1.0 rtree embreex, at the repo root; without embreex the mesh build takes > 1 h) and the solver of9-port be1a3ab or later (pull, wmake libso in
+# numpy scipy trimesh==5.1.0 rtree embreex, at the repo root; without embreex the mesh build takes > 1 h) and the solver of9-port 8a97d02 or later (pull, wmake libso in
 # libraries/porousInterfaceProperties, wmake in the solver).
 # Submit from this folder with sbatch job.slurm after checking the load with squeue; never ./run there.
 #SBATCH --job-name=REVlowpc
 #SBATCH --partition=global
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --ntasks=4
 #SBATCH --mem=16G
+#SBATCH --no-requeue
 #SBATCH --time=72:00:00
-# (50 ms on 8 cores; job 3051: 10 ms in 20,440 s on 16 cores, ~85k steps -> estimate 30-55 h here, REV_lowpc ~3x
-# less (dt ~3x larger in its smoke test); check the log after an hour)
+# (10 ms on 4 cores: estimate ~7 h, from job 3059 on 8 cores and the T12 dt; check the log after an hour)
+# --no-requeue: a requeue after a node crash would rerun ./Allpre, which deletes the results; restart with job_restart.slurm
 #SBATCH --output=Log_%x_%j.log
 #SBATCH --error=Err_%x_%j.err
 #SBATCH --mail-user=martin.sinegre@gmail.com
