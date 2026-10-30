@@ -9,7 +9,12 @@ cd "${0%/*}" || exit 1
 #
 #   geometry   Textiles/PW-22-15-0.4-0.5.stl (TexGen, funge.py), copy in
 #              constant/triSurface/; REV box in rev_domain.json (inspect_stl.py,
-#              rerun only if the STL changes: python inspect_stl.py <stl> 0.01)
+#              rerun only if the STL changes: python inspect_stl.py <stl> 0.01).
+#              REV_gapflow (2026-10-30): the box from inspect_stl.py moved by half a
+#              crossing-yarn spacing along y (y 0.333-3.0 mm), so the bath plane lies in the
+#              middle of a gap, not on the centreline of a crossing yarn: without
+#              yarn suction the half-yarn bath blocks the water (../../verification/study2d_gapRise,
+#              S8 and S10). Move it again if inspect_stl.py is rerun
 #   mesh       uniform 20 um hex mesh by build_fields.py: the REV box (91 x 133
 #              x 14 cells) plus 3 free cell layers below and above it (--zpad 3,
 #              same cells in the box as without padding). Patches: inlet = y min

@@ -18,6 +18,9 @@ S3_K1e-12_lowpc_t40 1e-12 1000 0.4 40
 S4_K1e-12_t20       1e-12 5000 0.5 20
 S5_K1e-12_t40_fill33 1e-12 5000 0.5 40 3.3e-4
 S6_C_wet_cut12      2e-11 500 0.4 40 - 1.2e-3 0.9
+S7_C_wet_t20        2e-11 500 0.4 20 - 1.2e-3 0.9
+S8_closed_y         1e-20 500 0.4 40
+S9_closed_z         1e-20 500 0.4 40
 "
 
 [ -f "$SRC/constant/polyMesh/owner" ] && [ -f "$SRC/0/K" ] || { echo "no mesh or 0/K in $SRC"; exit 1; }

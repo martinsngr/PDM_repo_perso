@@ -21,9 +21,9 @@ startTime       0;
 stopAt          endTime;
 // REV, wicking along y over 2.67 mm (outlet closed). Job 3051 (10 ms): y-yarn
 // front 1.63 mm, fit 13.9 mm/sqrt(s) -> the closed end (2.67 mm) at ~31 ms.
-// 150 ms (2026-10-30, a weekend run): estimates first gap full at ~11 ms, second rise possible from
-// ~45 ms, yarn front at the closed end at ~78 ms, next crossing yarn at ~96 ms or earlier
-// (../../verification/study2d_gapRise)
+// 150 ms (2026-10-30, a weekend run), bath plane at y 0.333 mm. Estimates if the yarn saturation limits the
+// gap water: first gap full (y 0.5 mm) in ~1 ms, second gap from ~16 ms (y 0.84 mm), next crossing yarn at ~51 ms
+// (y 1.16 mm), yarn front at the closed end at ~78 ms (../../verification/study2d_gapRise)
 endTime         0.15;
 deltaT          1e-8;
 writeControl    adjustableRunTime;

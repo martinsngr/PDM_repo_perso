@@ -1,6 +1,6 @@
 #!/bin/bash
 # SLURM job of REV_gapflow (REV with K 2e-11, Van Genuchten pc0 500 Pa, m 0.4, theta 40 deg, change L; wicking along y, water-only
-# reservoir, saturated rows) on mini03: can the solver show gap water following the yarn saturation? Not physical yarn values.
+# reservoir at y 0.333 mm, mid-gap, saturated rows) on mini03: can the solver show gap water following the yarn saturation? Not physical yarn values.
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.
 # Needs on the cluster (mini03): the repo .venv with numpy, scipy, trimesh, rtree (python3 -m venv .venv && .venv/bin/pip install
 # numpy scipy trimesh==5.1.0 rtree embreex, at the repo root; without embreex the mesh build takes > 1 h) and the solver of9-port 8a97d02 or later (pull, wmake libso in
@@ -48,9 +48,9 @@ fi
 
 chmod +x Allpre run clean
 # mesh and initial fields from the repo scripts (~20 s); the counts must match the laptop build
-# (porous 78,528, free 163,532, 242,060 cells)
+# (porous 78,489, free 163,571, 242,060 cells: bath plane at y 0.333 mm, Allpre)
 ./Allpre
-grep -q "porous 78,528, free 163,532" log.initFields || { echo "ERROR: mesh differs from the laptop build"; exit 1; }
+grep -q "porous 78,489, free 163,571" log.initFields || { echo "ERROR: mesh differs from the laptop build"; exit 1; }
 # solver log in ./logs during the run (not the node /tmp), filtered at the end to every 100th step + the
 # last 400 lines (../tools/runTools.sh)
 LOG_DIR=logs LOG_EVERY=100 ./run

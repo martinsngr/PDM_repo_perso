@@ -47,6 +47,11 @@ passes".
 
 | `S5_K1e-12_t40_fill33` (added 2026-10-30 16:41, S3 stopped at 1.62 ms to free its 4 cores: low pc changed little at 1 ms, top 0.19 mm, gap water 1,306 against 1,178 cells) | as S1, initial gap water column to y = 0.33 mm instead of 0.1 mm, i.e. past the opening at y 0.16 mm where the slots around yarn 5 end. Map of S2 at 1 ms: in the gaps between the y-yarn flanks (about 8 cells at mid-thickness) there is only a partly filled film, no bridge. Tests the solver directly on a meniscus bridged between the flanks: **gap top ≥ 0.5 mm by 1 ms** (slit suction 690 Pa at θ 40°, 160 µm), stable ≤ 3 m/s from 0.6 ms; if instead the column retracts to the slots, gap top back below 0.3 mm |
 | `S6_C_wet_cut12` (added 2026-10-30 17:05, after S5 at 0.5 ms and the yarn-saturation comparison below) | set C of the full run `REV_gapflow`: K 2e-11, VG 500 / 0.4, θ 40°, `darcyFaceMaxDa` 0.2. Cut REV longer, y < 1.2 mm (91 × 60 × 20 cells: second gap y 0.84–1.16 mm included). Every yarn cell at S ≥ 0.9 (pc 242 Pa, below the gap suction 368–690 Pa), gap column 0.1 mm. Nothing drains the gap: does the water pass the openings when the yarn suction is off? **Gap top ≥ 0.5 mm by 1.5 ms, ≥ 0.84 mm by 3 ms; stable ≤ 5 m/s** (lowest pc tested with L). Stuck at an opening (top 0.19 or about 0.86 mm) with wet yarns: the barrier is the geometry |
+| `S7_C_wet_t20` (added 2026-10-30 18:20, after S6 at 1.4 ms: top of the water connected to the bath 0.271 mm, rows ≥ 20 % water to 0.19 mm, water in isolated pockets up to 1.19 mm; θ acts most in S1, S2, S4) | S6 with θ 20°, one change: does a lower θ open the gap when the yarn suction is off? For the choice of θ in `REV_gapflow` before it starts. **Top of the connected water ≥ S6 + 0.1 mm at 1.5 ms; rows ≥ 20 % water above 0.25 mm; ≤ 6 m/s** |
+| `S8_closed_y` (added 2026-10-30 18:50: the previous student's interFoam cases, `~/group_repository/textailes/water/mono-region/`, showed water moving around impermeable yarns; there the water lies under the whole fabric and rises through the thickness, z, g = 0, body-fitted, ~4 µm at the walls, basket weave) | cut REV of T11 (y < 0.7 mm), K 1e-20, θ 40°, bath at the edge y = 0 as in all our runs: no yarn suction or feed at all. My estimate (the flanks face each other over 2–7 cells only): **top of the connected water ≤ 0.30 mm at 3 ms**, ≤ 5 m/s. If it climbs past 0.5 mm, the porous exchange was the barrier in S6, not the geometry |
+| `S9_closed_z` (added at the same time) | as S8 with the previous student's direction, on our mesh and plain weave (`throughPlane.py`): water fills the 3 padding layers below the fabric, bath on `bottom`, the edges y closed, free cells otherwise air. **≥ 50 % of the free cells water up to mid-thickness by 1 ms**, ≤ 5 m/s; reaching the top face by 3 ms is open (the gaps widen again above mid-thickness) |
+| `S10_closed_mid` (added 2026-10-30 19:30, after S9 filled the gaps through the thickness in < 0.7 ms while S8, same closed yarns, bath at the edge, stalls at 0.231 mm: the edge bath of the REV cuts the half crossing yarn 5, so water enters only through slots 1–3 cells wide; S7 and S9 stopped for the cores) | closed yarns (K 1e-20, θ 40°), mesh from y 0.333 to 1.5 mm (`makeShifted.sh`): bath plane in the middle of a gap, as a bath surface can be in a dipped strip, gap column 0.1 mm. **Rows ≥ 50 % water up to y ≈ 0.5 mm by 1 ms (the first gap fills); connected top reaches about 0.84 mm by 3 ms through the slots around yarn 6; second gap rows stay < 20 % water (same opening as y 0.16 mm)**, ≤ 5 m/s |
+| `S11_C_mid` (added at the same time) | same mesh and bath, set C (K 2e-11, VG 500 / 0.4, θ 40°, L), dry yarns as `REV_gapflow`: the candidate for the weekend run. **Connected top ≥ 0.5 mm by 3 ms, rows ≥ 20 % water up to 0.45 mm; yarns take water from the gap (front ahead)**, ≤ 5 m/s |
 
 **Success criterion: gap top (free box cells, α > 0.5) at y ≥ 0.5 mm by 3 ms, stable.** That is past the widening behind
 yarn 5 and up to crossing yarn 6.
@@ -58,7 +63,35 @@ yarn 5 and up to crossing yarn 6.
 | top flat below 0.3 mm in all | the valve does not depend on K | locate where the water stops; θ 20°, a lower K |
 | a set is not stable | L is not enough at those values | cause first (see `../../NOTES_solver.md`, open issues), no rerun |
 
-## Results (interim, 2026-10-30 17:10: S1, S2 near 3 ms, S4, S5 running, S6 queued)
+## Results S6–S10 (2026-10-30 evening; S6, S10, S11 still running)
+**The bath plane decides.** `connected.py`, `zLayers.py`; water = free cells α > 0.5, connected = reached from the bath through water cells.
+
+| Run | Yarns | Bath | Result |
+|---|---|---|---|
+| S9 | closed, K 1e-20 | under the fabric (the previous student's direction) | ≥ 91 % of the free cells water up to z 0.14 mm (mid-thickness 0.07 mm) by 0.7 ms, top stays at z ~0.18 mm; prediction **pass**; early peaks 8 m/s (4 % of steps above 5 m/s). Stopped at 2.1 ms |
+| S8 | closed, K 1e-20 | at the edge y = 0, on the half crossing yarn | connected top 0.231 / 0.251 / 0.251 mm at 1 / 2 / 2.5 ms, 1,173 cells, no row ≥ 50 %: prediction (≤ 0.30 mm) **pass** at 2.5 ms; ≤ 2.2 m/s |
+| S10 | closed, K 1e-20 | at y 0.34 mm, mid-gap | connected top 0.551 / 0.752 / 0.812 / 0.812 mm at 0.2 / 0.4 / 0.6 / 0.8 ms, 4,437 cells, rows ≥ 50 % up to 0.491 mm from 0.6 ms; at y 0.45 mm water spans the space between the flanks; predictions **pass** so far; ≤ 3.1 m/s after 0.2 ms |
+| S6 | S ≥ 0.9, set C | edge | connected top 0.271 mm at 1.4 ms, 0.291 at 2.1; isolated pockets ~480 cells at both ends of yarn 6, not growing after 0.8 ms; "≥ 0.5 mm by 1.5 ms" **fail** for connected water (the raw gap top, 1.19 mm, is set by pockets); peak 5.9 m/s |
+| S7 | S ≥ 0.9, set C, θ 20° | edge | connected top 0.271 mm at 0.4 ms, 2,461 cells (S6 1,359): more water, faster; stopped at 0.57 ms for the cores, prediction not scored |
+
+The edge bath of the REV cuts the half crossing yarn 5 along its centreline: 77 % of its faces are yarn, the water enters through slots 1–3 cells wide that open abruptly at y 0.16 mm. **That was a setup choice: S8 and S10, with the same closed yarns, differ only in the bath plane.** `REV_gapflow` moved to the mid-gap plane (2026-10-30, `rev_domain.json`, y 0.333–3.0 mm, porous 78,489, free 163,571, inlet 1,274 faces, 330 porous).
+Flanks of neighbouring y-yarns (yarns 1, 2, cells): facing height 2 / 3 / 4 / 6 / 7 / 6 / 5 / 3 / 2 at y 0.17 / 0.21 / 0.25 / 0.29 / 0.33 / 0.37 / 0.41 / 0.45 / 0.49 mm, x gap 7–12 where they face.
+
+## Results S1–S5 (S1–S5 final at 3 ms, S3 stopped at 1.62 ms; 2026-10-30, `summary.md`)
+| Run | gap water [cells] | gap top α > 0.5 / α > 0.1 [mm] | highest row 50 % / 20 % water [mm] | cells α > 0.5 above 0.25 mm | lost top + bottom [cells] | y-yarn front [mm] | per-step max free \|U\| after 0.2 ms [m/s] |
+|---|---|---|---|---|---|---|---|
+| S1 (θ 40°) | 1,589 | 0.231 / 0.311 | none / 0.150 | 0 | 21 | 0.511 | 2.13 |
+| S2 (θ 30°) | 2,737 | 0.271 / 0.391 | 0.070 / 0.170 | 18 | 112 | 0.511 | 2.98 |
+| S4 (θ 20°) | 3,240 | 0.291 / 0.491 | 0.110 / 0.190 | 62 | 348 | 0.531 | 3.53 |
+| S5 (column to 0.33 mm) | 2,907 | 0.291 / 0.511 | none / 0.190 | 77 | 2,972 | 0.632 | 3.96 |
+| T12 at 2 ms (K 1e-11, low pc, θ 40°) | 1,848 | 0.231 / 0.291 | none / 0.150 | 0 | 80 | 0.632 | 3.55 |
+
+**Predictions:** all stable, no step above 5 m/s, no stopGuard, budgets ≤ 1.5e-8 of the water: **pass**. S1: yarn front 0.511 mm **pass**, dt median 1.23e-6 s
+**pass**, gap water at 1 ms ≥ T12 **fail** (1,178), gap top ≥ 0.30 mm **fail** (0.231). S2: gap top ≥ S1 + 0.04 mm **pass** (0.271). S3: stopped, not scored. S4: gap
+top ≥ S2 + 0.04 mm **fail** (+0.02), gap water ≥ 1.2 × S2 **fail narrowly** (1.18). S5: ≥ 0.5 mm by 1 ms **fail**: the column retracts, top 0.371 → 0.291 mm, the rows ≥ 20 %
+water back to y 0.19 mm by 3 ms, 2,972 cell volumes out through top and bottom. **No set reaches the success criterion.** Decision table, row 2: top still rising at
+0.04 mm/ms in S2 and S4. **No row above y 0.19 mm is ≥ 20 % water in any run at 3 ms: the gap top is corner water, no gap is filled.** θ acts most on the volume.
+
 **First look at 1 ms (`analyse.py`, solver `8a97d02`, laptop):**
 
 | At 1 ms | S1 | S2 (θ 30°) | S3 (low pc) | T12 (K 1e-11, low pc) |
@@ -90,8 +123,9 @@ y-yarns reach S_eq for the two widths:
 | 4 | 0.251 | 0.231 | 0.311 | 0.792 |
 | 6.5 | 0.251 | 0.251 | 0.331 | 0.952 |
 
-T12 agrees to 2 ms. Base pc (jobs 3051, 3055/3058, θ 60°): S_eq 0.995–0.998, the y-yarns reach 0.992 at the inlet at 30.5 ms, gap top 0.19 mm
-apart from 2–4 corner cells at y 1.23–1.43 mm. 1D similarity: y = 0.16 mm + k√t with k 2.21 mm/√s (S_eq 0.841) gives 0.23 / 0.26 / 0.30 /
+T12 agrees to 2 ms. Base pc (jobs 3051, 3055/3058, K 1e-11, θ 60°): S_eq 0.995–0.998, the y-yarns reach 0.992 at the inlet at 30.5 ms, gap top 0.19 mm
+apart from 2–4 corner cells at y 1.23–1.43 mm. **Not a hard limit:** in S1, S2 and S4 (base pc, K 1e-12) the corner water climbs to 0.23–0.29 mm while the y-yarns reach S_eq only at
+y ≤ 0.05 mm. 1D similarity: y = 0.16 mm + k√t with k 2.21 mm/√s (S_eq 0.841) gives 0.23 / 0.26 / 0.30 /
 0.34 mm at 1 / 2 / 4 / 6.5 ms, against the measured contour 0.231 / 0.271 / 0.311 / 0.331. **Correlation on one pc curve, plus base pc
 consistent; no run has reached the second gap.**
 

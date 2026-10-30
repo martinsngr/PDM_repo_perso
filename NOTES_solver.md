@@ -415,10 +415,16 @@ opening at y 0.16 mm where the slots around yarn 5 end: gap top ≥ 0.5 mm by 1 
 the y-yarn flanks, ≤ 3 m/s from 0.6 ms; otherwise the column retracts below 0.3 mm. Added at 17:05: S6, set C (K 2e-11, VG 500 / 0.4, θ 40°) on
 a longer cut (y < 1.2 mm), every yarn at S ≥ 0.9, so nothing drains the gap: gap top ≥ 0.5 mm by 1.5 ms, ≥ 0.84 mm by 3 ms, ≤ 5 m/s; stuck at an opening
 means the barrier is the geometry.
-**Interim results (2026-10-30 17:10, table in the study README):** all stable to 1 ms, gap top 0.19–0.21 mm; S1 prediction on gap water fails
-(1,178 cells against T12's 1,505: lower K gives less gap water); θ acts most on the volume (S2 1,826 cells). S5 does not climb at 0.5 ms (about 75 % of
-its water loss goes to the padding and out through the open top and bottom). **In job 3059 the gap top stays between the heights where the y-yarns reach
-S_eq (yarn pc = gap suction 2σcosθ/w) for w 300 and 160 µm;** base pc consistent (S_eq never reached). Correlation, no run has reached the second gap yet.
+Added at 18:20, after S6 at 1.4 ms (top of the water connected to the bath 0.271 mm, rows ≥ 20 % water to 0.19 mm): S7 = S6 with θ 20°: connected top ≥ S6 + 0.1 mm at 1.5 ms, rows ≥ 20 % water above 0.25 mm, ≤ 6 m/s.
+Added at 18:50, closed yarns (K 1e-20, θ 40°, cut y < 0.7 mm): S8 bath at the edge y = 0: connected top ≤ 0.30 mm at 3 ms (flanks facing over 2–7 cells only); S9 the previous student's direction, water under the
+fabric, through the thickness: ≥ 50 % of the free cells water up to mid-thickness by 1 ms. (The previous student's interFoam cases, `~/group_repository/textailes/water/mono-region/`: bath at z, g = 0, body-fitted.)
+Added at 19:30: bath plane moved to the middle of a gap (mesh y 0.333–1.5 mm): S10 closed yarns: rows ≥ 50 % water up to 0.5 mm by 1 ms, connected top about 0.84 mm by 3 ms, second gap rows < 20 %; S11 set C, dry yarns: connected top ≥ 0.5 mm by 3 ms, rows ≥ 20 % up to 0.45 mm, ≤ 5 m/s.
+**Results S1–S5 (2026-10-30, tables and scoring in the study README):** all stable (≤ 4 m/s, no step above 5 m/s, L holds at K 1e-12). No set reaches 0.5 mm: gap
+top at 3 ms 0.231 / 0.271 / 0.291 mm for θ 40 / 30 / 20° (K 1e-12, base pc), still rising at 0.04 mm/ms at θ 30 and 20°; no row above y 0.19 mm is ≥ 20 % water, so that top is
+corner water, no gap is filled. Lower K gives less gap water (S1 1,178 cells at 1 ms, T12 1,505). S5 (column to 0.33 mm) retracts to y 0.19 mm in the 20 % sense, ~3,000 cell
+volumes out through the open top and bottom. **In job 3059 the gap top stays between the heights where the y-yarns reach S_eq (yarn pc = gap suction 2σcosθ/w) for w 300
+and 160 µm;** not a hard limit (S1, S2, S4 climb with S_eq reached only at y ≤ 0.05 mm). No run has reached the second gap yet. **Evening: the bath plane decides.** Closed yarns (K 1e-20, θ 40°): S9, water under the fabric, ≥ 91 % water up to z 0.14 mm by 0.7 ms (the previous student's behaviour, on our mesh and plain weave: pass); S8, bath on
+the half crossing yarn at y = 0, connected top 0.25 mm at 2.5 ms; S10, bath at y 0.34 mm mid-gap, connected top 0.81 mm by 0.6 ms, the gap filled up to the crossing yarn. **The solver carries water around the yarns; the half-yarn bath of the REV blocked it.** S6 (S ≥ 0.9, bath on the half yarn): connected top 0.29 mm at 2.1 ms. S10 and S11 (set C, dry yarns, mid-gap) running.
 
 ## Open issues
 

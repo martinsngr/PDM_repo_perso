@@ -20,7 +20,7 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `trialWicking/wickingFront.ipynb` | Front analysis of the 1D cases (front at S = 0.1 vs √t, profiles, p_air/p_water) |
 | `meshing_strat_trial/REV/` | **The REV in one folder:** TexGen geometry (`Textiles/`, `funge.py`), `inspect_stl.py` (REV box → `rev_domain.json`, `--zgap`), `build_fields.py` (mesh + eps, K, fYarn, yarnID), `check_periodicity.py`, `meshing.pvsm`, solver dictionaries, `Allpre` (geometry → mesh → fields → initial α). Run scripts not written yet |
 | `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 and θ0 40° (2026-10-27); with change L, 10 ms, 4 cores since 2026-10-30 |
-| `meshing_strat_trial/REV_gapflow/` | Copy of `REV_lowpc` with K 2e-11, VG pc0 500 Pa, m 0.4, θ0 40°, `darcyFaceMaxDa` 0.2, L, 150 ms, 8 cores (2026-10-30): can the solver show gap water rising behind the yarn saturation? Not physical values |
+| `meshing_strat_trial/REV_gapflow/` | Copy of `REV_lowpc` with K 2e-11, VG pc0 500 Pa, m 0.4, θ0 40°, `darcyFaceMaxDa` 0.2, L, 150 ms, 8 cores, **bath plane at y 0.333 mm, mid-gap** (2026-10-30): can the solver show gap water rising behind the yarn saturation? Not physical values |
 | `meshing_strat_trial/2D_bench/` | **The 2D bench:** thick-wall slit (yarn wall 8 cells \| gap 8 \| yarn wall 8), G + H + F′ + I on; `Allpre`, `run`, `check.py` |
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
@@ -396,22 +396,32 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
   sink models (Pillai).
 
 ## Next steps
+**Plan to the first yarn characterization (~2026-11-20; agreed with the user 2026-10-30), in this order:** (1) read REV_lowpc + L and `REV_gapflow`; (2) tensor K, solver change and the 6 checks
+(`NOTES_solver.md`, start Monday 2026-11-02); (3) weave factor (REV front ÷ 1D yarn front, 0.78 so far): vary K, wick along x, shift the inlet plane, other weaves and densities (STLs from the user,
+`funge.py`); (4) mesh check, same REV at 15 µm; (5) yarn-only REV against the hybrid; (6) 1D model with gravity, script from measured geometry to a REV case; (7) freeze the solver version before
+the data, for a blind first prediction. Left out unless the gaps turn out to matter: G2b, 10 µm, gap tuning, `verification/PLAN.md` Studies 1, 2a, 2b. Cores: about 8–10 usable on mini03 (cap 46), the user
+expects more in the coming days and can also use mini01. Test planned: vertical wicking, front and uptake vs time, same yarn in different weaves and densities, then other yarns.
+
 **2026-10-30 — START HERE.** L committed in the solver repo (`8a97d02`, docs `97f3b35`), installed on the laptop.
+- **Final goal (user, 2026-10-30):** correlate the REV with cm-scale tests and use it as a prediction tool. First check (`verification/upscaling_REV/`): in job 3055/3058 the row-mean
+  yarn S collapses on y/√t within 2–8 % for S 0.1–0.7 over 2–20 ms (S ≥ 0.8 not converged); front 14.0, uptake 2.43 mm/√s. Setup values, under 2 weave repeats. Missing: measured
+  yarn inputs, a 1D model with gravity, a cm test not used for calibration. Weighing a wicked strip would show whether the gaps fill (TexGen geometry: 65 g/m² yarns full, up to 215 g/m² all full).
 - **REV_lowpc = L validation (decided with the user):** only changes from job 3059: `porousFreeAirKrPorous on` in
   `constant/transportProperties`, `endTime` 10 ms, `caseSetup` N 4 and `job.slurm` `--ntasks=4` (next to the new case on
   mini03), `job.slurm` `--no-requeue`; `run` stops if the binary ignores the keyword; `job_restart.slurm` added (= `REV/`).
   Its submission overwrites the 3059 results on mini03 (local copy `~/PDM_results/REV_lowpc_run3059`).
 - **Screening (user: can the solver carry gap water rising significantly? the yarn may lead):** `verification/study2d_gapRise/`,
-  cut REV, K 1e-12: S1 VG 5000 / 0.5 θ 40°, S2 θ 30°, S3 VG 1000 / 0.4, S4 θ 20°, S5 column to 0.33 mm; S6 set C with wet yarns. To 1 ms: stable, gap
-  top 0.19–0.21 mm, K 1e-12 does not help (results in its README).
+  cut REV, K 1e-12: S1 VG 5000 / 0.5 θ 40°, S2 θ 30°, S3 VG 1000 / 0.4, S4 θ 20°, S5 column to 0.33 mm; S6 set C with wet yarns (running on the laptop:
+  `./runAll.sh S6_C_wet_cut12` resumes it). S1–S5 at 3 ms: stable, gap top 0.23–0.29 mm, no row above y 0.19 mm ≥ 20 % water, K 1e-12 does not help (results in its README).
 - **Measured (`satGap.py`):** in job 3059 the gap top stays between the heights where the y-yarns reach S_eq (yarn pc = gap suction 2σcosθ/w) for w 300 and
   160 µm, at every write to 6.5 ms; the 1D similarity predicts that contour within 0.012 mm; base pc: S_eq never reached, gap top 0.19 mm.
 - **Hypothesis (user, not tested):** the gap fills up to the next crossing yarn, a second gap rise starts once the yarns around it are saturated.
 - **`REV_gapflow` (decided with the user 2026-10-30): the test of that hypothesis on the full REV.** Set C: K 2e-11 (`Allpre`), VG 500 / 0.4, θ 40°, L,
   `darcyFaceMaxDa` 0.2 (same 39,406 porous/free Darcy faces), 150 ms on 8 cores (weekend run, ~53 h, a write every ms), `job.slurm` continues from the last
-  complete write if requeued after a crash. Same K·pc0 as REV_lowpc (yarn front 8.55 mm/√s), lower S_eq.
-  **Prediction:** gap top ≈ 0.16 mm + 3.2 mm/√s·√t (S_eq 0.73, w 200 µm): y 0.5 mm at ~11 ms, y 0.84 mm at ~45 ms, y 1.16 mm at ~96 ms or earlier (yarn front
-  at the closed end at ~78 ms, the yarns then fill faster). Scratch copy: built by `Allpre`, 15 steps,
+  complete write if requeued after a crash. Same K·pc0 as REV_lowpc (yarn front 8.55 mm/√s), lower S_eq. **Pending since 2026-10-30 ~17:15:**
+  partition `global` has `MaxCPUsPerNode=46` (not 48), 40 in use with REV_lowpc (job 3063, 4 cores, started 16:36): it starts when 3063 ends.
+  **Bath plane moved to y 0.333 mm, mid-gap (decided with the user 2026-10-30, `rev_domain.json`, porous 78,489, free 163,571; S8 against S10 in study 2d: the half-yarn bath blocks the water even with closed yarns).**
+  **Estimate if the yarn saturation limits the gap water:** y = 0.43 mm + 3.2 mm/√s·√t (S_eq 0.73, w 200 µm): y 0.5 mm in ~1 ms, y 0.84 mm at ~16 ms, y 1.16 mm at ~51 ms, yarn front at the closed end at ~78 ms. Not tested with wicking yarns yet (S11 running). Scratch copy before the shift: built by `Allpre`, 15 steps,
   L active, α in [−6e-20, 1]. Check `satGap.py <run> 500 0.4 40` on the writes, water lost through top/bottom (discuss thicker padding above ~10 %).
   **Aim (user):** if the solver can show the phenomenon with tuned values, its absence with real yarn values is a result of the model, not a solver limit
   (still to confirm by experiment). Real yarn pc (estimate 19 kPa·cosθ) ≫ gap suction (0.4–0.7 kPa): S_eq ≥ 0.99, gaps fill only near full yarn saturation.

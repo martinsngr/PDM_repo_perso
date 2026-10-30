@@ -7,6 +7,8 @@ Studies 1, 2a, 2b, 3 proposed by the independent review and agreed with the user
 to a nearly saturated yarn, from the REV_lowpc failure; phases 1–5 run (2D bench, truncated REV, ablations, variants
 K1/K2/G2/G2b); K2 chosen by the user. Results and predictions in its README and in `../NOTES_solver.md`.
 
+**Added 2026-10-30: plan to the first yarn characterization (~2026-11-20), `../NOTES_cases.md` "Next steps".** Studies 1, 2a, 2b below stay on hold unless the gaps turn out to matter.
+
 ## Rules (from the review, agreed)
 - Do not modify the installed solver. Variants are built under a new name in a scratch area, **with the patch saved
   in the study folder** (`verification/<study>/solver/`).

@@ -3,7 +3,8 @@
     ../../.venv/bin/python analyse.py [run ...]      (default: every S* folder and T12)
 Reuses ../study2c_nearSaturation/analyseCut.py (log statistics, per-write quantities). Added per write: gap water top
 for alpha > 0.1, free box cells with alpha > 0.5 above y 0.25, 0.5 and 0.84 mm, water in the padding (cell volumes), water
-lost through top and bottom (waterBudget.csv, cell volumes). Writes summary.md."""
+lost through top and bottom (waterBudget.csv, cell volumes), and the highest cell row whose free box cells are at least 50 % and
+20 % water (alpha > 0.5): a filled gap, unlike the gap top, which a single corner cell can set. Writes summary.md."""
 import csv
 import glob
 import os
@@ -27,6 +28,10 @@ def extra(run, times):
     zv = sorted({float(l.split()[2]) for l in re.findall(r"\(\s*([-\d.e+]+\s+[-\d.e+]+\s+[-\d.e+]+)\s*\)",
                                                         bm.split("vertices", 1)[1].split(");", 1)[0])})
     box = (C[:, 2] > zv[1]) & (C[:, 2] < zv[2])
+    iy = np.round((C[:, 1] - C[:, 1].min()) / 20e-6).astype(int)
+    ny = iy.max() + 1
+    yr = np.array([C[iy == j, 1][0] for j in range(ny)]) * 1e3
+    nfree = np.bincount(iy[F & box], minlength=ny)
     rows = {}
     for t in times:
         a = field(os.path.join(run, t, "alpha.wetting"), n)
@@ -36,6 +41,10 @@ def extra(run, times):
                               n25=int((w & (C[:, 1] > 0.25e-3)).sum()), n50=int((w & (C[:, 1] > 0.5e-3)).sum()),
                               n84=int((w & (C[:, 1] > 0.84e-3)).sum()),
                               pad=a[F & ~box].sum())
+        frac = np.bincount(iy[w], minlength=ny) / np.maximum(nfree, 1)
+        for name, level in (('f50', 0.5), ('f20', 0.2)):
+            k = np.where(frac >= level)[0]
+            rows[float(t)][name] = yr[k.max()] if k.size else float('nan')
     return rows
 
 
@@ -65,13 +74,13 @@ def main():
                    + (f"; {L['stop']}" if L["stop"] else "") +
                    f"\nper-step max free |U| per 0.05 ms [m/s]: {L['bins']}\n\n"
                    "| t [ms] | y-yarn front [mm] | mean porous S | gap water [cells] | gap top a>0.5 / a>0.1 [mm] "
-                   "| cells a>0.5 above 0.25 / 0.5 / 0.84 mm | padding water [cells] | lost top+bottom [cells] "
-                   "| max free \\|U\\| [m/s] | free > 1 / > 5 m/s |\n|---|---|---|---|---|---|---|---|---|---|")
+                   "| row 50 % / 20 % water [mm] | cells a>0.5 above 0.25 / 0.5 / 0.84 mm | padding water [cells] | lost top+bottom [cells] "
+                   "| max free \\|U\\| [m/s] | free > 1 / > 5 m/s |\n|---|---|---|---|---|---|---|---|---|---|---|")
         for r in R:
             x = X[r["t"]]
             ls = [v for tt, v in B if tt <= r["t"] * (1 + 1e-9)]
             out.append(f"| {r['t']*1e3:.2f} | {r['front']:.3f} | {r['S']:.4f} | {r['gap']:.0f} | {r['gtop']:.3f} / {x['top01']:.3f} "
-                       f"| {x['n25']} / {x['n50']} / {x['n84']} | {x['pad']:.0f} | {ls[-1] if ls else float('nan'):.0f} | {r['umax']:.2f} | {r['n1']} / {r['n5']} |")
+                       f"| {x['f50']:.3f} / {x['f20']:.3f} | {x['n25']} / {x['n50']} / {x['n84']} | {x['pad']:.0f} | {ls[-1] if ls else float('nan'):.0f} | {r['umax']:.2f} | {r['n1']} / {r['n5']} |")
         out.append("")
     txt = "\n".join(out)
     print(txt)
