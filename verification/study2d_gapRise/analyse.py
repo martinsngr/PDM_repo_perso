@@ -2,7 +2,7 @@
 """analyse.py  -  gap-rise table of the screening runs of study2d_gapRise (README.md), with the reference T12 of study 2c.
     ../../.venv/bin/python analyse.py [run ...]      (default: every S* folder and T12)
 Reuses ../study2c_nearSaturation/analyseCut.py (log statistics, per-write quantities). Added per write: gap water top
-for alpha > 0.1, free box cells with alpha > 0.5 above y 0.25 and 0.5 mm, water in the padding (cell volumes), water
+for alpha > 0.1, free box cells with alpha > 0.5 above y 0.25, 0.5 and 0.84 mm, water in the padding (cell volumes), water
 lost through top and bottom (waterBudget.csv, cell volumes). Writes summary.md."""
 import csv
 import glob
@@ -34,6 +34,7 @@ def extra(run, times):
         w01 = F & box & (a > 0.1)
         rows[float(t)] = dict(top01=C[w01, 1].max() * 1e3 if w01.any() else float("nan"),
                               n25=int((w & (C[:, 1] > 0.25e-3)).sum()), n50=int((w & (C[:, 1] > 0.5e-3)).sum()),
+                              n84=int((w & (C[:, 1] > 0.84e-3)).sum()),
                               pad=a[F & ~box].sum())
     return rows
 
@@ -64,13 +65,13 @@ def main():
                    + (f"; {L['stop']}" if L["stop"] else "") +
                    f"\nper-step max free |U| per 0.05 ms [m/s]: {L['bins']}\n\n"
                    "| t [ms] | y-yarn front [mm] | mean porous S | gap water [cells] | gap top a>0.5 / a>0.1 [mm] "
-                   "| cells a>0.5 above 0.25 / 0.5 mm | padding water [cells] | lost top+bottom [cells] "
+                   "| cells a>0.5 above 0.25 / 0.5 / 0.84 mm | padding water [cells] | lost top+bottom [cells] "
                    "| max free \\|U\\| [m/s] | free > 1 / > 5 m/s |\n|---|---|---|---|---|---|---|---|---|---|")
         for r in R:
             x = X[r["t"]]
             ls = [v for tt, v in B if tt <= r["t"] * (1 + 1e-9)]
             out.append(f"| {r['t']*1e3:.2f} | {r['front']:.3f} | {r['S']:.4f} | {r['gap']:.0f} | {r['gtop']:.3f} / {x['top01']:.3f} "
-                       f"| {x['n25']} / {x['n50']} | {x['pad']:.0f} | {ls[-1] if ls else float('nan'):.0f} | {r['umax']:.2f} | {r['n1']} / {r['n5']} |")
+                       f"| {x['n25']} / {x['n50']} / {x['n84']} | {x['pad']:.0f} | {ls[-1] if ls else float('nan'):.0f} | {r['umax']:.2f} | {r['n1']} / {r['n5']} |")
         out.append("")
     txt = "\n".join(out)
     print(txt)

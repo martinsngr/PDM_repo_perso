@@ -408,7 +408,17 @@ Cut REV of study 2c, solver `8a97d02` (A–L), 3 ms. S1 K 1e-12, VG 5000 / 0.5, 
 1000 / 0.4. **Predictions (before the runs):** all stable (no step above 5 m/s after 0.2 ms, ≤ 3 m/s from 0.6 ms); S1 dt
 median 5e-7 to 1.25e-6 s, y-yarn front 0.45–0.55 mm at 3 ms, gap water at 1 ms ≥ T12 (1,505 cells), gap top ≥ 0.30 mm at
 3 ms, more likely below 0.5 mm than above; S2 gap top ≥ S1 + 0.04 mm; S3 yarn front 0.35–0.45 mm, gap water ≥ 1.2 × S1, gap
-top ≥ S1. **Success: gap top ≥ 0.5 mm by 3 ms, stable.** Decision table in the study README.
+top ≥ S1. **Success: gap top ≥ 0.5 mm by 3 ms, stable.** Decision table in the study README. Added after the first look at
+1 ms (all stable, gap top 0.19–0.21 mm, θ acts most): S4 as S1 with θ 20°: prediction gap water ≥ 1.2 × S2, gap top ≥ S2 + 0.04 mm
+at 3 ms, ≤ 5 m/s. Added at 16:41 (S3 stopped at 1.62 ms to free its cores): S5 as S1 with the initial gap column to y 0.33 mm, past the
+opening at y 0.16 mm where the slots around yarn 5 end: gap top ≥ 0.5 mm by 1 ms if the solver carries a meniscus bridged between
+the y-yarn flanks, ≤ 3 m/s from 0.6 ms; otherwise the column retracts below 0.3 mm. Added at 17:05: S6, set C (K 2e-11, VG 500 / 0.4, θ 40°) on
+a longer cut (y < 1.2 mm), every yarn at S ≥ 0.9, so nothing drains the gap: gap top ≥ 0.5 mm by 1.5 ms, ≥ 0.84 mm by 3 ms, ≤ 5 m/s; stuck at an opening
+means the barrier is the geometry.
+**Interim results (2026-10-30 17:10, table in the study README):** all stable to 1 ms, gap top 0.19–0.21 mm; S1 prediction on gap water fails
+(1,178 cells against T12's 1,505: lower K gives less gap water); θ acts most on the volume (S2 1,826 cells). S5 does not climb at 0.5 ms (about 75 % of
+its water loss goes to the padding and out through the open top and bottom). **In job 3059 the gap top stays between the heights where the y-yarns reach
+S_eq (yarn pc = gap suction 2σcosθ/w) for w 300 and 160 µm;** base pc consistent (S_eq never reached). Correlation, no run has reached the second gap yet.
 
 ## Open issues
 
