@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-10-30. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-02. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -281,6 +281,13 @@ their estimates: `NOTES_cases.md`, REV case status. **Decisions:** K diagonal in
 "axis"`: t = x or y exactly); **harmonic** face value of the normal components on all porous faces; one commit in the
 solver repo with `CHANGES_of9-port.md` updated (letter to assign: "K" would clash with the permeability).
 
+**Review against `8a97d02` (2026-11-02): the list below holds, with these corrections. The user writes the code, guided step by step, proposed letter T.** K reaches the
+solution only through `k0f`: `Ur`, `Uwetting`, `UnonWetting` are output only unless fixed on a patch (`alphaEqn.H:78`, `:89–118`); K cancels in M1/M (`PcCoeff`) and in L/M (`rho`, `alphaEqnSubCycle.H:43`, missed
+below). k0 = K_xx, not tr K/3 (tr/3 rounds, K cancels anyway). Face normal = the exact mesh axis, not Sf/|Sf| (rounding: a tensor K0·I would not give K0). K stays AUTO_WRITE: it is read from the time
+folder, NO_WRITE would break every restart. Coats gravity part: ĝ·K·ĝ of the cell × Σ|Sf·g| instead of surfaceSum(k0f·|Sf·g|): exact for g along an axis, same value as the scalar code for K0·I.
+`trialWicking/*/system/controlDict` have their own Coats copies (needed for check 3). Private test copy of the design (session scratchpad, never installed), measured: bench 108 steps, serial: installed = scalar
+K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 62 steps, 4 cores: installed = scalar K bit-identical; scalar against tensor K0·I bit-identical once coupled faces with equal values use the formula of `fvc::interpolate` (w·K + (1 − w)·K, which rounds when w ≠ 0.5; with K itself: dt identical, fields within 9e-13 relative). `Uwetting`, `UnonWetting`, `Ur` differ in the last digits (order of the products), output only. Yarn-aligned tensor (Kpar 1e-11, Kperp 2.2e-12; S1: VG 5000 / 0.5, θ 40°, L) on the cut REV, 203 steps: stable, budget closed, dt 2.65e-7 s at the Coats limit (REV scalar 1.25e-7 s, estimate ×2), K 2.5 MB per write for 63,700 cells (REV ~10 MB). A full solver compile takes 5 min. Anisotropic physics not tested: checks 3–6 below.
+
 **Why diagonal is simple and exact here:** since A every porous flux is a two-point flux k0f·snGrad·|Sf|
 (`phiWetting`/`phiNonWetting` in `alphaEqn.H`; `phiDarcyExplicit`, the p Laplacian with `rAUfD = Mf` and F's
 reconstruct in `pEqn.H`), the gravity term is Lf·(g·Sf). On an axis-aligned Cartesian mesh with diagonal K the exact
@@ -424,7 +431,7 @@ top at 3 ms 0.231 / 0.271 / 0.291 mm for θ 40 / 30 / 20° (K 1e-12, base pc), s
 corner water, no gap is filled. Lower K gives less gap water (S1 1,178 cells at 1 ms, T12 1,505). S5 (column to 0.33 mm) retracts to y 0.19 mm in the 20 % sense, ~3,000 cell
 volumes out through the open top and bottom. **In job 3059 the gap top stays between the heights where the y-yarns reach S_eq (yarn pc = gap suction 2σcosθ/w) for w 300
 and 160 µm;** not a hard limit (S1, S2, S4 climb with S_eq reached only at y ≤ 0.05 mm). No run has reached the second gap yet. **Evening: the bath plane decides.** Closed yarns (K 1e-20, θ 40°): S9, water under the fabric, ≥ 91 % water up to z 0.14 mm by 0.7 ms (the previous student's behaviour, on our mesh and plain weave: pass); S8, bath on
-the half crossing yarn at y = 0, connected top 0.25 mm at 2.5 ms; S10, bath at y 0.34 mm mid-gap, connected top 0.81 mm by 0.6 ms, the gap filled up to the crossing yarn. **The solver carries water around the yarns; the half-yarn bath of the REV blocked it.** S6 (S ≥ 0.9, bath on the half yarn): connected top 0.29 mm at 2.1 ms. S10 and S11 (set C, dry yarns, mid-gap) running.
+the half crossing yarn at y = 0, connected top 0.25 mm at 2.5 ms; S10, bath at y 0.34 mm mid-gap, connected top 0.81 mm by 0.6 ms, the gap filled up to the crossing yarn. **The solver carries water around the yarns; the half-yarn bath of the REV blocked it.** S6 (S ≥ 0.9, bath on the half yarn): connected top 0.31 mm at 3 ms. S10 to 3 ms: first gap rows ~75 % water near the bath, top 0.892 mm just past the opening at 0.84 mm, second gap not filled (films only), ≤ 3.9 m/s. **S11 (set C, dry yarns, mid-gap, 0.93 ms): max free |U| 17–32 m/s from 0.4 ms in the slots around yarn 6 (T12 ≤ 3.5 m/s): stronger than the currents L kept down at pc0 1000; dt, α and budget fine. Cause not known.** 2026-11-02: the same current on the full REV (`REV_gapflow`, job 3065, 41 m/s at the 1 ms write) diverged at 1.386 ms; not pursued, decision of the user (setup not physical; `NOTES_cases.md`, REV case status).
 
 ## Open issues
 
@@ -433,8 +440,11 @@ Solver behaviour:
   the pressure of a partly filled free cell (concave staircase corner of a yarn surface), its Darcy faces drop the
   surface-tension force (`pEqn.H:38/:65`) and, with G, take its VOF pressure as both phase pressures; the air leaves
   into the yarn with the gap cell's air mobility (C), F′ amplifies. Cause of the REV_lowpc failure (job 3059). Fix L
-  (`8a97d02`, air kr from the porous cell, study variant K2) weakens the leak; full-REV validation planned on mini03
-  (2026-10-30). The phase-pressure inconsistency itself (G2b) remains.
+  (`8a97d02`, air kr from the porous cell, study variant K2) weakens the leak. Full REV (`NOTES_cases.md`, REV case
+  status): pc0 1000 Pa (job 3063) reaches 10 ms with the 3059 currents gone to 8 ms, then a local current of 7–11 m/s under
+  crossing yarn 6 in the last 2 ms; pc0 500 Pa, K 2e-11, mid-gap bath (job 3065) reaches 41 m/s by 1 ms and diverges at
+  1.386 ms: **L is not enough for that setup** (cause not known, not pursued). Base REV with L past 15 ms not run. The
+  phase-pressure inconsistency itself (G2b) remains.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
