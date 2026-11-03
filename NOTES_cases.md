@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-02.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-03.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -19,9 +19,9 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `trialWicking/singleYarn_vertical_hybrid/` | Yarn twin of `1D_vertical_hybrid` (lateral wall closed). 0.1 s: mini03 11.9 h |
 | `trialWicking/wickingFront.ipynb` | Front analysis of the 1D cases (front at S = 0.1 vs √t, profiles, p_air/p_water) |
 | `meshing_strat_trial/REV/` | **The REV in one folder:** TexGen geometry (`Textiles/`, `funge.py`), `inspect_stl.py` (REV box → `rev_domain.json`, `--zgap`), `build_fields.py` (mesh + eps, K, fYarn, yarnID), `check_periodicity.py`, `meshing.pvsm`, solver dictionaries, `Allpre` (geometry → mesh → fields → initial α). Run scripts not written yet |
-| `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 and θ0 40° (2026-10-27); with change L, 10 ms, 4 cores since 2026-10-30: job 3063 reached 10 ms (REV case status) |
+| `meshing_strat_trial/REV_lowpc/` | Copy of `REV/` with VG pc0 1000 Pa, m 0.4 and θ0 40° (2026-10-27); with change L, 4 cores since 2026-10-30: job 3063 reached 10 ms, its continuation job 3067 30 ms (REV case status) |
 | `meshing_strat_trial/REV_gapflow/` | Copy of `REV_lowpc` with K 2e-11, VG pc0 500 Pa, m 0.4, θ0 40°, `darcyFaceMaxDa` 0.2, L, 150 ms, 8 cores, **bath plane at y 0.333 mm, mid-gap** (2026-10-30): can the solver show gap water rising behind the yarn saturation? Not physical values. Job 3065 diverged at 1.386 ms; not fixed, not rerun (decision of the user, 2026-11-02) |
-| `meshing_strat_trial/REV_midbath/` | `REV` values (K 1e-11, VG pc0 5000 Pa, m 0.5, θ0 60°) with L and the bath plane of `REV_gapflow` (y 0.333 mm, mid-gap), 30 ms, 8 cores (2026-11-02): L past 15 ms at the base pc, bath plane effect, scalar reference for tensor K (REV case status) |
+| `meshing_strat_trial/REV_midbath/` | `REV` values (K 1e-11, VG pc0 5000 Pa, m 0.5, θ0 60°) with L and the bath plane of `REV_gapflow` (y 0.333 mm, mid-gap), 30 ms, 8 cores (2026-11-02): L past 15 ms at the base pc, bath plane effect, scalar reference for tensor K. Job 3068 reached 30 ms, calm after 1.5 ms (REV case status) |
 | `meshing_strat_trial/2D_bench/` | **The 2D bench:** thick-wall slit (yarn wall 8 cells \| gap 8 \| yarn wall 8), G + H + F′ + I on; `Allpre`, `run`, `check.py` |
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
@@ -124,6 +124,12 @@ h_eq = 2σcosθ/(ρgw) ≈ 13 mm (300 µm, θ 75°) while the yarn holds ~0.5 m.
 crossing yarns (checked 2026-10-26, REV geometry above: the free space is continuous along x but tortuous, straight
 channels only in the outer layers; whether the menisci pass the widenings behind each crossing is open). In the 2D bench the
 yarn walls lead even with a straight gap (they draw water out of it).
+**Yarn pc against the gap suction (computed 2026-11-03, solver VG, Se = S/0.999):** pc(S 0.95) = 0.30–0.33·pc0 for m 0.3–0.5
+(0.38 at m 0.6), i.e. 1,626 Pa at the REV values, against a gap suction 2σcosθ/w of 240 / 450 Pa (w 300 / 160 µm, θ 60°)
+and at most 480 / 900 Pa (θ 0°). Equal at S 0.95 needs pc0 ≈ 740–1,480 Pa (w 300 µm, θ 60–0°) or 1,380–2,770 Pa (160 µm)
+at m 0.5 (m 0.4: +8 %); no θ and no m does it at pc0 5000 (that needs gaps narrower than 44 µm at θ 60°, 89 µm at θ 0°).
+REV_lowpc (pc0 1000, m 0.4, θ 40°) sits in that range (S_eq 0.93 / 0.84). The fibre-bundle estimate (~19 kPa·cosθ, REV
+case status) puts real yarns above pc0 5000, so with real values the yarns win against any open gap until S ≥ 0.99.
 
 ### 2D bench (`2D_bench/`, since 2026-10-13)
 - Thick-wall slit, 2.0 × 0.48 mm, 100 × 1 × 24 cells: yarn walls z < 0.16 and > 0.32 mm (eps 0.5, K 1e-11, ending 3 cells
@@ -319,7 +325,7 @@ solver ignores `waterOnlyPatches`.
     interface, kr on yarn/gap faces from the gap cell α, H on a wet surface) is unstable where a nearly saturated
     yarn (pc ≈ meniscus suction) faces a partly filled gap cell. Scripts and runs: laptop scratchpad (disposable).
 - **Job 3063 (REV_lowpc + L, mini03, 4 cores, solver `8a97d02`, 2026-10-30 16:36 to 2026-10-31 00:47; copy
-  `~/PDM_results/REV_lowpc_run3063`, analysed 2026-11-02): reached 10 ms, past the 6.553 ms where job 3059 diverged, no
+  `~/PDM_results/REV_lowpc_run3063_3067` since 2026-11-03, with job 3067 to 30 ms; analysed 2026-11-02): reached 10 ms, past the 6.553 ms where job 3059 diverged, no
   stopGuard.** 29,216 s (2,920 s per simulated ms), ~25,800 steps, dt 3.9e-7 s at the Coats limit, no dips after the start in
   the log (every 100th step; 3059: 2.2e-7 s, dips from 5 ms). Budget closed (imbalance 8.8e-22 m³, 9e-12 of the water). α in [−2.5e-20,
   1.0060]; porous α above 1.001 from 2.5 ms, peak 1.006 at ~7 ms, 1.003 at the end (3059 ≤ 1.003).
@@ -350,8 +356,8 @@ solver ignores `waterOnlyPatches`.
     z 0.10 mm, 1 yarn face, α 0.34 / 0.22 / 0.26, p 1,570 / 919 / 1,152 Pa), right below the yarn 6 cell (0.35, 0.51, 0.10)
     (S 0.45–0.48), the only porous cell above 2 m/s (6.3 / 3.6 / 3.9 m/s). Same spot as the two fastest cells at the 5 ms
     write (x 0.33–0.35, 2.5 m/s). Corner cell (0.37, 0.51, 0.10), 3 yarn faces, 3.5–7.1 m/s. Only 1–3 free cells above
-    5 m/s, no effect on dt, α or budget. No data after 10 ms: not known whether it grows. Not checked: the flow direction
-    across that face, whether this is the air pump of study 2c.
+    5 m/s, no effect on dt, α or budget. After 10 ms, the flow direction and whether it is the air pump of study 2c:
+    job 3067 below.
   - **Job 3067, continuation to 30 ms (user, started 2026-11-02; `job_restart.slurm` on mini03, same 4-core decomposition,
     ~16 h; `endTime` 0.03 set on mini03 only, the repo keeps 0.01): does the local current stay local?**
     Predictions before the run: reaches 30 ms without stopGuard; the current stays in a few cells, ≤ 20 m/s, more sites
@@ -360,6 +366,51 @@ solver ignores `waterOnlyPatches`.
     Fails if stopGuard stops it or free |U| stays above 50 m/s (job 3065's level before it diverged). The restart reads
     6-digit fields and takes another path (restart of 3059, 2026-10-29): a current that vanishes right after the restart
     says nothing about stability. `waterBudget.csv` gets a second 0.01 row, inflows restart from 0 there.
+    **Result (analysed 2026-11-03, copy `~/PDM_results/REV_lowpc_run3063_3067`, 0–30 ms; log every 100th step from 10 ms;
+    scripts: `check.py`, study 2d `connected.py` / `satGap.py`, study 2c `cellFaces.py`, per-ms log statistics and a
+    fast-cell locator in the session scratchpad):** reached 30 ms, no stopGuard. 53,630 s (2,680 s per simulated ms),
+    ~59,000 steps. dt at the Coats limit on every sampled step, no dips: 3.8–3.9e-7 s to 17 ms, 3.6e-7 at 17–22 ms,
+    2.9e-7 at 22.5–28 ms (when the yarn 7 sites below appear; cause not checked), 3.3e-7 at 29–30 ms. α min −1.5e-6 in the
+    first steps after the restart (6-digit fields), −1e-19 at the writes; porous α above 1.001 on every sampled step, max
+    per ms 1.0036–1.0044 at 10–14 ms, 1.0015–1.0024 after; free α ≤ 1.0006. Budget: restart offset −1.21e-15 m³ (7.8e-6
+    of the water), constant from 10.5 to 30 ms.
+    - **Yarn 6 site fades:** 7.2 m/s at the 10 ms write; 23 m/s at the first sampled step after the restart (restart
+      transient), 7 m/s at 11.7 ms; at the writes the same cell 2.7–6.8 m/s to 13.5 ms, ≤ 2.4 m/s from 14 ms, while yarn 6
+      wets (mean S 0.44 → 0.58 at 15 ms). It fades over 4 ms and the same kind of site forms again later, so not a
+      restart effect alone.
+    - **New sites around crossing yarn 7 from ~22.7 ms, sustained:** maximum |U| implied by the log (all cells) 10.9 m/s at
+      22.7 ms, 22.4 at 23.9 ms, 16–19 per ms after, median of the sampled steps 13–19 m/s from 23 ms. Writes 24 / 25 / 27.5
+      / 30 ms: free max 10.9 / 13.0 / 13.0 / 16.7 m/s, 22 / 21 / 37 / 34 free cells above 5 m/s in 6 / 6 / ≥ 8 / ≥ 8 sites
+      of 1–8 cells (listing capped at 8):
+      the row below yarn 7 (y 1.153 mm, from 23 ms), inside its y range at z 0 and 0.14 mm (y 1.333 mm, from 27.5 ms), the
+      row above it (y 1.514 mm, the fastest at 28–30 ms); x mirror pairs across x 0.91 mm. The fastest cell of each site:
+      free, 1 yarn face (one site 2), α 0.20–0.37, p 700–1,170 Pa, yarn neighbour S 0.21–0.41, except one pure-air cell
+      without yarn face (y 1.173 mm, 5.0–5.7 m/s); porous max |U| 8–11 m/s (next to them).
+      Yarn 7 mean S 0.17 → 0.28 from 22.5 to 30 ms.
+    - **It is the air pump of study 2c** (face fluxes at 27.5 ms, `cellFaces.py`): cell (1.469, 1.153, 0.020) mm, α 0.25,
+      p 995 Pa: air enters through its free y− face at 13.2 m/s from a cell at −74 Pa (against the pressure difference)
+      and leaves through its one yarn face (y+, yarn S 0.27) at 15.1 m/s; water through that face 0.17 m/s, into the yarn.
+      Cell (0.729, 1.333, 0.000) mm: air in through z− at 10.2 m/s, out through the yarn face above at 12.9 m/s. In study
+      2c the pump cells had 3–5 yarn faces next to nearly saturated yarn; here 1 yarn face next to yarn at S 0.2–0.4.
+      Hypothesis, not tested: L takes the air kr from the porous cell, which is large at S 0.2–0.4, so L does not limit
+      this leak.
+    - **Integrals:** y-yarn front 1.133 / 1.273 / 1.454 / 1.634 / 1.774 mm at 10 / 15 / 20 / 25 / 30 ms; fit 10–30 ms
+      front = 9.39 mm/√s·√t + 0.14 mm (2–10 ms: 9.52). Mean porous S 0.244 → 0.392; crossing yarn 6 mean S 0.44 → 0.75,
+      yarn 7 0.01 → 0.28.
+    - **Gaps:** gap water 2,863 → 3,828 cell volumes; connected to the bath 2,265 → 2,781 cells, top 0.271 → 0.311 mm,
+      rows ≥ 20 % connected water up to 0.19 → 0.21 mm: the valve holds. Gap top (any free box cell α > 0.5) 0.291 → 0.311
+      mm to 20 ms, 0.511–0.551 mm from 20.5 ms by isolated pockets (3–10 cells; 122 isolated cells at 30 ms, in the y range
+      of yarn 6; not looked at further). S_eq heights (w 300 / 160 µm) 0.291 / 0.371 mm at 10 ms, 0.371 / 0.511 at 30 ms:
+      the connected water stays below the 300 µm height.
+    - **Lost through top/bottom:** 2,310 cell volumes from 10 to 30 ms (~3,040 in total, 65 % through the bottom), 47 per
+      0.5 ms at 10.5 ms, 66 at 22.5 ms, 57 at 26.5 ms; padding cells α > 0.05: 628 → 730–790.
+    - **Scoring:** 30 ms without stopGuard: yes. Current stays in a few cells, ≤ 20 m/s: no (the yarn 6 site faded, but 6
+      to ≥ 8 sites with 21–37 cells above 5 m/s formed around yarn 7, predicted as possible; sampled max 22.4 m/s, 13–19 m/s
+      sustained from 23 ms). Front ~1.84 mm: 1.774 mm (−0.07 mm, −4 %). Gap top 0.46–0.52 mm: no (0.551 mm by isolated
+      pockets, connected water 0.311 mm). Lost ~2,300 cell volumes: ~3,040 (+30 %). Failure criteria (stopGuard, free |U|
+      staying above 50 m/s): not met. **Stable to 30 ms at pc0 1000 with L, but the air pump is not removed: it moves with
+      the wetting of the crossing yarns (yarn 6 at 8–13 ms, yarn 7 from 23 ms) and reaches 10–17 m/s at the writes.**
+      Not known: whether it keeps growing after 30 ms (yarn 8 still dry, mean S 0.02).
 - **Job 3065 (`REV_gapflow`, mini03, 8 cores, `8a97d02`, 2026-10-31 00:47 to 01:32; copy
   `~/PDM_results/REV_gapflow_run3065`, quick diagnostic 2026-11-02): diverged at 1.386 ms** (stopGuard, dt 4e-28 s;
   2,622 s, ~5,400 steps; 0.49 s per step as estimated). **Not fixed, not rerun (user, 2026-11-02): the setup is not
@@ -381,7 +432,7 @@ solver ignores `waterOnlyPatches`.
     user's second-gap hypothesis stays untested with wicking yarns. Runs side by side: S10 closed yarns, mid-gap ≤ 3.9
     m/s; S6 set C wet yarns, edge bath 5.9 m/s; S11 and 3065 set C dry yarns, mid-gap 32–51 m/s; pc0 1000 with a mid-gap
     bath not run, so K, pc0, `darcyFaceMaxDa` and the bath plane cannot be separated.
-- **`REV_midbath/` (decided with the user 2026-11-02): the REV values with L and the bath in the middle of a gap, instead of a closed-yarn full REV** (S10 already covers closed yarns up to y 1.5 mm: its top stops at
+- **`REV_midbath/`, job 3068 (mini03, 8 cores, started 2026-11-02; decided with the user the same day): the REV values with L and the bath in the middle of a gap, instead of a closed-yarn full REV** (S10 already covers closed yarns up to y 1.5 mm: its top stops at
   0.892 mm from 2.3 ms, and by 3 ms 19 % of the inlet flow leaves through the open faces, so a longer closed-yarn run would mostly measure that leak; closed yarns cannot feed the far side of a crossing). **Questions:** (1) L past 15 ms at
   the base pc, never run; (2) REV/1D front ratio with this bath plane (edge bath 13.9/18 = 0.78; plan item 3); (3) does this bath plane alone trigger the currents of S11 and job 3065; (4) scalar reference for
   tensor K (job 3051 has the edge bath and no L). **Changes from `REV`:** `rev_domain.json` (y 0.333–3.0 mm; porous 78,489, free 163,571, inlet 330 porous + 944 free faces), `porousFreeAirKrPorous on`, the L check in `run`,
@@ -394,6 +445,38 @@ solver ignores `waterOnlyPatches`.
   - Gaps: ≤ 1,500 cell volumes at 1 ms (edge bath drains to 16 %, here 770), ~1,300 at 10 ms within a factor 2 (edge bath 394, × 944/290 free inlet faces); water connected to the bath below y 0.55 mm to 15 ms, rows ≥ 20 % below y 0.45 mm.
   - Lost through top/bottom ≤ 100 cell volumes by 30 ms (REV 12).
   **Reading:** calm = this bath plane alone does not trigger the currents of job 3065, which then come from K and pc0 (`darcyFaceMaxDa` 0.2 not separated). S11-type current = the bath plane matters, to settle before tensor K uses it. Fit within ±10 % of 13.9 mm/√s = the REV/1D ratio barely depends on the inlet plane; otherwise it is a setup dependence that the weave factor has to carry.
+  **Result (analysed 2026-11-03, copy `~/PDM_results/REV_midbath_run3068`, same scripts as job 3067): reached 30 ms, calm after 1.5 ms.**
+  - Run: no stopGuard, 103,320 s on 8 cores (3,440 s per simulated ms; job 3055 4,390), ~243,000 steps. dt 1.25e-7 s at the Coats limit (1.14–1.2e-7 at 11–16 ms), below 5e-8 s only in the
+    first ms (0.3 % of the sampled steps). α in [−1.1e-17, 1.0017]: above 1.001 only in the first ms (2.4 % of the sampled steps), ≤ 1 after; porous max 0.9959 at the writes. No overshoot:
+    the one of jobs 3051/3055 sat in the half yarn 5 at the inlet, which this domain does not contain. Budget: one-time −8.6e-18 m³ (1e-3 cell volume, 4e-8 of the water) in the first
+    0.5 ms, constant after.
+  - Velocity: free max 15.0 / 7.0 / 1.6 m/s at the 0.5 / 1 / 1.5 ms writes, ≤ 1.1 m/s from 2 ms, 0.75–0.89 m/s from 4.5 ms (mostly in the bath row, y 0.34 mm), no free cell above 1 m/s at 29.5
+    and 30 ms; implied by the log (all cells): 15 m/s at 0.5 ms, 5 m/s at 1 ms, ≤ 1.4 m/s from 2 ms. The 0.5 ms transient: 47 free cells above 3 m/s, mostly in an x mirror pair of sites
+    in the row below crossing yarn 6 (y 0.484 mm, z 0.08 mm), fastest 15 m/s, 1 yarn face, α 0.36, p 1.9 kPa, yarn S 0.46: the signature of the job 3067 pump sites; gone by 1.5 ms,
+    while the gap column drained.
+  - Front: y-yarn front 0.604 mm (initial) → 0.865 / 0.985 / 1.185 / 1.526 / 1.947 / 2.288 / 2.549 / 2.749 mm at 0.5 / 1 / 2 / 5 / 10 / 15 / 20 / 25 ms, the closed end (last row,
+    2.990 mm) at 28 ms. Fit 2–10 ms front = 14.35 mm/√s·√t + 0.52 mm (2–20 ms 14.44, 2–25 ms 14.15): +3 % against the edge bath (job 3051, 2–10 ms, 13.9), 0.80 of the 1D 18.04. Mean
+    porous S 0.056 → 0.404 (10 ms) → 0.684 (30 ms); crossing yarn 6 mean S 0.92 at 5 ms, 0.98 from 25 ms; yarn 7 0.21 / 0.58 / 0.87 at 5 / 10 / 30 ms; yarn 8 0.63 at 30 ms; min
+    porous α rises from 24 ms (0.175 at 30 ms).
+  - **Gaps: drained, then cut off from the bath by J.** Gap water 4,715 → 373 / 179 / 96 cell volumes at 0.5 / 1 / 2 ms, 81–98 to 30 ms; water connected to the bath 17 cells from 1 ms
+    (bath row only, top 0.343 mm), no row ≥ 20 % water; 9–18 isolated cells up to 0.72–0.80 mm. The dry yarns drained the initial column through the free inlet cells: 54 / 17 of the
+    944 free inlet cells at α > 0.5 at 0.5 / 1 ms, 17 to 30 ms (mean α of those cells 0.024–0.025 from 5 ms). J closes a free reservoir face while its cell is air-rich (α < 0.5), so
+    927 of the 944 faces stay closed and the gaps get no water from the bath (open issue in `NOTES_solver.md`: a drained free reservoir face does not refill). Job 3051 (edge bath)
+    the same: 9 of 290 free inlet cells water from 0.5 to 10 ms. The yarns are fed through the 330 porous inlet faces (inlet-row S 0.97–0.99): 90–92 % of the bath inflow at every write
+    (`phi`/`alphaPhi0.wetting` on the inlet patch: 1.6e-8 m³/s at 1 ms, 3.2e-9 at 30 ms), the 17 free cells that never drained the other 8–10 %, the 927 closed faces nothing. At the base pc S_eq is 0.995–0.998
+    (w 300 / 160 µm, θ 60°) and the y-yarn row-mean S is below it from the first row at every write, so the gaps next to the yarns would drain anyway; whether a refilling free face
+    changes the gap water or the yarn feed: not tested.
+  - Lost through top/bottom 11 cell volumes by 30 ms (2.5 by 0.5 ms, from the initial column); padding dry (no cell α > 0.05).
+  - **Scoring:** 30 ms without stopGuard: yes. dt 1.2–1.3e-7 s at the Coats limit: yes (1.14–1.26e-7). Free |U| ≤ 3 m/s at the writes after 1 ms: yes from 1.5 ms (7.0 m/s at the 1 ms
+    write, within the accepted single-write spikes). No sustained current above 5 m/s around yarn 6: yes (transient to 1 ms). α ≤ 1.02 per ms: yes (1.0017). Front fit 12–16 mm/√s:
+    yes (14.35). Closed end at 25–35 ms: yes (28 ms). Gaps ≤ 1,500 cell volumes at 1 ms: yes (179); ~1,300 at 10 ms within a factor 2: no (81, 16× less: the J cut-off above);
+    connected water below 0.55 mm and rows ≥ 20 % below 0.45 mm to 15 ms: yes (trivially). Lost ≤ 100 cell volumes: yes (11).
+  - **Answers:** (1) L past 15 ms at the base pc: calm to 30 ms, no corner pattern (job 3058, edge bath, no L: 3.5 / 4.8 m/s at 15 / 20 ms next to yarn 7), but the bath plane differs and
+    the gaps hold almost no water here: not attributed to L. (2) Front: 14.35 against 13.9 mm/√s (+3 %, within ±10 %): the REV/1D ratio barely depends on the inlet plane (0.78–0.80),
+    with the gaps cut off from the bath in both runs. (3) This bath plane alone does not trigger the currents of S11 and job 3065: only a 1 ms transient at the same place below
+    yarn 6 while the gap column drains; those currents then come from set C (K 2e-11, VG 500 / 0.4, θ 40°, `darcyFaceMaxDa` 0.2; not separated). Hypothesis, not tested: the pump
+    sites need partly filled free cells next to a crossing yarn at S 0.2–0.5; at the base pc the gaps drain within 1.5 ms and the sites die, with set C or pc0 1000 the gaps keep water
+    and the sites persist (job 3067). (4) Scalar reference for tensor K: this run (scalar 1e-11, mid-gap bath, L, 30 ms).
 - **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
   "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
   harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
@@ -479,7 +562,9 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 the data, for a blind first prediction. Left out unless the gaps turn out to matter: G2b, 10 µm, gap tuning, `verification/PLAN.md` Studies 1, 2a, 2b. Cores: about 8–10 usable on mini03 (cap 46), the user
 expects more in the coming days and can also use mini01. Test planned: vertical wicking, front and uptake vs time, same yarn in different weaves and densities, then other yarns.
 
-**2026-11-02 — START HERE.** Running on mini03: job 3067, REV_lowpc continued from 10 to 30 ms (~16 h, REV case status; check it against the predictions written there). To submit after commit, push and pull: `REV_midbath` (`sbatch job.slurm`, ~37 h, same section, predictions written); copies in `~/PDM_results/REV_lowpc_run3063` and `REV_gapflow_run3065`, results in REV case status. Job 3063 passes the L validation (10 ms, no stopGuard), with a local fast current from 8.2 ms. Job 3065 diverged at 1.386 ms: not fixed, not rerun (decision of the user); why S11 and 3065 run at 17–51 m/s stays unanswered. **Next: tensor K, item (2) of the plan: the user writes the code, guided step by step (2026-11-02; corrections to the plan in `NOTES_solver.md`, "Review against `8a97d02`").** Not run: base REV with L past 15 ms (the corner pattern of job 3058).
+**2026-11-03, end of day — START HERE.** (1) **Tensor K, step 5 next** (the user writes it, guided; state of the solver working tree and the remaining steps in `NOTES_solver.md`, "Planned: diagonal tensor K", "State 2026-11-03"). (2) **mini03: jobs 3067 and 3068 ended and were scored on 2026-11-03** (REV case status; copies `~/PDM_results/REV_lowpc_run3063_3067`, the 3063 copy renamed, 0–30 ms, and `REV_midbath_run3068`; fetched with `rsync -avz`, about 3× less to transfer). 3067 (pc0 1000, L): stable to 30 ms, but the study 2c air pump moves with the wetting of crossing yarn 7 (10–17 m/s at the writes from 24 ms, 22 m/s peak; face fluxes checked). 3068 (base values, L, mid-gap bath): calm after 1.5 ms, front 14.35 mm/√s (edge bath 13.9), closed end at 28 ms; gaps drained by 1 ms and cut off from the bath by J (927 of 944 free inlet faces stay closed; 3051: 281 of 290). **To discuss with the user:** whether J's closure of drained free inlet faces needs a change before the tensor K runs (it decides the gap water in both bath planes). No job on mini03 uses `tools/` any more (Pitfalls). (3) **Study 2e built, not run** (`verification/study2e_bathLayer/`, decided with the user 2026-11-03: the bath inside the mesh, option B): `B_full` = job 3068 plus 5 rows of water below the bath plane (inlet at their bottom, `bathWall` on their z ends; fabric cells and initial fields identical to job 3068, checked cell by cell), 30 ms on 16 cores (~18 h), compared directly with job 3068; predictions in its README. Short variants `R0_inlet` / `B_layer` (3 ms, cut at 1.5 mm) built and smoke-tested, not submitted (user). To submit after commit, push and pull: `sbatch job.slurm` in `B_full/`. The notes changes since commit `8b86db9` are not committed (job numbers, Courant pitfall, harmonic weights, the 3067/3068 scoring).
+
+**2026-11-02.** Running on mini03: job 3067, REV_lowpc continued from 10 to 30 ms (~16 h, REV case status; check it against the predictions written there). Also job 3068, `REV_midbath` (8 cores, started 2026-11-02, ~37 h, same section, predictions written); copies in `~/PDM_results/REV_lowpc_run3063` and `REV_gapflow_run3065`, results in REV case status. Job 3063 passes the L validation (10 ms, no stopGuard), with a local fast current from 8.2 ms. Job 3065 diverged at 1.386 ms: not fixed, not rerun (decision of the user); why S11 and 3065 run at 17–51 m/s stays unanswered. **Next: tensor K, item (2) of the plan: the user writes the code, guided step by step (2026-11-02; corrections to the plan in `NOTES_solver.md`, "Review against `8a97d02`").** Not run: base REV with L past 15 ms (the corner pattern of job 3058).
 L committed in the solver repo (`8a97d02`, docs `97f3b35`), installed on the laptop.
 - **Final goal (user, 2026-10-30):** correlate the REV with cm-scale tests and use it as a prediction tool. First check (`verification/upscaling_REV/`): in job 3055/3058 the row-mean
   yarn S collapses on y/√t within 2–8 % for S 0.1–0.7 over 2–20 ms (S ≥ 0.8 not converged); front 14.0, uptake 2.43 mm/√s. Setup values, under 2 weave repeats. Missing: measured
@@ -591,8 +676,9 @@ committed); REV geometry facts measured (above); REV decisions put to the user (
    delete the obsolete scratch build `hybridPorousInterFoamH`.
 
 ## Pitfalls met
+- **`Courant Number` in the log covers all cells, free and porous** (stock `CourantNo.H`: 0.5·Σ|φ|/V·dt, no cell filter; checked 2026-11-02): the "free Courant" of these notes is that number. Co·Δx/dt gives the fastest cell anywhere, not where it is; at the writes analysed so far (jobs 3059, 3063, 3065) the fastest cell was a free one.
 - **Don't pull a change of `tools/` onto a cluster while runs use it** (risk, not tested): `system/controlDict` includes `tools/<functionObject>` with `runTimeModifiable yes`, and a coded function object that recompiles inside
-  `mpirun` aborts (`MPI_ERR_TRUNCATE`). The tensor K change touches `tools/coatsTimeStep`: on mini03 only once jobs 3067 and `REV_midbath` have ended.
+  `mpirun` aborts (`MPI_ERR_TRUNCATE`). The tensor K change touches `tools/coatsTimeStep`: on mini03 only once jobs 3067 and `REV_midbath` have ended (both ended 2026-11-03).
 - **Check the standard OpenFOAM BCs before coding one** (lesson of 2026-10-27, `verification/standardOpenBC`): the
   REV's coded `pOpenAir` re-implemented `totalPressure` on its free faces (bit-identical), and its yarn-face branch
   existed only because the inlet kept α 0.99 (an impesFoam NaN workaround; the hybrid clips Se): with α 1 at the bath

@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-02. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-03. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -90,7 +90,10 @@ Assumptions and their limits:
 - pc = 0 in free cells: the yarn's pc at its surface saturation acts as a jump across the surface (menisci in the
   surface pores); the gap meniscus curvature is the VOF part.
 - One contact angle θ, independent of the yarn's saturation (wrong on wet yarn surfaces, see open issues).
-- Uniform meshes: G (phase-pressure differences) and H, I use 0.5 interpolation weights.
+- Uniform meshes: G (phase-pressure differences) and H, I use 0.5 interpolation weights. G's harmonic K (and T's, kept
+  identical) puts the owner weight w on the owner resistance, 1/(w/K_P + (1 − w)/K_N); two half cells in series give
+  1/((1 − w)/K_P + w/K_N) (w = d_N/(d_P + d_N), `surfaceInterpolation.C:187`; OpenFOAM's `harmonic` scheme swaps the
+  weights, `reverseLinear`). Same for w = 0.5: swap both before any non-uniform mesh (checked 2026-11-03).
 
 ## Why each change (condensed evidence)
 
@@ -288,6 +291,22 @@ folder, NO_WRITE would break every restart. Coats gravity part: ĝ·K·ĝ of the
 `trialWicking/*/system/controlDict` have their own Coats copies (needed for check 3). Private test copy of the design (session scratchpad, never installed), measured: bench 108 steps, serial: installed = scalar
 K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 62 steps, 4 cores: installed = scalar K bit-identical; scalar against tensor K0·I bit-identical once coupled faces with equal values use the formula of `fvc::interpolate` (w·K + (1 − w)·K, which rounds when w ≠ 0.5; with K itself: dt identical, fields within 9e-13 relative). `Uwetting`, `UnonWetting`, `Ur` differ in the last digits (order of the products), output only. Yarn-aligned tensor (Kpar 1e-11, Kperp 2.2e-12; S1: VG 5000 / 0.5, θ 40°, L) on the cut REV, 203 steps: stable, budget closed, dt 2.65e-7 s at the Coats limit (REV scalar 1.25e-7 s, estimate ×2), K 2.5 MB per write for 63,700 cells (REV ~10 MB). A full solver compile takes 5 min. Anisotropic physics not tested: checks 3–6 below.
 
+**State 2026-11-03 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
+- Done: step 0 `Make/files` builds `hybridPorousInterFoam_T` (revert to `hybridPorousInterFoam` before the commit); step 1 K read as scalar or tensor
+  (`createPorousMediaFields.H` top, `KisTensor`, `KScalar`/`KTensor` autoPtr, k0 = K_xx); step 2 new `tensorKFaces.H` (axis normal, diagonal
+  guard, internal and boundary k0f; coupled equal values w·KP + (1 − w)·KN) and its include after `k0f`; step 3 G's block writes k0f only for a
+  scalar K (`if (!KisTensor)`), counting unchanged; step 4 fatal error if a porous face is not a Darcy face (after the Darcy face count).
+- Measured after steps 1, 2 and 3 (each build against the installed `8a97d02`, scalar K): 2D bench 108 steps serial and cut REV (study 2d S1)
+  62 steps on 4 cores bit-identical (α, p, U, φ, K, 17 digits). Step 4 written, not built yet. No tensor run yet.
+- Next: step 5 `updateDarcyVelocities.H` (named fields `forceWetting`/`forceNonWetting`, then `if (KisTensor)`: Solid·(kr/μ)·(K & force),
+  else Solid·M·force); step 6 `tools/coatsTimeStep` (tensor K lookup, gravity part ĝ·K·ĝ; not on mini03 while jobs use `tools/`); step 7
+  `build_fields.py --k-par/--k-perp`; then checks 1–6 below; tidy the comments (some in French) and the diff layout (`createPorousMediaFields.H`
+  coupled block of G: indentation, the multi-line `if`); `CHANGES_of9-port.md` entry; commit as T (only the solver files: the repo also has
+  unrelated tutorial edits and `OpenFoamV8/hpif.tar.gz`).
+- Regression procedure (scratch, disposable): copy `0`, `constant`, `system` and `caseSetup` of `2D_bench` and of
+  `verification/study2d_gapRise/S1_K1e-12_t40` with `endTime` 2e-5 / 5e-5 s, one write, `writePrecision 17`, no `dsLocator`, `tools/` next to
+  the copies; run installed and `_T` (cut REV: serial precompile, `decomposePar`, `mpirun -np 4`, `reconstructPar`), `cmp` the fields.
+
 **Why diagonal is simple and exact here:** since A every porous flux is a two-point flux k0f·snGrad·|Sf|
 (`phiWetting`/`phiNonWetting` in `alphaEqn.H`; `phiDarcyExplicit`, the p Laplacian with `rAUfD = Mf` and F's
 reconstruct in `pEqn.H`), the gravity term is Lf·(g·Sf). On an axis-aligned Cartesian mesh with diagonal K the exact
@@ -442,9 +461,14 @@ Solver behaviour:
   into the yarn with the gap cell's air mobility (C), F′ amplifies. Cause of the REV_lowpc failure (job 3059). Fix L
   (`8a97d02`, air kr from the porous cell, study variant K2) weakens the leak. Full REV (`NOTES_cases.md`, REV case
   status): pc0 1000 Pa (job 3063) reaches 10 ms with the 3059 currents gone to 8 ms, then a local current of 7–11 m/s under
-  crossing yarn 6 in the last 2 ms; pc0 500 Pa, K 2e-11, mid-gap bath (job 3065) reaches 41 m/s by 1 ms and diverges at
-  1.386 ms: **L is not enough for that setup** (cause not known, not pursued). Base REV with L past 15 ms not run. The
-  phase-pressure inconsistency itself (G2b) remains.
+  crossing yarn 6 in the last 2 ms; continued to 30 ms (job 3067): the yarn 6 site fades by 14 ms, new sites around
+  crossing yarn 7 from 23 ms, 10–17 m/s at the writes (22 m/s peak), stable to 30 ms. Their face fluxes are the pump
+  (air in from free faces against the pressure difference, out through the cell's yarn face), with **1 yarn face** next to
+  yarn at S 0.2–0.4 (study 2c: 3–5 yarn faces, nearly saturated yarn); hypothesis, not tested: L's porous-side air kr is
+  large there, so L does not limit this leak. pc0 500 Pa, K 2e-11, mid-gap bath (job 3065) reaches 41 m/s by 1 ms and
+  diverges at 1.386 ms: **L is not enough for that setup** (cause not known, not pursued). Base REV values with L and a
+  mid-gap bath (job 3068): calm to 30 ms after a 1 ms transient of the same kind below yarn 6 (15 m/s at 0.5 ms), while
+  the gaps drained. The phase-pressure inconsistency itself (G2b) remains.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
@@ -462,7 +486,10 @@ Solver behaviour:
 - Inlet: `+ 0.001` in the boundary relative flux (0.23 % deficit at a fixed-velocity inlet). The old reservoir inlet
   lets air through (1 % air on inflow, air vent at air-filled free inlet cells, water short circuit through the yarn
   inlet faces): **J** (opt-in) makes it water-only. With J: a drained free reservoir face does not refill (no meniscus
-  on a boundary face); the 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
+  on a boundary face). In the REV the dry yarns drain the initial gap column through the free inlet cells within 0.5–1
+  ms, after which the faces of the drained cells stay closed: 927 of 944 (mid-gap bath, job 3068), 281 of 290 (edge
+  bath, job 3051); the gaps then get no water from the bath (measured 2026-11-03, `NOTES_cases.md` REV case status).
+  The 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
 - Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
   `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face
   values = boundary values). At the bath the yarn faces sit almost in equilibrium (net drive 7–16 Pa REV, 25–30 Pa
