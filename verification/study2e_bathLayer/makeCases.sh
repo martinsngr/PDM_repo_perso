@@ -14,16 +14,23 @@
 #   B_layer   NB 5, NA 58: R0_inlet with the bath layer, 3 ms, 4 cores, writes every 0.1 ms
 #             (R0_inlet and B_layer: short variants for diagnostics, built and smoke-tested, not submitted: the user runs
 #             B_full only, 2026-11-03)
+#   Bbox_cut  as B_layer with the bath under the fabric box only (mode box: the layer cells under the padding removed,
+#             padding floor closed at y0), 3 ms, 4 cores: the leak test of option 1 (2026-11-04; B_full, job 3072, leaked
+#             through the open padding beside its bath)
+#   Bbox_full as B_full in mode box, 30 ms, 16 cores, requeued and continued like B_full: run after Bbox_cut passes
 #     ./makeCases.sh
 set -e
 cd "${0%/*}"
 SRC=../../meshing_strat_trial/REV_midbath
-#        name     NB  NA   job      N  endTime writeInterval hours logEvery restart
-specs=( "R0_inlet 0   58   2eR0     4  3e-3    1e-04         12    20       no"
-        "B_layer  5   58   2eB      4  3e-3    1e-04         12    20       no"
-        "B_full   5   133  2eBfull  16 0.03    5e-04         72    100      yes" )
+#        name      NB  NA   job       N  endTime writeInterval hours logEvery restart mode
+specs=( "R0_inlet  0   58   2eR0      4  3e-3    1e-04         12    20       no      -"
+        "B_layer   5   58   2eB       4  3e-3    1e-04         12    20       no      -"
+        "B_full    5   133  2eBfull   16 0.03    5e-04         72    100      yes     -"
+        "Bbox_cut  5   58   2eBboxC   4  3e-3    1e-04         12    20       no      box"
+        "Bbox_full 5   133  2eBboxF   16 0.03    5e-04         72    100      yes     box" )
 for spec in "${specs[@]}"; do
-    read -r name NB NA job N endTime wInt hours logEvery restart <<< "$spec"
+    read -r name NB NA job N endTime wInt hours logEvery restart mode <<< "$spec"
+    [ "$mode" = - ] && mode=""
     rm -rf "$name"
     mkdir -p "$name/0.orig" "$name/constant" "$name/system"
     cp "$SRC"/0.orig/{U,UnonWetting,Uwetting,p} "$name/0.orig/"
@@ -39,7 +46,7 @@ for spec in "${specs[@]}"; do
     grep -q 'meshing_strat_trial/tools/runTools.sh' "$name/run"
     ylo=$([ "$NB" -gt 0 ] && echo 0.233 || echo 0.333); yhi=$([ "$NA" -eq 133 ] && echo 3.0 || echo 1.496)
     ../../.venv/bin/python - "$name/system/controlDict" "$endTime" "$wInt" \
-        "// study 2e (2026-11-03): $name, y $ylo-$yhi mm ($NB rows of bath layer), $endTime s" <<'PYEOF'
+        "// study 2e (2026-11-03): $name, y $ylo-$yhi mm ($NB rows of bath layer${mode:+ under the fabric box only}), $endTime s" <<'PYEOF'
 import re, sys
 p, end, wint, comment = sys.argv[1:5]
 s = open(p).read()
@@ -58,9 +65,9 @@ PYEOF
 #!/bin/bash
 cd "\${0%/*}" || exit 1
 # Mesh and initial fields of $name (study 2e, ../README.md): ../buildCase.sh with NB = $NB rows of bath layer
-# below the bath plane and NA = $NA fabric rows above it.
+# below the bath plane and NA = $NA fabric rows above it${mode:+, mode $mode (bath under the fabric box only)}.
 ./clean
-../buildCase.sh . $NB $NA
+../buildCase.sh . $NB $NA${mode:+ $mode}
 EOT
     if [ "$restart" = yes ]; then
         requeue="#SBATCH --open-mode=append

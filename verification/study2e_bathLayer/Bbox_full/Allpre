@@ -1,0 +1,6 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+# Mesh and initial fields of Bbox_full (study 2e, ../README.md): ../buildCase.sh with NB = 5 rows of bath layer
+# below the bath plane and NA = 133 fabric rows above it, mode box (bath under the fabric box only).
+./clean
+../buildCase.sh . 5 133 box

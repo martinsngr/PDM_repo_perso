@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-03.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-04.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -33,7 +33,8 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 - **Properties (setup values, not calibrated):** K 1e-11 m² scalar, ε 0.5, Brooks–Corey n 3, Van Genuchten pc0 5000 Pa
   m 0.5, water/air (μ 1e-3 / 1.76e-5 Pa·s), σ 0.072. pc0 5000 Pa is consistent with K 1e-11 by Leverett scaling (4–8 kPa).
   The wicking rate constrains K·pc0, the equilibrium height (pc0/ρg ≈ 0.5 m) constrains pc0: fitting both needs
-  experimental-length samples. Real K (tensor), pc and contact angle (polyester) come later.
+  experimental-length samples. Real K (tensor), pc and contact angle (polyester) come later. A change of the kr or pc
+  model (not only its coefficients) also needs `tools/coatsTimeStep` changed: `NOTES_solver.md`, open issues.
 - **Gravity along the wicking direction** (−x), reservoir at x-min (REV: −y, reservoir at y-min).
 - **Case layout (meshing_strat_trial):** source fields in `0.orig/`, `./Allpre` writes `0/` (eps, K by setFields or
   build_fields, `alpha.wetting` by `initFields.py`); `0/` is never edited by hand and not committed; `./clean` keeps
@@ -130,6 +131,25 @@ and at most 480 / 900 Pa (θ 0°). Equal at S 0.95 needs pc0 ≈ 740–1,480 Pa 
 at m 0.5 (m 0.4: +8 %); no θ and no m does it at pc0 5000 (that needs gaps narrower than 44 µm at θ 60°, 89 µm at θ 0°).
 REV_lowpc (pc0 1000, m 0.4, θ 40°) sits in that range (S_eq 0.93 / 0.84). The fibre-bundle estimate (~19 kPa·cosθ, REV
 case status) puts real yarns above pc0 5000, so with real values the yarns win against any open gap until S ≥ 0.99.
+**Lowering Smax does not help the gaps (derived 2026-11-04, not run):** the solver's pc and kr take Se = S/Smax (clipped to
+[1e-4, 1 − 1e-4]: pc floor 71 Pa at pc0 5000, m 0.5), so with the same Smax in both, the yarn equation in Se is the
+present one with ε·Smax: same Se profiles, time ×Smax, front ×1/√Smax, uptake ×√Smax (Smax 0.95: +2.6 % / −2.5 %). The
+gap condition (yarn pc ≤ 2σcosθ/w) is a condition on Se (≥ 0.996–0.999 at the REV values) and does not move. Put
+otherwise: a lower Smaxpc lowers pc at a fixed S, but S is not fixed; the gap feels the yarn water pressure, which near the
+bath is set by the flow the yarn carries (≈ −qμy/K, kr ≈ 1), not by the pc curve, and the yarn settles at a lower S for
+the same pressure (3068's bottom row, S 0.97–0.99 at 0.7–1.2 kPa, would sit near S 0.92–0.94 at Smax 0.95). Only the
+start changes: rows initialised at S 0.99 would begin at the 71 Pa floor instead of 676 Pa. Smax < 1 is
+trapped air (to measure by weighing a wicked yarn), relevant to the uptake, not to the gaps; set in pc
+(`alpha.wettingmaxpc`) alone it leaves the air mobile above Smax and lowers the water kr (inconsistent).
+**Where an unfed gap can hold water (1D estimate, 2026-11-04, not run):** near the bath kr ≈ 1 and the yarn suction is
+pc ≈ (qμ/K + ρg)·y (q inflow Darcy flux, 1D: 6.1 mm/√s ÷ 2√t), so a meniscus beside the yarn survives up to
+y ≈ 2σcosθ/w ÷ (qμ/K + ρg): 0.025 / 0.14 / 0.8 / 2.3 mm at 1 ms / 30 ms / 1 s / 10 s for w 300 µm, θ 60° (×1.9 at 160 µm),
+i.e. 4–8 % of the yarn front, growing as √t; the gap's own Jurin height (24–46 mm) only once q < ρgK/μ ≈ 1e-4 m/s
+(~15 min, yarn front near its equilibrium ~0.5 m). A gap fed by the bath is not bound by this: it can rise while feeding
+the yarn flanks (2D bench, base values: meniscus 0.79 mm at 2 ms); study 2e (`B_full`) tests that in the REV. **Not
+understood:** in job 3068 the first y-yarn row stayed at S 0.97–0.99 (pc 0.7–1.2 kPa) to 30 ms, while this estimate gives
+~7 rows below 240 Pa by 30 ms (REV flux per yarn section ~1.5× the 1D one); candidate: the porous boundary faces of the
+bath (Open issues, `NOTES_solver.md`), internal faces in `B_full`.
 
 ### 2D bench (`2D_bench/`, since 2026-10-13)
 - Thick-wall slit, 2.0 × 0.48 mm, 100 × 1 × 24 cells: yarn walls z < 0.16 and > 0.32 mm (eps 0.5, K 1e-11, ending 3 cells
@@ -477,6 +497,17 @@ solver ignores `waterOnlyPatches`.
     yarn 6 while the gap column drains; those currents then come from set C (K 2e-11, VG 500 / 0.4, θ 40°, `darcyFaceMaxDa` 0.2; not separated). Hypothesis, not tested: the pump
     sites need partly filled free cells next to a crossing yarn at S 0.2–0.5; at the base pc the gaps drain within 1.5 ms and the sites die, with set C or pc0 1000 the gaps keep water
     and the sites persist (job 3067). (4) Scalar reference for tensor K: this run (scalar 1e-11, mid-gap bath, L, 30 ms).
+- **Study 2e, `B_full` (job 3072, `verification/study2e_bathLayer/`, mini03 16 cores, 2026-11-03/04, analysed 2026-11-04; copy
+  `~/PDM_results/study2e_B_full`): job 3068 with 5 rows of bath water below the plane.** Reached 30 ms, no stopGuard, 2,330 s per
+  simulated ms, dt at the Coats limit, α ≤ 1.0041, budget closed. **The gaps at the bath stay wet:** all 944 free cells of the
+  first fabric row water at every write (job 3068: 17), gap water ~12,000 cell volumes from 5 ms (81–98), the first gap and the
+  slots around crossing yarn 6 full (rows ≥ 50 % water up to 0.70 mm), connected top 0.865 mm at 30 ms (the opening above yarn
+  6, as S10): J's face closure was the cause of the dry gaps. **But the run leaks:** the layer also runs under the padding, the
+  padding fills with water up to y ~0.7 mm along the fabric's outer faces and pours out through the open top/bottom faces,
+  ~8e-8 m³/s from 3 ms, 283,700 cell volumes by 30 ms = 86 % of the inflow (design error of the study). y-yarn front fit
+  15.65 / 15.28 mm/√s (2–10 / 2–20 ms; job 3068 14.36 / 14.44), closed end at 22.5 ms (28), yarn water 1.17–1.36 × job 3068: the
+  gap feed and the padding feed are not separable. The yarn 6 pump transient: 12–15 m/s at 0.20–0.35 ms in a partly filled
+  cell, gone once the gap filled (water-filled cells do not pump). Scoring P1–P6 and details in the study README.
 - **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
   "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
   harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
@@ -562,7 +593,7 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 the data, for a blind first prediction. Left out unless the gaps turn out to matter: G2b, 10 µm, gap tuning, `verification/PLAN.md` Studies 1, 2a, 2b. Cores: about 8–10 usable on mini03 (cap 46), the user
 expects more in the coming days and can also use mini01. Test planned: vertical wicking, front and uptake vs time, same yarn in different weaves and densities, then other yarns.
 
-**2026-11-03, end of day — START HERE.** (1) **Tensor K, step 5 next** (the user writes it, guided; state of the solver working tree and the remaining steps in `NOTES_solver.md`, "Planned: diagonal tensor K", "State 2026-11-03"). (2) **mini03: jobs 3067 and 3068 ended and were scored on 2026-11-03** (REV case status; copies `~/PDM_results/REV_lowpc_run3063_3067`, the 3063 copy renamed, 0–30 ms, and `REV_midbath_run3068`; fetched with `rsync -avz`, about 3× less to transfer). 3067 (pc0 1000, L): stable to 30 ms, but the study 2c air pump moves with the wetting of crossing yarn 7 (10–17 m/s at the writes from 24 ms, 22 m/s peak; face fluxes checked). 3068 (base values, L, mid-gap bath): calm after 1.5 ms, front 14.35 mm/√s (edge bath 13.9), closed end at 28 ms; gaps drained by 1 ms and cut off from the bath by J (927 of 944 free inlet faces stay closed; 3051: 281 of 290). **To discuss with the user:** whether J's closure of drained free inlet faces needs a change before the tensor K runs (it decides the gap water in both bath planes). No job on mini03 uses `tools/` any more (Pitfalls). (3) **Study 2e built, not run** (`verification/study2e_bathLayer/`, decided with the user 2026-11-03: the bath inside the mesh, option B): `B_full` = job 3068 plus 5 rows of water below the bath plane (inlet at their bottom, `bathWall` on their z ends; fabric cells and initial fields identical to job 3068, checked cell by cell), 30 ms on 16 cores (~18 h), compared directly with job 3068; predictions in its README. Short variants `R0_inlet` / `B_layer` (3 ms, cut at 1.5 mm) built and smoke-tested, not submitted (user). To submit after commit, push and pull: `sbatch job.slurm` in `B_full/`. The notes changes since commit `8b86db9` are not committed (job numbers, Courant pitfall, harmonic weights, the 3067/3068 scoring).
+**2026-11-03, end of day — START HERE.** (1) **Tensor K, step 5 next** (the user writes it, guided; state of the solver working tree and the remaining steps in `NOTES_solver.md`, "Planned: diagonal tensor K", "State 2026-11-03"). (2) **mini03: jobs 3067 and 3068 ended and were scored on 2026-11-03** (REV case status; copies `~/PDM_results/REV_lowpc_run3063_3067`, the 3063 copy renamed, 0–30 ms, and `REV_midbath_run3068`; fetched with `rsync -avz`, about 3× less to transfer). 3067 (pc0 1000, L): stable to 30 ms, but the study 2c air pump moves with the wetting of crossing yarn 7 (10–17 m/s at the writes from 24 ms, 22 m/s peak; face fluxes checked). 3068 (base values, L, mid-gap bath): calm after 1.5 ms, front 14.35 mm/√s (edge bath 13.9), closed end at 28 ms; gaps drained by 1 ms and cut off from the bath by J (927 of 944 free inlet faces stay closed; 3051: 281 of 290). **To discuss with the user:** whether J's closure of drained free inlet faces needs a change before the tensor K runs (it decides the gap water in both bath planes). No job on mini03 uses `tools/` any more (Pitfalls). (3) **Study 2e: `B_full` (job 3072) ended 2026-11-04 13:17, analysed the same day** (REV case status, study README; copy `~/PDM_results/study2e_B_full`): with the bath inside the mesh the gaps at the bath stay wet (first row 944/944 water, ~12,000 cell volumes of gap water, first gap and the slots around yarn 6 full), so J's face closure kept them dry; but the layer under the padding makes the padding fill and pour through the open top/bottom faces (86 % of the inflow), so `B_full` is not a usable reference and its yarn gain is not attributed. **Chosen with the user 2026-11-04: option 1, bath under the fabric box only** (padding floor closed at the plane as `inletPad` in job 3068, no outer meniscus; a one-way J face was discussed and set aside: the meniscus would stay on the boundary face). Built as mode `box` of `buildCase.sh` (layer cells under the padding removed by subsetMesh): `Bbox_cut` (1.5 mm, 3 ms, 4 cores: the leak test) and `Bbox_full` (30 ms, 16 cores); fields above the plane identical to job 3068, smoke tests passed, predictions in the study README. **Next: commit, push, pull; submit `Bbox_cut`; `Bbox_full` only if its leak stays ≤ 100 cell volumes by 3 ms (`B_full`: 10,670).** Short variants `R0_inlet` / `B_layer` (3 ms, cut at 1.5 mm) built and smoke-tested, not submitted. Still open: why the first y-yarn row stays below S_eq (B_full 0.987–0.994, 3068 0.971–0.992; gap-vs-yarn estimates above). The notes changes since commit `8b86db9` are not committed (job numbers, Courant pitfall, harmonic weights, the 3067/3068 scoring).
 
 **2026-11-02.** Running on mini03: job 3067, REV_lowpc continued from 10 to 30 ms (~16 h, REV case status; check it against the predictions written there). Also job 3068, `REV_midbath` (8 cores, started 2026-11-02, ~37 h, same section, predictions written); copies in `~/PDM_results/REV_lowpc_run3063` and `REV_gapflow_run3065`, results in REV case status. Job 3063 passes the L validation (10 ms, no stopGuard), with a local fast current from 8.2 ms. Job 3065 diverged at 1.386 ms: not fixed, not rerun (decision of the user); why S11 and 3065 run at 17–51 m/s stays unanswered. **Next: tensor K, item (2) of the plan: the user writes the code, guided step by step (2026-11-02; corrections to the plan in `NOTES_solver.md`, "Review against `8a97d02`").** Not run: base REV with L past 15 ms (the corner pattern of job 3058).
 L committed in the solver repo (`8a97d02`, docs `97f3b35`), installed on the laptop.

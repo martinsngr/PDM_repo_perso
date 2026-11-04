@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-03. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-04. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -246,6 +246,21 @@ wicking direction; tested on a horizontal-wicking bench with a vertical bath fac
   removes the original's spurious foot ahead of the front. `1D_vertical_hybrid` 0.1 s vs impesFoam: mean α −1.1 to −4.8 %.
 - **Single yarn (3D):** original diverged within 10 steps; modified runs to 0.1 s (mini03, 11.9 h, mean α 0.899 vs
   impesFoam 0.904).
+- **Coats time step (checked 2026-11-04):** the hybrid solver has no porous dt limit (OpenFOAM's VoF `setDeltaT.H`: `maxCo`,
+  `maxAlphaCo`, `maxDeltaT` only); the coded `coatsTimeStep` (first in `trialWicking/1D_vertical_hybrid/system/controlDict`,
+  then `tools/`) is impesFoam's `CoatsNo.H` term by term (flow df_w/dS·Σ|φ|, gravity d(λaλb/λt)/dS·KΔρΣ|Sf·g|, capillary
+  2|dpc/dS|·Σ K·A/d·λaλb/λt, all ×dt/(εV)). Differences: impesFoam's gravity part carries a factor Σ|φ|/(Σ|φ| + n·1e-15),
+  which drops it in cells without flux (`coatsTimeStep` keeps it; gravity is ~1e-5 of the capillary part here); limit
+  `CoatsMaxCo` instead of `maxCo`; dSmax from the last step's |Δα|/dt instead of impesFoam's predicted |div φ_b|/ε; kr and pc
+  re-implemented in the function object with the hybrid library's Se clipping [1e-4, 1 − 1e-4] (impesFoam's library: no
+  clipping in kr, VSMALL in dpc/dS; same values in our range), Brooks–Corey + Van Genuchten assumed (the selected models are
+  not checked). `tools/` adds: porous cells only, faces porousFace·k0f (all faces of a porous cell, boundary included, as
+  impesFoam), capillary-wave limit. Measured, 1D twins (`1D_vertical_impes_inletRes` vs `1D_vertical_hybrid`, logs of
+  2026-09-30 / 10-01): both at Coats CFL ≈ 0.50, dt within 0.2 % from 1 to 30 ms (5.92 / 5.93e-7 s at 1 ms, 6.19 / 6.19e-7
+  at 30 ms), 10 % apart at 50 ms (front at the top), 139,642 / 145,652 steps to 0.1 s. anisoImpesFoam (tensor K) builds
+  the Coats number as a tensor with the full face Kf summed over all faces and takes the largest component: for a yarn
+  cell Kpar on all 6 faces instead of 2Kpar + 4Kperp (dt ~2× smaller at Kpar/Kperp 4.6); `coatsTimeStep` sums the
+  solver's k0f, the coefficient its capillary flux uses on each face.
 
 ### Free-surface part and porous/free coupling (`verification/slit_freeSurface/`, runs in `meshing_strat_trial/slit_test/`, `2D_bench/`)
 Tables and figure regenerated from the runs on 2026-10-15 (`slitVerification.py` → `summary.md`, `slit_verification.png`;
@@ -291,15 +306,18 @@ folder, NO_WRITE would break every restart. Coats gravity part: ĝ·K·ĝ of the
 `trialWicking/*/system/controlDict` have their own Coats copies (needed for check 3). Private test copy of the design (session scratchpad, never installed), measured: bench 108 steps, serial: installed = scalar
 K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 62 steps, 4 cores: installed = scalar K bit-identical; scalar against tensor K0·I bit-identical once coupled faces with equal values use the formula of `fvc::interpolate` (w·K + (1 − w)·K, which rounds when w ≠ 0.5; with K itself: dt identical, fields within 9e-13 relative). `Uwetting`, `UnonWetting`, `Ur` differ in the last digits (order of the products), output only. Yarn-aligned tensor (Kpar 1e-11, Kperp 2.2e-12; S1: VG 5000 / 0.5, θ 40°, L) on the cut REV, 203 steps: stable, budget closed, dt 2.65e-7 s at the Coats limit (REV scalar 1.25e-7 s, estimate ×2), K 2.5 MB per write for 63,700 cells (REV ~10 MB). A full solver compile takes 5 min. Anisotropic physics not tested: checks 3–6 below.
 
-**State 2026-11-03 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
+**State 2026-11-04 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
 - Done: step 0 `Make/files` builds `hybridPorousInterFoam_T` (revert to `hybridPorousInterFoam` before the commit); step 1 K read as scalar or tensor
   (`createPorousMediaFields.H` top, `KisTensor`, `KScalar`/`KTensor` autoPtr, k0 = K_xx); step 2 new `tensorKFaces.H` (axis normal, diagonal
   guard, internal and boundary k0f; coupled equal values w·KP + (1 − w)·KN) and its include after `k0f`; step 3 G's block writes k0f only for a
-  scalar K (`if (!KisTensor)`), counting unchanged; step 4 fatal error if a porous face is not a Darcy face (after the Darcy face count).
-- Measured after steps 1, 2 and 3 (each build against the installed `8a97d02`, scalar K): 2D bench 108 steps serial and cut REV (study 2d S1)
-  62 steps on 4 cores bit-identical (α, p, U, φ, K, 17 digits). Step 4 written, not built yet. No tensor run yet.
-- Next: step 5 `updateDarcyVelocities.H` (named fields `forceWetting`/`forceNonWetting`, then `if (KisTensor)`: Solid·(kr/μ)·(K & force),
-  else Solid·M·force); step 6 `tools/coatsTimeStep` (tensor K lookup, gravity part ĝ·K·ĝ; not on mini03 while jobs use `tools/`); step 7
+  scalar K (`if (!KisTensor)`), counting unchanged; step 4 fatal error if a porous face is not a Darcy face (after the Darcy face count);
+  step 5 (2026-11-04) `updateDarcyVelocities.H`: block with `const volVectorField forceWetting`/`forceNonWetting` (−∇p_phase + ρg in the mixture
+  form), `if (KisTensor)` Solid·(kr/μ)·(KTensor() & force), else the old Solid·M·force.
+- Measured after steps 1, 2 and 3, and again after 4 + 5a and 4 + 5b (2026-11-04; each build against the installed `8a97d02`, scalar K): 2D bench
+  108 steps serial and cut REV (study 2d S1) 62 steps on 4 cores bit-identical (α, p, U, φ, `alphaPhi0`, `Uwetting`, `UnonWetting`, `Ur`, K, 17
+  digits). Step 4's guard runs only with a tensor K: compiled, not exercised yet. No tensor run yet. Regression script (scratch):
+  `regress.sh setup run-ref run-T compare`, copies of the two cases with `endTime` 2e-5 / 5e-5 s, `writePrecision` 17, no `dsLocator`.
+- Next: step 6 `tools/coatsTimeStep` (tensor K lookup, gravity part ĝ·K·ĝ; not on mini03 while jobs use `tools/`); step 7
   `build_fields.py --k-par/--k-perp`; then checks 1–6 below; tidy the comments (some in French) and the diff layout (`createPorousMediaFields.H`
   coupled block of G: indentation, the multi-line `if`); `CHANGES_of9-port.md` entry; commit as T (only the solver files: the repo also has
   unrelated tutorial edits and `OpenFoamV8/hpif.tar.gz`).
@@ -468,7 +486,8 @@ Solver behaviour:
   large there, so L does not limit this leak. pc0 500 Pa, K 2e-11, mid-gap bath (job 3065) reaches 41 m/s by 1 ms and
   diverges at 1.386 ms: **L is not enough for that setup** (cause not known, not pursued). Base REV values with L and a
   mid-gap bath (job 3068): calm to 30 ms after a 1 ms transient of the same kind below yarn 6 (15 m/s at 0.5 ms), while
-  the gaps drained. The phase-pressure inconsistency itself (G2b) remains.
+  the gaps drained. With the bath inside the mesh (study 2e, `B_full`) the same transient comes earlier and shorter (12–15
+  m/s at 0.20–0.35 ms, partly filled cell α 0.25–0.42) and stops once the gap fills: water-filled cells do not pump. The phase-pressure inconsistency itself (G2b) remains.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
@@ -489,6 +508,9 @@ Solver behaviour:
   on a boundary face). In the REV the dry yarns drain the initial gap column through the free inlet cells within 0.5–1
   ms, after which the faces of the drained cells stay closed: 927 of 944 (mid-gap bath, job 3068), 281 of 290 (edge
   bath, job 3051); the gaps then get no water from the bath (measured 2026-11-03, `NOTES_cases.md` REV case status).
+  With the bath inside the mesh (study 2e, `B_full`, job 3072, 2026-11-04: 5 water rows below the plane, inlet at their
+  bottom) the first gap row stays water at every write and the gaps hold ~12,000 cell volumes: the closure is the cause.
+  That run leaks through the open padding beside the bath (its README), so the fix of the bath setup is still open.
   The 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
 - Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
   `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face
@@ -500,6 +522,16 @@ Solver behaviour:
   start-up only (no dynamic meshes). Runs > 5 ms: the 2D bench to 20 ms is stable (2026-10-15, `NOTES_cases.md`).
 - Porous faces on an open (fixed-p) boundary are unstable: close such boundaries or pad them with free cells.
 - `createPorousMediaFields.H` interpolates kr2 with the `"kr1"` scheme name (harmless with linear).
+- **kr/pc models outside the solver (noted with the user 2026-11-04, to settle before the measured yarn models go in):**
+  `tools/coatsTimeStep` (and its copies in the 1D and verification controlDicts) re-implements Brooks–Corey kr and Van
+  Genuchten pc. It reads their coefficients from `transportProperties` (n, `alpha.wettingmin/max`, pc0 as one number, m,
+  `alpha.wettingminpc/maxpc`), so a coefficient change is followed; it does not check the selected models and takes the kr
+  end points as 1. Another kr or pc law (e.g. a fitted or tabulated pc), a pc0 per cell or end points ≠ 1 would give a wrong
+  dt without any message. Options then: a fatal guard on `relativePermeabilityModel`/`capillarityModel`/end points, or kr,
+  dkr/dS and dpc/dS taken from the solver's models. Same formulas in the analysis scripts (`verification/analyseWicking1D.py`,
+  `wicking1DPressures.py`, `study2d_gapRise/satGap.py`). Upstream, both libraries (porousMultiphaseFoam and the hybrid
+  copy, `krBrooksAndCorey.C`) read kramax and krbmax from the same keyword `kr<S>max`: water and air end points cannot
+  differ.
 
 Model questions (raised by an independent review, 2026-10-13; answers so far in brackets):
 - Counter-current flow across yarn/gap faces (air out, water in): check for sign-flipping face fluxes or alternating
