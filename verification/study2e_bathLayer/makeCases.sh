@@ -18,19 +18,34 @@
 #             padding floor closed at y0), 3 ms, 4 cores: the leak test of option 1 (2026-11-04; B_full, job 3072, leaked
 #             through the open padding beside its bath)
 #   Bbox_full as B_full in mode box, 30 ms, 16 cores, requeued and continued like B_full: run after Bbox_cut passes
-#     ./makeCases.sh
+#   Bband_cut  (2026-11-05) as Bbox_cut in mode band: the bath only under the yarn band of the bath plane, the open space
+#             above and below the yarns on a closed floor and dry at the start; 12 ms (Bbox_full flooded its outer layers
+#             at 5-8 ms), 4 cores, writes every 0.25 ms, requeued and continued
+#   BbandP_cut as Bband_cut with a graded padding (PAD_GRADED "10 1.3": 10 layers from 20 um growing x1.3, 0.85 mm
+#             instead of 0.06 mm): does a thicker padding matter?
+#   Bband_full as Bbox_full in mode band (30 ms, 16 cores): the scalar reference if the cut cases pass
+#   mem: SLURM memory request (2026-11-05: the cut band cases peak at 0.4 / 0.6 GB serial on the laptop; 6G lets them
+#   start next to jobs pending on memory)
+#     ./makeCases.sh [name ...]          (no name: every case)
 set -e
 cd "${0%/*}"
 SRC=../../meshing_strat_trial/REV_midbath
-#        name      NB  NA   job       N  endTime writeInterval hours logEvery restart mode
-specs=( "R0_inlet  0   58   2eR0      4  3e-3    1e-04         12    20       no      -"
-        "B_layer   5   58   2eB       4  3e-3    1e-04         12    20       no      -"
-        "B_full    5   133  2eBfull   16 0.03    5e-04         72    100      yes     -"
-        "Bbox_cut  5   58   2eBboxC   4  3e-3    1e-04         12    20       no      box"
-        "Bbox_full 5   133  2eBboxF   16 0.03    5e-04         72    100      yes     box" )
+#        name       NB  NA   job       N  endTime writeInterval hours logEvery restart mode pad    mem
+specs=( "R0_inlet   0   58   2eR0      4  3e-3    1e-04         12    20       no      -    -      16G"
+        "B_layer    5   58   2eB       4  3e-3    1e-04         12    20       no      -    -      16G"
+        "B_full     5   133  2eBfull   16 0.03    5e-04         72    100      yes     -    -      16G"
+        "Bbox_cut   5   58   2eBboxC   4  3e-3    1e-04         12    20       no      box  -      16G"
+        "Bbox_full  5   133  2eBboxF   16 0.03    5e-04         72    100      yes     box  -      16G"
+        "Bband_cut  5   58   2eBbandC  4  0.012   2.5e-04       36    100      yes     band -      6G"
+        "BbandP_cut 5   58   2eBbandPC 4  0.012   2.5e-04       48    100      yes     band 10x1.3 6G"
+        "Bband_full 5   133  2eBbandF  16 0.03    5e-04         72    100      yes     band -      16G" )
+only=" $* "
 for spec in "${specs[@]}"; do
-    read -r name NB NA job N endTime wInt hours logEvery restart mode <<< "$spec"
+    read -r name NB NA job N endTime wInt hours logEvery restart mode pad mem <<< "$spec"
+    [ $# -gt 0 ] && [[ "$only" != *" $name "* ]] && continue
     [ "$mode" = - ] && mode=""
+    padenv=""
+    [ "$pad" != - ] && padenv="PAD_GRADED=\"${pad/x/ }\" "
     rm -rf "$name"
     mkdir -p "$name/0.orig" "$name/constant" "$name/system"
     cp "$SRC"/0.orig/{U,UnonWetting,Uwetting,p} "$name/0.orig/"
@@ -46,7 +61,7 @@ for spec in "${specs[@]}"; do
     grep -q 'meshing_strat_trial/tools/runTools.sh' "$name/run"
     ylo=$([ "$NB" -gt 0 ] && echo 0.233 || echo 0.333); yhi=$([ "$NA" -eq 133 ] && echo 3.0 || echo 1.496)
     ../../.venv/bin/python - "$name/system/controlDict" "$endTime" "$wInt" \
-        "// study 2e (2026-11-03): $name, y $ylo-$yhi mm ($NB rows of bath layer${mode:+ under the fabric box only}), $endTime s" <<'PYEOF'
+        "// study 2e: $name, y $ylo-$yhi mm ($NB rows of bath layer${mode:+, mode $mode}${padenv:+, graded padding $pad}), $endTime s" <<'PYEOF'
 import re, sys
 p, end, wint, comment = sys.argv[1:5]
 s = open(p).read()
@@ -65,9 +80,10 @@ PYEOF
 #!/bin/bash
 cd "\${0%/*}" || exit 1
 # Mesh and initial fields of $name (study 2e, ../README.md): ../buildCase.sh with NB = $NB rows of bath layer
-# below the bath plane and NA = $NA fabric rows above it${mode:+, mode $mode (bath under the fabric box only)}.
+# below the bath plane and NA = $NA fabric rows above it${mode:+, mode $mode}${padenv:+, graded padding $pad}
+# (../buildCase.sh header).
 ./clean
-../buildCase.sh . $NB $NA${mode:+ $mode}
+${padenv}../buildCase.sh . $NB $NA${mode:+ $mode}
 EOT
     if [ "$restart" = yes ]; then
         requeue="#SBATCH --open-mode=append
@@ -102,7 +118,7 @@ fi'
 #SBATCH --partition=global
 #SBATCH --nodes=1
 #SBATCH --ntasks=$N
-#SBATCH --mem=16G
+#SBATCH --mem=$mem
 #SBATCH --time=$hours:00:00
 $requeue
 #SBATCH --output=Log_%x_%j.log

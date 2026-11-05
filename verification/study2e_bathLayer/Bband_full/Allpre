@@ -1,0 +1,7 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+# Mesh and initial fields of Bband_full (study 2e, ../README.md): ../buildCase.sh with NB = 5 rows of bath layer
+# below the bath plane and NA = 133 fabric rows above it, mode band
+# (../buildCase.sh header).
+./clean
+../buildCase.sh . 5 133 band

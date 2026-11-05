@@ -28,9 +28,10 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
 | H fix | `0f6c6d4` | (with H) | — | library: processor patch values of the α modified by H refreshed (H was undone on processor boundaries, 2026-10-26) | porous/free faces on processor boundaries |
 | J | `be1a3ab` | `waterOnlyPatches (<patches>)` | none | reservoir patches exchange water only: no air mobility on their porous faces, α flux = total flux, free faces closed next to air-rich cells (α < 0.5); water pressure from the p BC (`tools/pOpenAir`: hydrostatic, `reservoirWaterPressure` at `reservoirReferencePoint`) | reservoir (inlet) patches |
 | L | `8a97d02` | `porousFreeAirKrPorous on` | off | air kr of porous/free Darcy faces from the porous cell instead of the upstream cell of the air flux; the log reports it (`run` of `REV_lowpc` stops if a binary ignores the keyword) | porous/free faces |
+| T | `4bb5d2e` | none: `0/K` written as a `volTensorField` | scalar K | diagonal tensor K in the mesh axes: k0f = n·K·n per face (harmonic where the two cells differ), cell phase velocities (kr/μ)·K·F; guards (diagonal, axis faces, all porous faces Darcy) | porous faces |
 
 (No D: the inlet treatment was investigated, never a change; J is the inlet change of 2026-10-26.) Docs commits
-`d1c688a`, `3234fbf`, `8b35cc4`, `1a79db9`, `f9d5e41`, `c3dbf48`, `97f3b35`.
+`d1c688a`, `3234fbf`, `8b35cc4`, `1a79db9`, `f9d5e41`, `c3dbf48`, `97f3b35`, `11d060b`.
 
 - **Which keywords:** cases without free cells (1D, single yarn): `darcyFaceMaxDa 0.1` (A, C, E, F act; G–I change
   nothing, bit-identical). Porous + free fluid (2D bench, REV): additionally `porousFreeDarcyFaces on`,
@@ -41,7 +42,11 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   with α 1 on all inlet faces (then p = water pressure on the yarn faces; `verification/standardOpenBC`); the coded
   `tools/pOpenAir` (`reservoirWaterPressure`/`reservoirReferencePoint`) only where the bath surface is away from the
   patch (e.g. a vertical bath face) or the inlet keeps α 0.99.
-- **Installed (laptop, 2026-10-30):** `hybridPorousInterFoam` = `8a97d02` (A–L with the H fix), previous binary kept as
+- **Installed (laptop, 2026-11-05):** `hybridPorousInterFoam` = `4bb5d2e` (A–L + T, docs `11d060b`), byte-identical to the
+  tested `hybridPorousInterFoam_T` (md5 `ceb6faf0…`: only relinked under the final name), so the checks of
+  `verification/tensorK` apply to it as they are; previous binary kept as `hybridPorousInterFoam_8a97d02`. Pushed
+  (2026-11-05, user); mini03 still has `8a97d02`: pull + `wmake` there after the `Bbox_full` check (user, 2026-11-05).
+- **Before (laptop, 2026-10-30):** `hybridPorousInterFoam` = `8a97d02` (A–L with the H fix), previous binary kept as
   `hybridPorousInterFoam_be1a3ab`. Keyword on: bit-identical to the K2 scratch binary (cut REV, T12 configuration, 150
   steps, 4 cores). Keyword off: bit-identical to `be1a3ab` (cut REV 100 steps, 4 cores; 2D bench 90 steps, serial).
 - **Before (laptop, 2026-10-26, afternoon):** `hybridPorousInterFoam` = `be1a3ab` (A–J with the H fix), built from
@@ -291,7 +296,7 @@ the earlier numbers here came from terminal output and were partly rounded).
   2 ms numbers identical (2026-10-26, `verification/waterOnlyReservoir/`); `tools/pOpenAir` without the keyword: same
   numbers.
 
-## Planned: diagonal tensor K (decided with the user 2026-10-27, not implemented)
+## Diagonal tensor K: change T (decided with the user 2026-10-27; committed `4bb5d2e`, 2026-11-05; checks in `verification/tensorK`)
 
 Yarn-aligned permeability K = Kperp·I + (Kpar − Kperp)·t t, as `build_fields.py --k-mode tensor` already writes it
 (volTensorField `0/K`, Kpar/Kperp from Gebart with `VF_YARN`, `R_FIBRE`, `PACKING`). The REV studies it is for and
@@ -306,7 +311,7 @@ folder, NO_WRITE would break every restart. Coats gravity part: ĝ·K·ĝ of the
 `trialWicking/*/system/controlDict` have their own Coats copies (needed for check 3). Private test copy of the design (session scratchpad, never installed), measured: bench 108 steps, serial: installed = scalar
 K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 62 steps, 4 cores: installed = scalar K bit-identical; scalar against tensor K0·I bit-identical once coupled faces with equal values use the formula of `fvc::interpolate` (w·K + (1 − w)·K, which rounds when w ≠ 0.5; with K itself: dt identical, fields within 9e-13 relative). `Uwetting`, `UnonWetting`, `Ur` differ in the last digits (order of the products), output only. Yarn-aligned tensor (Kpar 1e-11, Kperp 2.2e-12; S1: VG 5000 / 0.5, θ 40°, L) on the cut REV, 203 steps: stable, budget closed, dt 2.65e-7 s at the Coats limit (REV scalar 1.25e-7 s, estimate ×2), K 2.5 MB per write for 63,700 cells (REV ~10 MB). A full solver compile takes 5 min. Anisotropic physics not tested: checks 3–6 below.
 
-**State 2026-11-05 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
+**State 2026-11-05: committed as `4bb5d2e` (docs `11d060b`), installed; the record of the steps and checks below:**
 - Done: step 0 `Make/files` builds `hybridPorousInterFoam_T` (revert to `hybridPorousInterFoam` before the commit); step 1 K read as scalar or tensor
   (`createPorousMediaFields.H` top, `KisTensor`, `KScalar`/`KTensor` autoPtr, k0 = K_xx); step 2 new `tensorKFaces.H` (axis normal, diagonal
   guard, internal and boundary k0f; coupled equal values w·KP + (1 − w)·KN) and its include after `k0f`; step 3 G's block writes k0f only for a
@@ -360,9 +365,10 @@ K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 6
   `symmetry` patches: its `darcyGradPressureAniso` fails on OF9, `NOTES_cases.md` impesFoam findings): fronts within 2.5 % (y) and
   0.7 % (x), aspect within 1.8 % from 2 ms (predicted 3 % / 2 %), aspect 1.59 → 1.86 at 8 ms in both; anisoImpesFoam ahead and
   wetter as the 1D twins. The x front left my 0.8 mm box at ~9.2 ms, so the predicted aspect at 10 ms could not be evaluated.
-- **All six checks done (2026-11-05).** Next: `CHANGES_of9-port.md` entry; commit as T (only the solver files: the repo also has unrelated tutorial edits and
-  `OpenFoamV8/hpif.tar.gz`); `tools/coatsTimeStep` and `build_fields.py` are committed in this repo (by the user). Layout and comment style
-  are the user's (2026-11-05: no cosmetic tidy wanted); one content point left: the `coatsTimeStep` header writes g.K.g for ĝ·K·ĝ.
+- **All six checks done (2026-11-05); committed by the user:** solver `4bb5d2e` (code) and `11d060b` (`CHANGES_of9-port.md`, section 14),
+  this repo `7593c42` (`tools/coatsTimeStep`, `build_fields.py`, `verification/tensorK`, notes). Installed binary = tested `_T`
+  (byte-identical). Both repos pushed (user); open: pull + rebuild on mini03 after the `Bbox_full` check (user); the `coatsTimeStep` header writes g.K.g for
+  ĝ·K·ĝ (content point, not fixed); the REV runs with a tensor K (studies (a), (b)) wait for `Bbox_full` (`NOTES_cases.md`).
 - Regression procedure (scratch, disposable): copy `0`, `constant`, `system` and `caseSetup` of `2D_bench` and of
   `verification/study2d_gapRise/S1_K1e-12_t40` with `endTime` 2e-5 / 5e-5 s, one write, `writePrecision 17`, no `dsLocator`, `tools/` next to
   the copies; run installed and `_T` (cut REV: serial precompile, `decomposePar`, `mpirun -np 4`, `reconstructPar`), `cmp` the fields.

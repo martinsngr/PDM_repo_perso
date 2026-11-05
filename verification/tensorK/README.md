@@ -21,7 +21,9 @@ studies that need it in `../../NOTES_cases.md` (REV case status, "Tensor K, plan
 **Solver version of this study (one version, PLAN.md rule):** `hybridPorousInterFoam_T` built 2026-11-05 from the
 working tree = `97f3b35` + `solver/T_steps0-5.patch` (sha1 of the patch `34904eb4…`; `Make/files` names the binary
 `_T`; md5 `ceb6faf0…`, built 10:12); reference `hybridPorousInterFoam` installed = `8a97d02` (md5 `5e2349b8…`). `coatsTimeStep` = `HEAD` + `solver/coatsTimeStep_T6.patch`
-(file sha1 `5b81431e…`).
+(file sha1 `5b81431e…`). **Committed 2026-11-05 as solver `4bb5d2e`** (docs `11d060b`; same code as the patch, binary name
+back to `hybridPorousInterFoam`) and thesis repo `7593c42`; the installed `hybridPorousInterFoam` built from `4bb5d2e` is
+byte-identical to the tested `_T` (md5 `ceb6faf0…`), so these checks apply to it; previous one kept as `hybridPorousInterFoam_8a97d02`.
 
 ## Files
 - `makeCases.sh`: builds the run folders (not tracked) from their sources, each with a `run` script naming its
