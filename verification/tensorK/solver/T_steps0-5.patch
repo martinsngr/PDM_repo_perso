@@ -1,0 +1,316 @@
+diff --git a/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files b/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files
+index 95d07d1..dc3a191 100644
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/Make/files
+@@ -1,3 +1,3 @@
+ hybridPorousInterFoam.C
+ 
+-EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam
++EXE = $(FOAM_USER_APPBIN)/hybridPorousInterFoam_T
+diff --git a/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H b/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H
+index a7550b7..34d5af1 100644
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H
+@@ -1,21 +1,45 @@
+ //Permeability Models
+ Info<< "Reading intrinsic permeability field field K\n" << endl;
+-volScalarField K
++// Change T: K is a volScalarField, or a volTensorField (diagonal, mesh faces
++// along the axes), told apart by the class in the file header
++IOobject KHeader
+ (
+-    IOobject
+-    (
+-        "K",
+-        runTime.timeName(),
+-        mesh,
+-        IOobject::MUST_READ,
+-        IOobject::AUTO_WRITE
+-    ),
+-    mesh
++    "K",
++    runTime.timeName(),
++    mesh,
++    IOobject::MUST_READ,
++    IOobject::AUTO_WRITE
+ );
++KHeader.typeHeaderOk<volTensorField>(false);
++const bool KisTensor = KHeader.headerClassName() == volTensorField::typeName;
++autoPtr<volScalarField> KScalar;
++autoPtr<volTensorField> KTensor;
++if (KisTensor)
++{
++    KTensor.reset(new volTensorField(KHeader, mesh));
++}
++else
++{
++    KScalar.reset(new volScalarField(KHeader, mesh));
++}
+ //volScalarField k0("k0", K*(eps*eps*eps)/(max((1-eps)*(1-eps),SMALL)) ); Uncomment for Kozeny-Carman
+-volScalarField k0("k0", K); 
++// Tensor K: k0 = K_xx. k0 only enters M1, M2, L1, L2, whose K cancels in M1/M
++// (PcCoeff) and L/M (rho); the velocities use K itself (updateDarcyVelocities.H)
++volScalarField k0
++(
++    "k0",
++    KisTensor
++  ? KTensor().component(tensor::XX)
++  : tmp<volScalarField>(KScalar())
++);
+ surfaceScalarField k0f("k0f",fvc::interpolate(k0,"k0"));
+ 
++if (KisTensor) 
++{
++    #include "tensorKFaces.H"
++}
++
++
+ // Phase Darcy fluxes of the last alphaEqn.H, kept to upwind kr in porous
+ // faces (updateVariables.H); zero before the first step
+ surfaceScalarField phiWettingUp("phiWettingUp", 0*phi);
+@@ -183,8 +207,10 @@ if (porousFreeDarcyFaces)
+     {
+         if (porousFace[facei] > 0.5 && Solidf[facei] < 0.5)
+         {
+-            k0f[facei] =
+-                1/(w[facei]/k0[own[facei]] + (1 - w[facei])/k0[nei[facei]]);
++            if (!KisTensor)
++            {
++                k0f[facei] = 1/(w[facei]/k0[own[facei]] + (1 - w[facei])/k0[nei[facei]]);
++            }
+             nPorousFreeFaces++;
+         }
+     }
+@@ -199,14 +225,13 @@ if (porousFreeDarcyFaces)
+             const scalarField& wp = w.boundaryField()[patchi];
+             forAll(k0fp, facei)
+             {
+-                if
+-                (
+-                    porousFace.boundaryField()[patchi][facei] > 0.5
+-                 && Solidf.boundaryField()[patchi][facei] < 0.5
+-                )
++                if (porousFace.boundaryField()[patchi][facei] > 0.5
++                 && Solidf.boundaryField()[patchi][facei] < 0.5 )
+                 {
+-                    k0fp[facei] =
+-                        1/(wp[facei]/k0i[facei] + (1 - wp[facei])/k0n[facei]);
++                    if (!KisTensor)
++                    {
++                    k0fp[facei] = 1/(wp[facei]/k0i[facei] + (1 - wp[facei])/k0n[facei]);
++                    }
+                     nPorousFreeFaces += 0.5;
+                 }
+             }
+@@ -275,6 +300,41 @@ surfaceScalarField DarcyFace("DarcyFace", 0*Solidf);
+         << " of " << returnReduce(nb, sumOp<label>())
+         << " boundary faces" << endl;
+ }
++// Change T: A porous face that isn't a Darcy face gets its flux from the momentum equation instead. That path has a scalar drag in UEqn.H
++// with the tensorial K all porous faces must be darcy faces aswell this patch test this (not a blocker but lead to false results)
++
++if (KisTensor)
++{
++    label nNotDarcy = 0 ;
++    forAll(DarcyFace, facei)
++    {
++        if (porousFace[facei]>0.5 && DarcyFace[facei]<0.5) 
++        {
++            nNotDarcy++;
++        }
++    }
++    forAll(DarcyFace.boundaryField(), patchi)
++    {
++        forAll(DarcyFace.boundaryField()[patchi], facei)
++        {
++            if (porousFace.boundaryField()[patchi][facei] > 0.5 && DarcyFace.boundaryField()[patchi][facei]<0.5)
++            {
++                nNotDarcy++;
++            }
++        }
++    }
++    reduce(nNotDarcy, sumOp<label>());
++    if (nNotDarcy > 0)
++    {
++        FatalErrorInFunction
++            << "Tensor K: " << nNotDarcy << " porous faces are not Darcy faces:"
++            << " increase darcyFaceMaxDa" << exit(FatalError);
++    }
++    Info<< "Tensor K: normal component on the faces, harmonic where it differs"
++        << " across a face" << endl;
++}
++
++
+ 
+ // Cells whose faces are all Darcy faces: their velocity is the one of the
+ // Darcy flux. Other porous cells keep the momentum-equation velocity, which
+diff --git a/OpenFoamV8/solvers/hybridPorousInterFoam/updateDarcyVelocities.H b/OpenFoamV8/solvers/hybridPorousInterFoam/updateDarcyVelocities.H
+index 8c8c02b..752d79e 100644
+--- a/OpenFoamV8/solvers/hybridPorousInterFoam/updateDarcyVelocities.H
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/updateDarcyVelocities.H
+@@ -1,17 +1,37 @@
+ // Calculate Porous Media Velocities
+-Uwetting = Solid*M1*(
+-         - fvc::grad(p)
+-         + (1.-alpha1)*fvc::grad(pc)
+-         -  pc*fvc::grad(alpha1)
+-         +  rho1*g
+-         );
++// Change T: the driving force of each phase (-grad p_phase + rho g) as a named
++// field, multiplied by the scalar mobility M (scalar K) or by kr/mu K (tensor K)
++{
++    const volVectorField forceWetting
++    (
++        "forceWetting",
++        - fvc::grad(p)
++        + (1. - alpha1)*fvc::grad(pc)
++        - pc*fvc::grad(alpha1)
++        + rho1*g
++    );
++
++    const volVectorField forceNonWetting
++    (
++        "forceNonWetting",
++        -fvc::grad(p)
++        -alpha1*fvc::grad(pc)
++        -pc*fvc::grad(alpha1)
++        +rho2*g
++    );
++
++    if (KisTensor)
++    {
++        Uwetting = Solid*(kr1/mu1)*(KTensor() & forceWetting);
++        UnonWetting = Solid*(kr2/mu2)*(KTensor() & forceNonWetting);
++    }
++    else
++    {
++        Uwetting = Solid*M1*forceWetting;
++        UnonWetting = Solid*M2*forceNonWetting;
++    }
++}
+ 
+-UnonWetting = Solid*M2*(
+-         -fvc::grad(p)
+-         -alpha1*fvc::grad(pc)
+-         -pc*fvc::grad(alpha1)
+-         +rho2*g
+-        );
+ 
+ Uwetting.correctBoundaryConditions();
+ UnonWetting.correctBoundaryConditions();
+diff --git a/OpenFoamV8/solvers/hybridPorousInterFoam/tensorKFaces.H b/OpenFoamV8/solvers/hybridPorousInterFoam/tensorKFaces.H
+new file mode 100644
+index 0000000..cd0f310
+--- /dev/null
++++ b/OpenFoamV8/solvers/hybridPorousInterFoam/tensorKFaces.H
+@@ -0,0 +1,110 @@
++// Change T: k0f of a diagonal tensor K: the normal component n.K.n of each cell,
++// harmonic mean of the two cells where they differ (resistances in series; the
++// value itself where they are equal). With a diagonal K and a face normal along a
++// mesh axis the exact face flux is (n.K.n) snGrad |Sf|, so k0f is all that changes.
++{
++    const volTensorField& KT = KTensor();
++    const tensorField& KTi = KT.primitiveField();  
++
++    // Unit vector of the mesh axis of a face (exact, so that a tensor K = K0*I
++    // gives exactly K0); fatal if the face is not along an axis
++    const auto axisNormal = [](const vector& S)
++    {
++        const vector m(cmptMag(S));
++        const direction d =
++            (m.x() >= m.y() && m.x() >= m.z()) ? 0 : (m.y() >= m.z() ? 1 : 2);
++        if (m[d] < (1 - 1e-6)*mag(S))
++        {
++            FatalErrorInFunction
++                << "Tensor K needs faces along the mesh axes: Sf = " << S
++                << exit(FatalError);
++        }
++        vector n(Zero);
++        n[d] = 1;
++        return n;
++    };
++
++    forAll(KTi, celli)
++    {
++        const tensor& t = KTi[celli];
++        const scalar maxOff = max
++        (
++            max(max(mag(t.xy()), mag(t.xz())), max(mag(t.yx()), mag(t.yz()))),
++            max(mag(t.zx()), mag(t.zy()))
++        );
++        if (maxOff > 1e-6*max(max(t.xx(), t.yy()), t.zz()))
++        {
++            FatalErrorInFunction
++                << "Tensor K must be diagonal: cell " << celli << " K = " << t
++                << exit(FatalError);
++        }
++    }
++
++    // Internal faces:
++    const vectorField& Sf = mesh.Sf().primitiveField();
++    const scalarField& w = mesh.weights().primitiveField();
++    const labelUList& own = mesh.owner();
++    const labelUList& nei = mesh.neighbour();
++    forAll(k0f, facei)
++    {
++        const vector n(axisNormal(Sf[facei]));
++        const scalar KP = n & (KTi[own[facei]] & n);
++        const scalar KN = n & (KTi[nei[facei]] & n);
++        if (KP == KN)
++        {
++            k0f[facei] = KP;
++        }
++        else
++        {
++            k0f[facei] = 1/(w[facei]/KP + (1 - w[facei])/KN);
++        }
++
++        // n from axisNormal(Sf[facei]); KP, KN = n.K.n of the owner and the
++        // neighbour cell; k0f[facei] = KP where KP == KN, else the harmonic mean
++    }
++
++    // Boundary faces: 
++    forAll(k0f.boundaryField(), patchi)
++    
++    {
++        fvsPatchScalarField& k0fp = k0f.boundaryFieldRef()[patchi];
++        const fvPatchTensorField& KTp = KT.boundaryField()[patchi];
++        const vectorField& Sfp = mesh.Sf().boundaryField()[patchi];
++
++        if (KTp.coupled())  // .coupled est une fonction donc a besoin de () pour etre appeler, pas besoin de mettre true dans le if c'est implicite
++            { 
++                const tensorField KTin(KTp.patchInternalField());
++                const tensorField KTnb(KTp.patchNeighbourField());
++                const scalarField& wp = mesh.weights().boundaryField()[patchi];
++                
++                forAll(k0fp, facei)
++                {
++                    const vector n(axisNormal(Sfp[facei]));
++                    const scalar KP = n & (KTin[facei] & n);
++                    const scalar KN = n & (KTnb[facei] & n);
++                    if (KP == KN)
++                    {
++                        k0fp[facei] = wp[facei]*KP + (1 - wp[facei])*KN;  // ca donne la meme chose que KP ou KN mais c'est plus general pour les patchs couplés
++                    }
++                    else
++                    {
++                        k0fp[facei] = 1/(wp[facei]/KP + (1 - wp[facei])/KN);
++                    }
++                }
++            }
++        else 
++            {
++                forAll(k0fp,facei)
++                {
++                    const vector n(axisNormal(Sfp[facei]));
++                    k0fp[facei] = n & (KTp[facei] & n);
++                }
++            
++            }
++
++        // coupled patch (processor, cyclic): same as above, the two sides from
++        // patchInternalField() and patchNeighbourField(), the weight from
++        // mesh.weights().boundaryField()[patchi]; equal values: w*KP + (1 - w)*KN
++        // other patches: n.K.n of the boundary value
++    }
++}

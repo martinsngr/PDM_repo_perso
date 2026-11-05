@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-04. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-05. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -300,27 +300,69 @@ their estimates: `NOTES_cases.md`, REV case status. **Decisions:** K diagonal in
 solver repo with `CHANGES_of9-port.md` updated (letter to assign: "K" would clash with the permeability).
 
 **Review against `8a97d02` (2026-11-02): the list below holds, with these corrections. The user writes the code, guided step by step, proposed letter T.** K reaches the
-solution only through `k0f`: `Ur`, `Uwetting`, `UnonWetting` are output only unless fixed on a patch (`alphaEqn.H:78`, `:89–118`); K cancels in M1/M (`PcCoeff`) and in L/M (`rho`, `alphaEqnSubCycle.H:43`, missed
+solution only through `k0f`: `Ur`, `Uwetting`, `UnonWetting` are output only unless fixed on a patch (`alphaEqn.H:78`, `:89–118`; on a patch with a fixed `Uwetting`, `correctUBc.H` puts the computed `UnonWetting` of the boundary cell into the flux: 1D cases' outlet, tensor check 3); K cancels in M1/M (`PcCoeff`) and in L/M (`rho`, `alphaEqnSubCycle.H:43`, missed
 below). k0 = K_xx, not tr K/3 (tr/3 rounds, K cancels anyway). Face normal = the exact mesh axis, not Sf/|Sf| (rounding: a tensor K0·I would not give K0). K stays AUTO_WRITE: it is read from the time
 folder, NO_WRITE would break every restart. Coats gravity part: ĝ·K·ĝ of the cell × Σ|Sf·g| instead of surfaceSum(k0f·|Sf·g|): exact for g along an axis, same value as the scalar code for K0·I.
 `trialWicking/*/system/controlDict` have their own Coats copies (needed for check 3). Private test copy of the design (session scratchpad, never installed), measured: bench 108 steps, serial: installed = scalar
 K = tensor 1e-11·I bit-identical (α, p, U, φ, 17 digits); cut REV (K 1e-12) 62 steps, 4 cores: installed = scalar K bit-identical; scalar against tensor K0·I bit-identical once coupled faces with equal values use the formula of `fvc::interpolate` (w·K + (1 − w)·K, which rounds when w ≠ 0.5; with K itself: dt identical, fields within 9e-13 relative). `Uwetting`, `UnonWetting`, `Ur` differ in the last digits (order of the products), output only. Yarn-aligned tensor (Kpar 1e-11, Kperp 2.2e-12; S1: VG 5000 / 0.5, θ 40°, L) on the cut REV, 203 steps: stable, budget closed, dt 2.65e-7 s at the Coats limit (REV scalar 1.25e-7 s, estimate ×2), K 2.5 MB per write for 63,700 cells (REV ~10 MB). A full solver compile takes 5 min. Anisotropic physics not tested: checks 3–6 below.
 
-**State 2026-11-04 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
+**State 2026-11-05 (the user writes the code, guided step by step; solver repo working tree on `of9-port`, not committed):**
 - Done: step 0 `Make/files` builds `hybridPorousInterFoam_T` (revert to `hybridPorousInterFoam` before the commit); step 1 K read as scalar or tensor
   (`createPorousMediaFields.H` top, `KisTensor`, `KScalar`/`KTensor` autoPtr, k0 = K_xx); step 2 new `tensorKFaces.H` (axis normal, diagonal
   guard, internal and boundary k0f; coupled equal values w·KP + (1 − w)·KN) and its include after `k0f`; step 3 G's block writes k0f only for a
   scalar K (`if (!KisTensor)`), counting unchanged; step 4 fatal error if a porous face is not a Darcy face (after the Darcy face count);
   step 5 (2026-11-04) `updateDarcyVelocities.H`: block with `const volVectorField forceWetting`/`forceNonWetting` (−∇p_phase + ρg in the mixture
-  form), `if (KisTensor)` Solid·(kr/μ)·(KTensor() & force), else the old Solid·M·force.
+  form), `if (KisTensor)` Solid·(kr/μ)·(KTensor() & force), else the old Solid·M·force; step 6 (2026-11-05, this repo, not the solver's)
+  `meshing_strat_trial/tools/coatsTimeStep`: K lookup replaced by a per-cell `Kg` (scalar K: its values; `volTensorField` K: ĝ·K·ĝ, ĝ =
+  g/max(|g|, vSmall)), gravity term `Kg[i]`, the old-solver fallback looks K up as a scalar itself.
 - Measured after steps 1, 2 and 3, and again after 4 + 5a and 4 + 5b (2026-11-04; each build against the installed `8a97d02`, scalar K): 2D bench
   108 steps serial and cut REV (study 2d S1) 62 steps on 4 cores bit-identical (α, p, U, φ, `alphaPhi0`, `Uwetting`, `UnonWetting`, `Ur`, K, 17
-  digits). Step 4's guard runs only with a tensor K: compiled, not exercised yet. No tensor run yet. Regression script (scratch):
-  `regress.sh setup run-ref run-T compare`, copies of the two cases with `endTime` 2e-5 / 5e-5 s, `writePrecision` 17, no `dsLocator`.
-- Next: step 6 `tools/coatsTimeStep` (tensor K lookup, gravity part ĝ·K·ĝ; not on mini03 while jobs use `tools/`); step 7
-  `build_fields.py --k-par/--k-perp`; then checks 1–6 below; tidy the comments (some in French) and the diff layout (`createPorousMediaFields.H`
-  coupled block of G: indentation, the multi-line `if`); `CHANGES_of9-port.md` entry; commit as T (only the solver files: the repo also has
-  unrelated tutorial edits and `OpenFoamV8/hpif.tar.gz`).
+  digits). Step 4's guard runs only with a tensor K: compiled, not exercised yet. No tensor run yet. Step 6 (2026-11-05, `_T` with the old
+  `coatsTimeStep` from git `HEAD` against the new one, same two cases): Coats line and `deltaT` identical at every step (109 / 63 lines), all
+  fields bit-identical; the tensor branch compiles, not run yet. Scratch regression scripts (`regress.sh`, `regress6.sh`) are lost with `/tmp`
+  at each laptop restart: rebuild from the procedure below (the bench also needs `tools/pOpenAir`, its `0/p` includes it).
+- Step 7 (2026-11-05, `meshing_strat_trial/REV/build_fields.py`): `K_PAR`/`K_PERP` (None) in the CONFIGURATION block, `--k-par`/`--k-perp`
+  in `parse_args` (in the `global` list), `ap.error` if only one is given or without `--k-mode tensor` (both tested); `main()` replaces
+  Gebart's values when given, the summary line says "given (--k-par/--k-perp)". Measured (scratch builds of the REV, `--cut-cells binary
+  --wick-axis y --zpad 3`, 11 s each): without the new options `0/` and `blockMeshDict` byte-identical to the `HEAD` script (scalar 1e-11 and
+  Gebart tensor); `--k-par 1e-11 --k-perp 2.2e-12`: yarns 0–4 (49,433 cells) diag(2.2e-12, 1e-11, 2.2e-12), yarns 5–9 (29,095 cells)
+  diag(1e-11, 2.2e-12, 2.2e-12), no off-diagonal term, free cells exactly 1·I, every porous cell owned (78,528 porous, 163,532 free, as the
+  scalar REV); `--k-par 1e-11 --k-perp 1e-11`: every porous cell exactly 1e-11·I (input of check 2). Yarn axis = longer in-plane extent of the
+  whole STL body (0–4: y, 4.00 vs 0.32 mm; 5–9: x, 2.73 vs 0.34 mm); a cell takes the axis of the yarn with the largest fraction in it.
+- **Checks 1 and 2 pass (2026-11-05, `verification/tensorK/`, runs rebuilt by its `makeCases.sh`; `_T` rebuilt 10:12 from the
+  recorded `solver/T_steps0-5.patch`):** check 1, scalar K: 1D column 0.03 s = stored `verification/wicking1D/ABC` (360 files, 30
+  writes); 2D bench 2 ms `_T` = installed (48 files, Coats/deltaT at all 8,447 steps). Check 2, tensor K0·I against scalar K0
+  (bench 2 ms serial; cut REV S1 0.5 ms, 4 cores, x cyclic): α, p, U, φ, `alphaPhi0` and the Coats/deltaT line of every step
+  identical; `Uwetting`/`UnonWetting` differ by ≤ 4.4e-16 relative, `Ur` ≤ 2.5e-13 (rounding of the product order, output
+  only); guards passed.
+- **Check 3 (2026-11-05, same folder; 1D column of `wicking1D/ABC`, K 2.5e-12 along the column, 1e-11 across, 0.12 s, the
+  column's own Coats copy replaced by `tools/coatsTimeStep`; x and z columns = the y mesh rotated by `transformPoints`,
+  exact):** x and z columns = y column (α, p, φ, `alphaPhi0`, Coats/deltaT at all 48,929 steps identical; vectors identical
+  after the rotation): each face takes its own axis component, the Coats gravity term ĝ·K·ĝ too. √K scaling: the K/4 column
+  at 4t = ABC at t within 1e-6 (front within 0.002 µm, ratio of the fitted rates 0.5000). Tensor y column against scalar
+  2.5e-12: round-off only (α 2.6e-13 relative at 120 ms), not bit-identical as predicted: the fixed `Uwetting` of the
+  outlet makes `correctUBc.H` use the computed air velocity of the last cell, which step 5 rounds differently.
+- **Check 5 passes (2026-11-05, same folder):** saturated 1D column, K_y 1e-11 | 2.5e-12 in series (one jump face), p 1000 / 0
+  Pa, gravity on, p tolerance 1e-12: tensor run = exact series solution (flux −7.9e-12 relative, cell p within 4e-9 Pa); the
+  scalar run follows the linear jump face instead (+0.21 % flux, p up to 1.6 Pa off): harmonic = series resistance, as decided.
+  The scalar path keeps its linear porous/porous faces (bit identity with `8a97d02`); the scalar REV has no jump between porous cells.
+- **Check 6 (2026-11-05, same folder): 2D bench, walls diag(Kpar 1e-11 along the slit, 2.2e-12, Kperp 2.2e-12), serial and 2
+  processors.** Serial: the walls draw less from the gap, meniscus 0.930 mm at 2 ms (scalar walls 0.790, impermeable 1.159);
+  wall front surface / back 1.190 / 1.150 mm (scalar 1.150 / 1.150): the surface rows lead (wetted higher by the gap, Kpar
+  along the slit), so the predicted mean front < 1.15 mm failed (1.170); front no longer uniform across the wall (60 µm);
+  budget 4.9e-15. Parallel, boundary on the lower wall surface: meniscus and fronts within 0.021 µm of serial, asymmetry as
+  the scalar control; max |Δα| 6.1e-3 (5.5× the scalar control, predicted ≤ 3×) from a transient at the inlet columns at
+  0.65 ms, which also appears in the scalar control (1e-3 at 0.60 ms) and in neither mid-gap split (≤ 3e-4; elsewhere 2.1e-3
+  tensor, 2.5e-3 scalar). Origin: the processor boundary on a porous/free surface meeting the inlet (open issues), amplified by
+  the anisotropic walls; tensor faces on processor patches are bit-identical to scalar (check 2).
+- **Check 4 (2026-11-05, same folder): 2D spreading box, K diag(2.5e-12, 1e-11), no gravity, 10 ms.** (a) Tensor run = isotropic
+  1e-11 on the mesh stretched ×2 along x: α within 1.5e-11, same 52,396 steps, identical dt: exact. (b) anisoImpesFoam (walls as
+  `symmetry` patches: its `darcyGradPressureAniso` fails on OF9, `NOTES_cases.md` impesFoam findings): fronts within 2.5 % (y) and
+  0.7 % (x), aspect within 1.8 % from 2 ms (predicted 3 % / 2 %), aspect 1.59 → 1.86 at 8 ms in both; anisoImpesFoam ahead and
+  wetter as the 1D twins. The x front left my 0.8 mm box at ~9.2 ms, so the predicted aspect at 10 ms could not be evaluated.
+- **All six checks done (2026-11-05).** Next: `CHANGES_of9-port.md` entry; commit as T (only the solver files: the repo also has unrelated tutorial edits and
+  `OpenFoamV8/hpif.tar.gz`); `tools/coatsTimeStep` and `build_fields.py` are committed in this repo (by the user). Layout and comment style
+  are the user's (2026-11-05: no cosmetic tidy wanted); one content point left: the `coatsTimeStep` header writes g.K.g for ĝ·K·ĝ.
 - Regression procedure (scratch, disposable): copy `0`, `constant`, `system` and `caseSetup` of `2D_bench` and of
   `verification/study2d_gapRise/S1_K1e-12_t40` with `endTime` 2e-5 / 5e-5 s, one write, `writePrecision 17`, no `dsLocator`, `tools/` next to
   the copies; run installed and `_T` (cut REV: serial precompile, `decomposePar`, `mpirun -np 4`, `reconstructPar`), `cmp` the fields.
@@ -496,7 +538,13 @@ Solver behaviour:
   loop: parallel = serial within 9e-4 (ordinary parallel difference, split mid-gap: 1.3e-3), serial bit-identical.
   **Fixed by `0f6c6d4` (2026-10-26). Parallel runs with H on `b525086` or older are not valid where yarn surfaces
   lie on processor boundaries.** Same split, with and without the fix: one-time water loss of ~3e-3 cell volumes at the start
-  (budget closed afterwards), not followed up.
+  (budget closed afterwards), not followed up. **Measured again 2026-11-05 (`verification/tensorK`, check 6, `_T`):** the loss
+  appears only when the processor boundary lies on the wall surface (scalar −2.6e-17 m³, tensor walls −5.7e-18 m³, from the
+  first write), not with a mid-gap split (3e-27 m³); the same wall-surface splits show a transient α difference to serial in
+  the wall cells at the inlet (scalar 1e-3 at 0.60 ms, tensor walls 6e-3 at 0.65 ms, decaying within 0.3 ms), absent with the
+  mid-gap split. Hypothesis, not tested: something at the corner where the processor patch meets the inlet patch (inlet p BC
+  `pOpenAir`, H, F′ there). Integrated results unaffected (meniscus, fronts within 0.05 µm). Possibly the one-time budget
+  loss of the REV runs in their first 0.5 ms (job 3068: −8.6e-18 m³; scotch puts processor boundaries on yarn surfaces).
 - Gravity–capillarity equilibrium oscillation with A+B+C (counter-current, zero total flux): cause not isolated.
 - I: why the exact coupling (2·μ_air next to wet walls) gives fast air currents (I bounded meanwhile).
 - `Free_Flow_Cases/Capillary_Rise/porous_Boundary` tutorial: A and C change the free water by +0.40 / +0.11 % (mechanism

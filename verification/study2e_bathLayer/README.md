@@ -182,3 +182,4 @@ hence the leak test first.
 (4 cores, ~2.5 h); then, if Q1 passes, `cd ../Bbox_full && sbatch job.slurm` (16 cores, ~18 h). Fetch as `B_full` into
 `~/PDM_results/study2e_Bbox_cut` / `study2e_Bbox_full` (`--exclude 'processor*' --exclude 'dynamicCode'`), then point the
 `dsLocator` include of the copy at this study's `tools/` (above).
+**Submitted (2026-11-04):** `Bbox_full` directly, as job 3078 (16 cores, ~16:47), without waiting for `Bbox_cut` (user: its result would not change anything that evening); `Bbox_cut` (job 3077) cancelled after 4 min. Q1 (the leak) is read from `Bbox_full` itself at 3 ms; Q2–Q4 apply to `Bbox_full` at the same times.

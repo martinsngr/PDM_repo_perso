@@ -64,6 +64,8 @@ EPS_FREE    = 0.99          # free-fluid threshold of hybridPorousInterFoam (por
 CUT_CELLS   = "fractional"  # "fractional" or "binary" (see step 3 above)
 K_MODE      = "tensor"      # "tensor" (Gebart, oriented) or "scalar" (K_SCALAR in every yarn cell)
 K_SCALAR    = 1e-11         # [m2], only used with K_MODE = "scalar"
+K_PAR  = None               # m2], --k-mode tensor: overrides Gebart when given
+K_PERP = None 
 WICK_AXIS   = "x"           # wicking direction (--wick-axis): inlet on its min face, outlet on its max face,
                             #   the other in-plane direction cyclic
 Z_PAD       = 0             # free cell layers added below and above the box (--zpad), same cell size as the box
@@ -265,11 +267,13 @@ def write_field(case, name, values, dims):
 
 # ------------------------------------------------------------------ main
 def parse_args():
-    global CASE_DIR, K_MODE, K_SCALAR, CUT_CELLS, WICK_AXIS, Z_PAD, PATCHES
+    global CASE_DIR, K_MODE, K_SCALAR, CUT_CELLS, WICK_AXIS, Z_PAD, PATCHES, K_PAR, K_PERP 
     ap = argparse.ArgumentParser(description="uniform hex mesh + eps/K fields from the TexGen STL")
     ap.add_argument("case", nargs="?", default=CASE_DIR, help="OpenFOAM case directory")
     ap.add_argument("--k-mode", choices=("tensor", "scalar"), default=K_MODE)
     ap.add_argument("--k-scalar", type=float, default=K_SCALAR, help="yarn K [m2] for --k-mode scalar")
+    ap.add_argument("--k-par", type=float, default=K_PAR, help= "yarn K_par if gebart not used")
+    ap.add_argument("--k-perp", type=float, default=K_PERP, help= "yarn K_perp if gebart not used")
     ap.add_argument("--cut-cells", choices=("fractional", "binary"), default=CUT_CELLS)
     ap.add_argument("--wick-axis", choices=("x", "y"), default=WICK_AXIS,
                     help="wicking direction: inlet on its min face, outlet on its max face, the other in-plane "
@@ -278,7 +282,11 @@ def parse_args():
                     help="free cell layers added below and above the box (same cell size; the box cells are "
                          f"unchanged); their inlet face is the patch '{PAD_PATCH}'")
     a = ap.parse_args()
-    CASE_DIR, K_MODE, K_SCALAR, CUT_CELLS = a.case, a.k_mode, a.k_scalar, a.cut_cells
+    if (a.k_par is None) != (a.k_perp is None):
+        ap.error("give both --k-par and --k-perp, or neither (Gebart)")
+    if a.k_par is not None and a.k_mode != "tensor":
+        ap.error("--k-par and --k-perp need --k-mode tensor")
+    CASE_DIR, K_MODE, K_SCALAR,K_PAR, K_PERP, CUT_CELLS = a.case, a.k_mode, a.k_scalar,a.k_par, a.k_perp,a.cut_cells
     WICK_AXIS, Z_PAD = a.wick_axis, a.zpad
     PATCHES = patches_for(WICK_AXIS)
 
@@ -373,6 +381,8 @@ def main():
 
     # permeability
     k_par, k_perp = gebart(VF_YARN, R_FIBRE, PACKING)
+    if K_PAR != None :
+        k_par, k_perp = K_PAR, K_PERP 
     I = np.eye(3)
     tt = tang[:, :, None] * tang[:, None, :]
     K = np.broadcast_to(K_VOID * I, (ncells, 3, 3)).copy()
@@ -396,8 +406,12 @@ def main():
     v_cell = np.prod(d)
     v_body = sum(b.volume for b in bodies)
     print("\n=========== summary ===========")
-    print(f"Gebart ({PACKING}, Vf={VF_YARN}, rf={R_FIBRE * 1e6:.1f} um): "
+    if K_PAR == None :
+        print(f"Gebart ({PACKING}, Vf={VF_YARN}, rf={R_FIBRE * 1e6:.1f} um): "
           f"Kpar = {k_par:.3e} m2, Kperp = {k_perp:.3e} m2, ratio {k_par / k_perp:.2f}")
+    else : 
+        print(f"given (--k-par/--k-perp): " 
+                  f"Kpar = {k_par:.3e} m2, Kperp = {k_perp:.3e} m2, ratio {k_par / k_perp:.2f}")
     print(f"Cut cells: {n_cut:,} ({n_cut / ncells * 100:.1f} % of mesh; overlapping yarns counted twice)")
     print(f"Yarn volume, fractional (sum f*V):   {F.sum() * v_cell * 1e9:.4f} mm3")
     print(f"Porous cells (eps <= {EPS_FREE}): {is_yarn.sum():,}, volume {is_yarn.sum() * v_cell * 1e9:.4f} mm3; "

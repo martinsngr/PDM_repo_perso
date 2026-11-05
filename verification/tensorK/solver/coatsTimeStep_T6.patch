@@ -1,0 +1,63 @@
+diff --git a/meshing_strat_trial/tools/coatsTimeStep b/meshing_strat_trial/tools/coatsTimeStep
+index c62bec8..fbbfa83 100644
+--- a/meshing_strat_trial/tools/coatsTimeStep
++++ b/meshing_strat_trial/tools/coatsTimeStep
+@@ -17,6 +17,8 @@
+   Reads from controlDict: CoatsMaxCo (0.5), dSmax (0.01), maxDeltaTCoats
+   (1e-3), minDeltaTCoats (0), CapillaryMaxCo (0.5). Overwrites maxDeltaT in
+   memory each step; setDeltaT.H then grows dt by at most 1.2x per step.
++  change solver T: gravity part of the Coats CFL to use K along gravity, not K itself (for a tensor K, g.K.g instead of K)
++  capillarry part already uses K along the face normal, so no change needed there
+ \*---------------------------------------------------------------------------*/
+ 
+ type            coded;
+@@ -43,14 +45,29 @@ codeExecute
+         mesh().lookupObject<volScalarField>("alpha.wetting");
+     const volScalarField& eps =
+         mesh().lookupObject<volScalarField>("eps");
+-    const volScalarField& K =
+-        mesh().lookupObject<volScalarField>("K");
+     const volScalarField& Solid =
+         mesh().lookupObject<volScalarField>("Solid");
+     const surfaceScalarField& phi =
+         mesh().lookupObject<surfaceScalarField>("phi");
+     const uniformDimensionedVectorField& g =
+         mesh().lookupObject<uniformDimensionedVectorField>("g");
++// Change T: permeability along gravity of each cell (gravity part of the
++    // Coats CFL): K for a scalar K, gHat.K.gHat for a tensor K
++    scalarField Kg(mesh().nCells(), 0);
++    if (mesh().foundObject<volTensorField>("K"))
++    {
++        const volTensorField& KT = mesh().lookupObject<volTensorField>("K");
++        const vector gHat = g.value()/max(mag(g.value()), vSmall);
++        forAll(Kg, i)
++        {
++            Kg[i] = gHat & (KT[i] & gHat);
++        }
++    }
++    else
++    {
++        Kg = mesh().lookupObject<volScalarField>("K").primitiveField();
++    }
++
+     const dictionary& tp =
+         mesh().lookupObject<IOdictionary>("transportProperties");
+     const dictionary& wet = tp.subDict("wetting");
+@@ -99,7 +116,7 @@ codeExecute
+         )().primitiveField()
+       : fvc::surfaceSum
+         (
+-            porousf*fvc::interpolate(K)*mesh().magSf()/mag(mesh().delta())
++            porousf*fvc::interpolate(mesh().lookupObject<volScalarField>("K"))*mesh().magSf()/mag(mesh().delta())
+         )().primitiveField()
+     );
+     const scalarField sumPhi
+@@ -143,7 +160,7 @@ codeExecute
+             (dt/eps[i])
+            *(
+                 (dkrb*kra - dkra*krb)/den*sumPhi[i]
+-              - K[i]*(rhoa - rhob)*sumSfg[i]
++              - Kg[i]*(rhoa - rhob)*sumSfg[i]
+                *(sqr(kra)*dkrb/mua + sqr(krb)*dkra/mub)/den
+               + 2*dpcdS*sumKA[i]*kra*krb/(mub*kra + mua*krb)
+             )/V[i];
