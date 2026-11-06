@@ -340,8 +340,15 @@ confinement hypothesis is wrong; look at the yarn–gap coupling.
 | R3 | Front fit 2–20 ms between job 3068 and `Bbox_full` (14.44–15.32 mm/√s); porous water at 10 / 30 ms 1.00–1.10 × job 3068 |
 | R4 | Free \|U\| ≤ 3 m/s at the writes from 1.5 ms, single-write spikes ≤ 10 m/s; the current of `Bbox_full` at 15–20 ms near crossing yarn 8 (6–9 m/s): recorded, no prediction |
 
-**Commands.** After commit, push and `git pull` on mini03 (solver `8a97d02` there, or `4bb5d2e` after the planned pull and
-`wmake`: the same scalar path), check the free cores (`sinfo -o "%n %C"`, `squeue`), then
+**Solver.** The `Bband` runs use of9-port `4bb5d2e` (change T) on mini03, pulled and built before their submission (decided with
+the user 2026-11-05), so that this scalar reference and the coming tensor K runs share one binary. Its scalar-K path is
+bit-identical to `8a97d02`, the build of `B_full` and `Bbox_full` (`verification/tensorK`, checks 1 and 2): the comparisons
+with those runs are not affected. Previous mini03 binary kept as `hybridPorousInterFoam_8a97d02`. Confirmed 2026-11-05: repo
+at `11d060b` (the docs commit on `4bb5d2e`), binary rebuilt 15:28, job 3090 started 15:32, job 3091 after it.
+
+**Commands.** After commit, push and `git pull` on mini03 (both repos; solver rebuilt, above), check the free cores and memory
+(`sinfo -o "%n %C"`, `squeue`, `scontrol show node mini03 | grep -E "RealMemory|AllocMem"`, `free -g`; the cut cases ask 6G
+and use ~1 GB on 4 ranks, measured on the laptop), then
 `cd verification/study2e_bathLayer/Bband_cut && sbatch job.slurm` and the same in `BbandP_cut` (4 cores each). Estimates from
 job 3068 (8 cores, ~30k cells per core, 3,440 s per simulated ms): `Bband_cut` ~11 h, `BbandP_cut` ~18 h (~46k cells per core),
 `Bband_full` ~20 h on 16 cores (as `Bbox_full`). Fetch into `~/PDM_results/study2e_<case>` with
@@ -350,3 +357,105 @@ then point all five function-object includes at this study's `tools/`:
 `sed -i 's#"\.\./\.\./tools/#"/home/martin_sng/PDM_repo_perso/verification/study2e_bathLayer/tools/#' ~/PDM_results/study2e_<case>/system/controlDict`.
 Analysis: `compare3068.py` (band columns: band first row, band gap water, open space), `leakFaces.py`,
 `../study2d_gapRise/connected.py`.
+
+### Results `Bband_cut`, job 3090
+
+**Run** (mini03, 4 cores, solver `4bb5d2e`, 2026-11-05 15:32 to 2026-11-06 01:14; copy `~/PDM_results/study2e_Bband_cut`;
+analysed 2026-11-06 with `compare3068.py` and two one-off scripts in the session scratchpad: bath cells against the gap cells
+above them, plane face fluxes). Reached 12 ms, no stopGuard, ~2,900 s per simulated ms. dt 1.15–1.43e-7 s at the Coats limit
+after 0.5 ms; budget closed (imbalance ≤ 8e-20 m³). The cut's closed end (1.486 mm) is reached at 4.5 ms (job 3068: 5.0 ms):
+yarn comparisons to 3 ms only.
+
+- **No leak:** lost through top/bottom 3.9 cell volumes by 12 ms (`Bbox_full` 468 by 10 ms; job 3068 ~3); padding water ≤ 2;
+  open space beside the yarns 3–46 cell volumes (`Bbox_full` 816 / 3,659 at 1 / 10 ms). No flux through `bathWall`.
+- **The band gaps do not stay wet.** The initial band column collapsed within 0.25 ms: through the plane faces under the band
+  gaps 800 cell volumes per ms of water and 2,400 of air went down into the bath (air from the open space beside the yarns),
+  while the yarn faces of the plane took 2,400 per ms up; net back-flow through the inlet −5.9e-12 m³ by 0.25 ms (job 3068
+  −1.9e-11 at 0.5 ms). Band first row (307 free cells) water 20 / 206 / 98 / 71 / 98 / 113 at 0.25 / 0.5 / 1 / 3 / 6 / 12 ms;
+  band gap water 152 / 345 / 290 / 296 / 334 / 437 / 498 cell volumes at 0.25 / 0.5 / 1 / 2 / 3 / 10 / 12 ms (job 3068 at 1 /
+  3 / 10 ms: 145 / 52 / 49; `Bbox_full` 970 / 1,328 / 3,234). **From 0.5 ms every bath cell under the band gaps is water, and
+  194–236 of the 307 first-row gap cells above them are air: the menisci sit on the bath plane faces.** Water reaches the band
+  gaps from below (the plane faces under them carry water net up at every write from 0.5 ms: +1,234 / +311 / +180 / +151 cell
+  volumes per ms at 0.5 / 1 / 5 / 10 ms, down parts ≤ 155: the `Bbox` loop is gone), and goes on into the yarn flanks. The
+  first-row band yarns sit at S 0.96–0.99 (VG pc 0.7–1.4 kPa), above the gap suction 2σcosθ/w = 240–450 Pa.
+  Hypothesis, not tested: the yarn flanks drain the gap cells down to the plane; a flat interface lying on a face (water-filled
+  bath cell below, air-filled gap cell above) is no interface cell, so neither the VOF curvature nor H's contact angle acts on
+  it, and the bath cannot push it back up (the slit tests' "empty gap above the inlet never rises", here with the bath inside the
+  mesh). The "band" also includes mostly open layers: at the first row z layers 6 / 7 / 11 / 12 are 87 / 51 / 42 / 59 % free
+  (yarn lens tips), layers 8–10 31–35 %; water stays in 4–21 of 28–32 first-row cells even in layers 8–10.
+- **Yarns:** front 0.965 / 1.165 / 1.286 mm at 1 / 2 / 3 ms, one row (0.02 mm) behind job 3068; porous water 0.91 / 0.94 /
+  0.97 / 0.99 × job 3068 at 0.5 / 1 / 2 / 3–8 ms: job 3068's yarns also absorbed the 3,103 cell volumes of initial water that
+  the band case removes from the open space (a design difference, not a coupling effect).
+- **Air in the bath:** 26–80 cell volumes from 0.5 ms, mostly interface cells of the top bath row, and 4–17 cells of the inlet
+  row (since the 0.25 ms collapse, 185 cell volumes of air reached rows 2–4), where J holds α at its 0.5 closure threshold
+  (bath min α 0.500) and α overshoots to 1.047 at 4.5 ms (1.002 at 10 ms) in free inlet-row cells.
+- **Velocity:** box free max 15.5 / 14.5 / 9.7 / 6.8 / 4.2 / 2.95 m/s at 0.25–1.5 ms (job 3068: 15.0 at 0.5, 7.0 at 1, 1.6 at 1.5
+  ms), ≤ 2.6 m/s from 1.75 ms; sampled log ≤ 3.2 m/s from 2 ms.
+
+| | Scoring |
+|---|---|
+| S1 | No: band first row 70–206 of 307 from 0.5 ms; band gap water 290–498 cell volumes from 1 ms (≥ 500 predicted), 2–9× job 3068 |
+| S2 | Yes: open space ≤ 46, padding ≤ 2, lost 3.9 cell volumes by 12 ms |
+| S3 | Yes: net up at every write from 0.5 ms |
+| S4 | No: front one row behind job 3068 at 1 / 2 / 3 ms, porous water 0.94–0.99 × (the removed initial water) |
+| S5 | Partly: no stopGuard, dt at the Coats limit, \|U\| ≤ 3 m/s from 1.5 ms, no flux through `bathWall`, imbalance ≤ 8e-20 m³; bath min α 0.5, not > 0.9 (air at the inlet row) |
+| S6 | Waits for `BbandP_cut` (job 3091) |
+
+**Reading.** The band bath removes the leak and the loop: the open space beside the yarns gets no bath water and stays nearly
+dry, the padding stays dry. It does not keep the gaps at the bath wet: the reading table's last case (S1 fails although fed),
+so confinement in x does not hold the gap water; the yarn flanks drain the gaps to the plane, where the menisci stop on the
+plane faces.
+
+## Option 3: the bath under everything with a wide padding (decided with the user 2026-11-06)
+
+**Why.** `Bband_cut`: no leak, but with the open space beside the yarns dry the band's gap column collapsed and the menisci
+stopped on the bath plane. In `B_full` and `Bbox_full`, where water reached the open space beside the yarns too, the gaps at the
+bath stayed wet. In a real dip the bath surrounds the fabric (outer meniscus up the fabric faces, ~1.4 mm on a flat wall at
+θ 60°, capillary length 2.7 mm); `B_full` leaked only because its padding is 60 µm: the outer meniscus reached the open faces. A
+wide padding lets the outer meniscus form inside the domain, the bath surface being nearly flat where it meets the open faces.
+`Bbox` with a wide padding was set aside: it keeps the 20 µm bath strip against a closed floor where the loop formed. Making
+top/bottom cyclic (a row of strips, air out at the far end) was set aside by the user: it changes the whole set-up.
+
+**Design (`BfullP_cut`, `./makeCases.sh BfullP_cut`).** `B_full` (5 bath rows under the fabric and the padding, `bathWall` only
+at the far z ends of the bath layer) on the cut (y 0.233–1.496 mm), with:
+- graded padding `PAD_GRADED="12 1.5"`: 12 layers per side from 20 µm growing ×1.5, 5.19 mm per side, outermost cell 1.74 mm
+  (cells stay 20 µm in x and y; the bath surface is flat and horizontal where the cells are long); estimated bath surface at
+  the open faces ~0.2 mm above the plane (exponential decay from 1.4 mm over 2.7 mm, not computed);
+- the whole bath bottom fed: `inletPad` (the padding part, 2,184 faces) open like the inlet (U, p) and in `waterOnlyPatches`
+  (J), so the bath under the padding is fed from below as a deep bath, not sideways through the 0.1 mm layer;
+- inlet total pressure p0 = ρ g Δy = 1000 × 9.81 × 0.10026 mm = 0.9836 Pa (makeCases column `p0in`): the solver solves the full
+  pressure, gravity as a body force in the face fluxes (`pEqn.H:31`, no `p_rgh`), so the water is at 0 Pa at the bath plane, at
+  rest against the air at 0 Pa of the open faces. With 0 Pa at the inlet (all runs so far) the water at the plane is at −1 Pa:
+  negligible against the capillary pressures in the gaps, but the only force on a wide flat bath surface, which would sink to
+  the inlet;
+- 217,854 cells, 12 cores, 12 ms, writes every 0.25 ms; everything else as `B_full` (REV values, J, L, outlet closed, x cyclic).
+
+**Checks (laptop scratch build, installed `4bb5d2e`, 2026-11-06).** checkMesh OK (non-orthogonality 0); patches inlet 1,274,
+`inletPad` 2,184, `bathWall` 910, top/bottom 5,278, outlet 3,458. On the 84,448 cells at job 3068's cell centres (the box and
+the first padding layer) eps, yarnID and α identical; the bath (17,290 cells) all water; padding above the plane dry. Smoke test
+(30 steps, serial): J active on inlet and `inletPad`, L active, dt at the Coats limit (1.24e-7 s), α in [−1.7e-19, 1.00004],
+imbalance 1.5e-24 m³; 2.3 s per step, 0.74 GB. After 30 steps (2.7 µs) the far bath and the air are still accelerating (|U| 1e-4
+and 1e-3 m/s, far bath top row at 2.2 Pa): the static balance cannot be read from the smoke test, hence F1 below.
+
+**Predictions (written before the run, 2026-11-06).** References: `B_full` (same bath, 60 µm padding) lost 1,644 / 3,550 /
+76,800 cell volumes through top/bottom by 0.5 / 2 / 10 ms, band first row 307/307, front 1.005 / 1.286 / 1.466 mm at 1 / 2 / 3
+ms; `Bbox_full` band gap water 970 / 1,023 / 1,328 / 3,234 at 1 / 2 / 3 / 10 ms; `Bband_cut` 290 / 296 / 334 / 437; job 3068
+front 0.985 / 1.185 / 1.306 mm. The cut's closed end is 1.26 mm above the plane: the outer meniscus may reach it.
+
+| | `BfullP_cut`, 12 ms |
+|---|---|
+| F1 (leak, far bath) | Lost through top/bottom ≤ 50 cell volumes by 12 ms; the far bath surface (more than 3 mm from the box) stays at the bath plane within one row at every write; net inflow through `inletPad` ≥ 0 from 1 ms (the far bath does not drain out). Fails if ≥ 1,000 cell volumes are lost by 12 ms |
+| F2 (gaps) | Band first row ≥ 276 of 307 cells water at every write from 0.5 ms; band gap water ≥ 900 cell volumes from 1 ms |
+| F3 (outer meniscus) | Water climbs the fabric's outer faces: the top of the padding water against the box at 12 ms between 0.3 mm above the plane and the cut end (1.26 mm), still rising (not at equilibrium by 12 ms); no prediction of its volume |
+| F4 (loop) | The plane faces under the band gaps carry water net up at every write from 0.5 ms |
+| F5 (yarns) | Front at 1 / 2 / 3 ms between job 3068 and `B_full`; porous water at 2–3 ms 1.00–1.36 × job 3068 |
+| F6 (stability) | No stopGuard; dt 1.1–1.4e-7 s at the Coats limit after 0.5 ms; box free \|U\| at the writes ≤ 3 m/s from 1.5 ms; no J closure at the bath bottom (bottom row min α > 0.9); \|imbalance\| ≤ 1e-16 m³ |
+
+**Reading.** F1 and F2 pass: this is the REV bath (full length next, then the tensor runs; ~1.9× the cells of `Bbox_full`). F1
+fails at the far edge: the open faces cannot meet a bath surface even where it is flat; then close the far-edge faces up to a
+few rows above the plane (5 mm from the fabric a wall forms no capillary slit with it). F2 fails with the bath around the fabric:
+the yarns' suction empties the gaps at the bath whatever the bath (the `Bband_cut` result stands).
+
+**Commands.** After commit, push and `git pull` on mini03: `cd verification/study2e_bathLayer/BfullP_cut && sbatch job.slurm`
+(12 cores, 8G; estimate 7–8 h from `Bband_cut`'s ~2,900 s per simulated ms at 27k cells per core, here 18k). Fetch and point the
+includes as for the other cases (end of option 2).

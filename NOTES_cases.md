@@ -513,6 +513,65 @@ solver ignores `waterOnlyPatches`.
   15.65 / 15.28 mm/√s (2–10 / 2–20 ms; job 3068 14.36 / 14.44), closed end at 22.5 ms (28), yarn water 1.17–1.36 × job 3068: the
   gap feed and the padding feed are not separable. The yarn 6 pump transient: 12–15 m/s at 0.20–0.35 ms in a partly filled
   cell, gone once the gap filled (water-filled cells do not pump). Scoring P1–P6 and details in the study README.
+- **Study 2e, `Bbox_full` (job 3078, mini03 16 cores, 2026-11-04 16:46 to 2026-11-05 13:01, analysed 2026-11-05; copy
+  `~/PDM_results/study2e_Bbox_full`, its five includes pointed at the study's `tools/`): the bath under the fabric box only
+  (option 1).** Reached 30 ms, no stopGuard, 2,400 s per simulated ms, dt 1.25e-7 s at the Coats limit, α ≤ 1.0074, budget closed
+  (one-time 4.4e-17 m³ at the start). **The leak returns from 8 ms (R1 failed):** lost through top/bottom 44 / 468 / 7,797 /
+  59,426 cell volumes at 3 / 10 / 20 / 30 ms (job 3068: 11 by 30 ms). To ~15 ms traces in outgoing air within 0.1 mm of the
+  plane (as job 3063). The two outermost box layers (z layers 3 and 16: 94–97 % free, no yarn cell below y 0.58 mm, nothing
+  between them and the padding) held the bath surface to 7.5 ms (their 182 first-row cells air), flooded at 8 ms; from ~17 ms
+  the bottom padding fills up to y0 + 0.3 mm over the whole width and pours out through the open bottom faces, 80–96 % of the
+  inflow from 23 ms. **The gaps are fed through a loop** (face fluxes `alphaPhi0.wetting`): water rises through the plane faces
+  under the outer layers' bath-surface cells (α 0.4–0.6, ~0.27 m/s, 1,300–1,800 cell volumes per ms), goes sideways into the
+  inner gaps and partly back down into the bath through the inner plane faces (net down at 1, 5 and 7.5 ms). Hypothesis, not
+  tested: a parasitic surface-tension current at the bath surface under the outer layers; its down branch matches the air that
+  collects at an x mirror pair of spots in the inlet row (min α 0.28–0.50 from 5 ms; J closes 17–21 inlet faces from 15 ms).
+  Gaps: inner first row (layers 4–15) water from 1 ms, the outer 182 cells from 8 ms; gap water 1,786 / 6,893 / 9,601 cell
+  volumes at 1 / 10 / 30 ms (`B_full` 5,890 / 12,271 / 12,484; job 3068 179 / 81 / 98); connected top 0.865 mm at 30 ms. Yarns:
+  front = job 3068 to 2 ms, fit 15.05 / 15.32 mm/√s (2–10 / 2–20 ms; job 3068 14.36 / 14.44), closed end 25.5 ms (28); porous
+  water 1.065 × job 3068 at 2–5 ms, 1.099 from 13 ms: not attributable (the gaps are fed by the loop). **A fast current at the
+  base pc, 15–20 ms** (6–9 m/s at the writes, 11.9 m/s in the log; job 3068 ≤ 0.8 m/s then): the air-pump pattern (free cell α
+  0.15, p 330–400 Pa, 2 faces on y-yarn 1 at S 0.22–0.45, its pure-air neighbour fast), x mirror sites at y 2.13–2.21 mm around
+  crossing yarn 8 while the front passes; cause not known. Scoring (Q1 passed at 3 ms; Q2, Q4, R1, R2 failed; Q3 at job 3068's
+  value; R3 front at `B_full`'s value) and details in the study README; scripts `compare3068.py`, `leakFaces.py` there.
+- **Study 2e option 2: the bath under the yarn band only (decided with the user 2026-11-05, after a step back over all the bath
+  findings; design, checks and predictions S1–S6 / R1–R4 in the study README).** At the bath plane the 944 free first-row cells
+  are 307 in the yarn band (z layers 6–12, between the y-yarns: confined in x) and 637 in the open space above and below the
+  yarns (layers 3–5 and 13–16: one yarn side, the padding and open air on the other). In job 3068 the open space drained first
+  (637 → 7 cells water by 0.5 ms), the band later (307 → 47 / 10 at 0.5 / 1 ms); the 2D bench (walls on both sides) kept its
+  water at a J inlet. Hypothesis: a bath-fed gap keeps its water where it is confined; the open space beside the yarns holds no
+  meniscus and, fed by the bath, carries water to the open faces. Mode `band` of `buildCase.sh`: the 5 bath rows only under the
+  band (3,185 cells, inlet 637 faces); the open space and the padding on a closed floor at y0 and dry at the start (job 3068's
+  3,103 cell volumes of initial water there removed); the band keeps its column (1,612 cell volumes); everything else as
+  `Bbox`. Graded padding option (`PAD_GRADED`, `build_mesh.py --pad`: 10 layers from 20 µm growing ×1.3, 0.86 mm per side, 1.7×
+  the cells; first padding cell 20 µm, so the box surface keeps uniform faces). Set aside in the discussion: no J with α 1 on the
+  inlet (a drained free inlet cell vents air, or α fixed at 1 refills it with the slit kick, 6×, 23 m/s); closing the lower part
+  of top/bottom (the 60–120 µm space beside the fabric becomes a slit of 300–600 Pa at a 90° wall, as strong as the gaps; a 120°
+  wall is neutral only on a knife edge, ±5° = ±4.7 mm of Jurin height); α held at 1 in the first band rows (code, not
+  conservative); the through-thickness set-up (no boundary problem but no in-plane front; useful later for the coupling and the
+  equilibrium uptake). Checks (laptop): the three cases pass checkMesh; above the plane the fields equal job 3068's except the
+  dry open space; smoke tests 30 steps (J, L, Coats dt 1.23e-7 s, α ≤ 1.0006, imbalance ≤ 7e-23 m³), `BbandP_cut` 10 steps on 4
+  ranks; `Bbox_full` rebuilt with the changed script byte-identical to job 3078's mesh and 0/; ~1 GB per 4-rank job (6G
+  requested: mini03 was memory-bound, a comsol job pending on 50G). **Submitted on mini03 the evening of 2026-11-05: job 3090
+  `Bband_cut` (108,745 cells, 12 ms, 4 cores, estimate ~11 h) and job 3091 `BbandP_cut` (graded padding, 182,637 cells, 12 ms,
+  4 cores, ~18 h), both running.** Solver: `4bb5d2e` (T), so that the scalar reference and the tensor runs share one binary
+  (scalar path bit-identical to `8a97d02`): pulled and built on mini03 by the user before the submission (confirmed: repo at
+  `11d060b`, the docs commit on `4bb5d2e`; binary rebuilt 15:28, previous one kept as `hybridPorousInterFoam_8a97d02` 15:26;
+  job 3090 started 15:32, job 3091 later). Job 3090
+  (started 15:32) built the case on mini03 exactly as on the laptop (band z −1.007e-05 to 1.309e-04 m, 3,103 cell volumes
+  removed, 1,612 kept, 3,185 bath cells, 108,745 cells, same patch faces). `Bband_full` (245,245 cells, 30 ms, 16 cores) built and smoke-tested, waits for the cut results.
+  **`Bband_cut` result (job 3090, ended 2026-11-06 01:14, analysed the same day; copy `~/PDM_results/study2e_Bband_cut`; scoring in the
+  study README): no leak, but the band gaps do not stay wet.** Lost through top/bottom 3.9 cell volumes by 12 ms, open space beside
+  the yarns ≤ 46, padding dry, no loop (the plane faces under the band gaps carry water net up at every write from 0.5 ms). The
+  initial band column collapsed within 0.25 ms (water and air from the open space went down into the bath, net back-flow through the
+  inlet); from 0.5 ms every bath cell under the band gaps is water while 194–236 of the 307 first-row gap cells above are air: **the
+  menisci sit on the bath plane faces**; band gap water 290–498 cell volumes from 1 ms (job 3068 ~50, `Bbox_full` 970–3,234). First-row
+  band yarns at S 0.96–0.99 (pc 0.7–1.4 kPa) against a gap suction of 240–450 Pa. Hypothesis, not tested: the yarn flanks drain the gaps
+  down to the plane, and a flat interface lying on a face (no interface cell) feels neither curvature nor H, so the bath cannot push it
+  back up (the slit tests' empty gap above an inlet). The band's outer layers are mostly open (first row: layers 6 / 7 / 11 / 12 87 /
+  51 / 42 / 59 % free); even layers 8–10 keep only 4–21 of 28–32 first-row cells wet. Yarns one row behind job 3068 to 3 ms, porous
+  water 0.94–0.99 × (job 3068's yarns also took the initial water the band case removes from the open space). Air in the inlet row
+  (J holds those cells at α 0.5; α overshoot to 1.047 there at 4.5 ms). `BbandP_cut` (job 3091) still running.
 - **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
   "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
   harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
@@ -598,6 +657,28 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 the data, for a blind first prediction. Left out unless the gaps turn out to matter: G2b, 10 µm, gap tuning, `verification/PLAN.md` Studies 1, 2a, 2b. Cores: about 8–10 usable on mini03 (cap 46), the user
 expects more in the coming days and can also use mini01. Test planned: vertical wicking, front and uptake vs time, same yarn in different weaves and densities, then other yarns.
 
+**2026-11-06:** `Bband_cut` (job 3090) analysed: no leak, but the band gaps' menisci sit on the bath plane (REV case status, study 2e
+option 2); S1 failed, S2/S3 passed. `BbandP_cut` (job 3091) ended the same morning, not fetched yet (S6, no longer decisive).
+**Decided with the user 2026-11-06: option 3, the bath under everything (as `B_full`) with a wide graded padding** (12 layers ×1.5,
+5.19 mm per side), the whole bath bottom fed (`inletPad` open and water-only), inlet total pressure 0.9836 Pa (water at 0 Pa at
+the bath plane: the solver solves the full p, gravity as a body force, `pEqn.H:31`). Reason: the gaps at the bath stayed wet only
+where the bath also reached the open space beside the yarns (`B_full`, `Bbox_full`), as in a real dip; `B_full` leaked only because
+its padding is 60 µm. `BfullP_cut` (217,854 cells, 12 ms, 12 cores) built, checked and smoke-tested; design, checks and predictions
+F1–F6 in the study README; to submit on mini03 after commit and pull. Set aside: `Bbox` + wide padding (keeps the loop corner),
+top/bottom cyclic (user: changes the whole set-up), the band bath with yarns continued below the plane (would likely end as
+`Bband_cut`). If the bath line needs it later, the REV can be lengthened (y planes periodic; cost ~L³).
+
+**2026-11-05, evening.** (1) **Check jobs 3090 (`Bband_cut`) and 3091 (`BbandP_cut`) on mini03** (REV case status,
+study 2e option 2; both run the T build, `4bb5d2e`, confirmed 2026-11-05): fetch into
+`~/PDM_results/study2e_Bband_cut` / `study2e_BbandP_cut` and point the five includes at the study's `tools/` (commands at the end
+of the study README), run `compare3068.py` (band columns), `leakFaces.py`, `../study2d_gapRise/connected.py`, score S1–S6.
+(2) **Decide with the user** from the README's reading table: `Bband_full` (3-layer padding) if S1 and S2 pass in `Bband_cut`; a
+full run with the graded padding (spec to add in `makeCases.sh`) if only `BbandP_cut` passes S2; rethink if both leak or the
+band drains although fed. (3) Then the REV tensor K runs (a), (b), which waited for the bath set-up; the chosen full band run is
+their scalar reference. Open from `Bbox_full`: the loop at the bath surface (hypothesis: parasitic current), the 15–20 ms
+current near crossing yarn 8 at the base pc. The study 2e files were committed by the user for the submission; these notes
+edits came after (not committed).
+
 **2026-11-05 (tensor K session).** Change T written (steps 0–7, by the user, guided) and checked in `verification/tensorK/`: checks 1, 2, 3, 5 pass, 6 done (two
 predictions failed as written, causes found), 4 done (exact against the stretched-mesh twin; anisoImpesFoam within 2.5 %); next the `CHANGES_of9-port.md` entry and the commits (both repos, by the user); state and results in `NOTES_solver.md`, "Planned:
 diagonal tensor K". **Still partly open, noted with the user (2026-11-05): the boundary set-up of the REV.** (1) The bath: J closes a drained free reservoir face and
@@ -610,7 +691,7 @@ they use.** Change T committed by the user (solver `4bb5d2e`, docs `11d060b`; th
 tested `_T`; previous binary `hybridPorousInterFoam_8a97d02`). Both repos pushed (user, 2026-11-05). mini03 (pull of both repos, `wmake` of the solver)
 after the `Bbox_full` check (user); none of its jobs uses `meshing_strat_trial/tools/` (`Bbox_full` includes the study 2c copy).
 
-**2026-11-03, end of day — START HERE.** (1) **Tensor K, step 5 next** (the user writes it, guided; state of the solver working tree and the remaining steps in `NOTES_solver.md`, "Planned: diagonal tensor K", "State 2026-11-03"). (2) **mini03: jobs 3067 and 3068 ended and were scored on 2026-11-03** (REV case status; copies `~/PDM_results/REV_lowpc_run3063_3067`, the 3063 copy renamed, 0–30 ms, and `REV_midbath_run3068`; fetched with `rsync -avz`, about 3× less to transfer). 3067 (pc0 1000, L): stable to 30 ms, but the study 2c air pump moves with the wetting of crossing yarn 7 (10–17 m/s at the writes from 24 ms, 22 m/s peak; face fluxes checked). 3068 (base values, L, mid-gap bath): calm after 1.5 ms, front 14.35 mm/√s (edge bath 13.9), closed end at 28 ms; gaps drained by 1 ms and cut off from the bath by J (927 of 944 free inlet faces stay closed; 3051: 281 of 290). **To discuss with the user:** whether J's closure of drained free inlet faces needs a change before the tensor K runs (it decides the gap water in both bath planes). No job on mini03 uses `tools/` any more (Pitfalls). (3) **Study 2e: `B_full` (job 3072) ended 2026-11-04 13:17, analysed the same day** (REV case status, study README; copy `~/PDM_results/study2e_B_full`): with the bath inside the mesh the gaps at the bath stay wet (first row 944/944 water, ~12,000 cell volumes of gap water, first gap and the slots around yarn 6 full), so J's face closure kept them dry; but the layer under the padding makes the padding fill and pour through the open top/bottom faces (86 % of the inflow), so `B_full` is not a usable reference and its yarn gain is not attributed. **Chosen with the user 2026-11-04: option 1, bath under the fabric box only** (padding floor closed at the plane as `inletPad` in job 3068, no outer meniscus; a one-way J face was discussed and set aside: the meniscus would stay on the boundary face). Built as mode `box` of `buildCase.sh` (layer cells under the padding removed by subsetMesh): `Bbox_cut` (1.5 mm, 3 ms, 4 cores: the leak test) and `Bbox_full` (30 ms, 16 cores); fields above the plane identical to job 3068, smoke tests passed, predictions in the study README. **`Bbox_full` running on mini03: job 3078 (16 cores, started 2026-11-04 ~16:47; at `B_full`'s 2,330 s per simulated ms the end is ~12:15 on 2026-11-05).** Submitted directly, without waiting for the leak test (user: nobody would act on its result in the evening); `Bbox_cut` (job 3077) cancelled after 4 min, its partial files stay in `Bbox_cut/` on mini03. Then: fetch into `~/PDM_results/study2e_Bbox_full`, point the `dsLocator` include at the study's `tools/` (study README), score R1–R3 and the leak (Q1 at 3 ms from its own `waterBudget.csv`: ≤ 100 cell volumes; `B_full` 10,670). Short variants `R0_inlet` / `B_layer` (3 ms, cut at 1.5 mm) built and smoke-tested, not submitted. Still open: why the first y-yarn row stays below S_eq (B_full 0.987–0.994, 3068 0.971–0.992; gap-vs-yarn estimates above). The notes changes since commit `8b86db9` are not committed (job numbers, Courant pitfall, harmonic weights, the 3067/3068 scoring).
+**2026-11-03, end of day.** (1) **Tensor K, step 5 next** (the user writes it, guided; state of the solver working tree and the remaining steps in `NOTES_solver.md`, "Planned: diagonal tensor K", "State 2026-11-03"). (2) **mini03: jobs 3067 and 3068 ended and were scored on 2026-11-03** (REV case status; copies `~/PDM_results/REV_lowpc_run3063_3067`, the 3063 copy renamed, 0–30 ms, and `REV_midbath_run3068`; fetched with `rsync -avz`, about 3× less to transfer). 3067 (pc0 1000, L): stable to 30 ms, but the study 2c air pump moves with the wetting of crossing yarn 7 (10–17 m/s at the writes from 24 ms, 22 m/s peak; face fluxes checked). 3068 (base values, L, mid-gap bath): calm after 1.5 ms, front 14.35 mm/√s (edge bath 13.9), closed end at 28 ms; gaps drained by 1 ms and cut off from the bath by J (927 of 944 free inlet faces stay closed; 3051: 281 of 290). **To discuss with the user:** whether J's closure of drained free inlet faces needs a change before the tensor K runs (it decides the gap water in both bath planes). No job on mini03 uses `tools/` any more (Pitfalls). (3) **Study 2e: `B_full` (job 3072) ended 2026-11-04 13:17, analysed the same day** (REV case status, study README; copy `~/PDM_results/study2e_B_full`): with the bath inside the mesh the gaps at the bath stay wet (first row 944/944 water, ~12,000 cell volumes of gap water, first gap and the slots around yarn 6 full), so J's face closure kept them dry; but the layer under the padding makes the padding fill and pour through the open top/bottom faces (86 % of the inflow), so `B_full` is not a usable reference and its yarn gain is not attributed. **Chosen with the user 2026-11-04: option 1, bath under the fabric box only** (padding floor closed at the plane as `inletPad` in job 3068, no outer meniscus; a one-way J face was discussed and set aside: the meniscus would stay on the boundary face). Built as mode `box` of `buildCase.sh` (layer cells under the padding removed by subsetMesh): `Bbox_cut` (1.5 mm, 3 ms, 4 cores: the leak test) and `Bbox_full` (30 ms, 16 cores); fields above the plane identical to job 3068, smoke tests passed, predictions in the study README. **`Bbox_full` running on mini03: job 3078 (16 cores, started 2026-11-04 ~16:47; at `B_full`'s 2,330 s per simulated ms the end is ~12:15 on 2026-11-05).** Submitted directly, without waiting for the leak test (user: nobody would act on its result in the evening); `Bbox_cut` (job 3077) cancelled after 4 min, its partial files stay in `Bbox_cut/` on mini03. Then: fetch into `~/PDM_results/study2e_Bbox_full`, point the `dsLocator` include at the study's `tools/` (study README), score R1–R3 and the leak (Q1 at 3 ms from its own `waterBudget.csv`: ≤ 100 cell volumes; `B_full` 10,670). Short variants `R0_inlet` / `B_layer` (3 ms, cut at 1.5 mm) built and smoke-tested, not submitted. Still open: why the first y-yarn row stays below S_eq (B_full 0.987–0.994, 3068 0.971–0.992; gap-vs-yarn estimates above). The notes changes since commit `8b86db9` are not committed (job numbers, Courant pitfall, harmonic weights, the 3067/3068 scoring).
 
 **2026-11-02.** Running on mini03: job 3067, REV_lowpc continued from 10 to 30 ms (~16 h, REV case status; check it against the predictions written there). Also job 3068, `REV_midbath` (8 cores, started 2026-11-02, ~37 h, same section, predictions written); copies in `~/PDM_results/REV_lowpc_run3063` and `REV_gapflow_run3065`, results in REV case status. Job 3063 passes the L validation (10 ms, no stopGuard), with a local fast current from 8.2 ms. Job 3065 diverged at 1.386 ms: not fixed, not rerun (decision of the user); why S11 and 3065 run at 17–51 m/s stays unanswered. **Next: tensor K, item (2) of the plan: the user writes the code, guided step by step (2026-11-02; corrections to the plan in `NOTES_solver.md`, "Review against `8a97d02`").** Not run: base REV with L past 15 ms (the corner pattern of job 3058).
 L committed in the solver repo (`8a97d02`, docs `97f3b35`), installed on the laptop.

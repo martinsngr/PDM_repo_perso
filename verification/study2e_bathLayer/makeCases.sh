@@ -24,13 +24,22 @@
 #   BbandP_cut as Bband_cut with a graded padding (PAD_GRADED "10 1.3": 10 layers from 20 um growing x1.3, 0.85 mm
 #             instead of 0.06 mm): does a thicker padding matter?
 #   Bband_full as Bbox_full in mode band (30 ms, 16 cores): the scalar reference if the cut cases pass
+#   BfullP_cut (2026-11-06) as B_full (bath under the fabric and the padding) on the cut, with a wide graded padding
+#             (PAD_GRADED "12 1.5": 12 layers from 20 um growing x1.5, 5.2 mm per side), so that the outer meniscus forms
+#             inside the domain and the bath surface is nearly flat where it meets the open top/bottom faces; inlet total
+#             pressure p0in = rho g dy (5 bath rows) = 0.9836 Pa, so that the water is at 0 Pa at the bath plane, at rest
+#             against the air of the open faces (with 0 Pa at the inlet the wide flat bath surface would sink to the inlet);
+#             the whole bath bottom fed (padin), 12 ms, 12 cores
+#   p0in: inlet total pressure in Pa (- = 0, as before)
+#   padin: yes = the padding part of the bath bottom (inletPad) is inlet too (same p, U, J), so that the bath under the
+#          padding is fed from below as a deep bath, not sideways through the 0.1 mm layer (BfullP_cut)
 #   mem: SLURM memory request (2026-11-05: the cut band cases peak at 0.4 / 0.6 GB serial on the laptop; 6G lets them
 #   start next to jobs pending on memory)
 #     ./makeCases.sh [name ...]          (no name: every case)
 set -e
 cd "${0%/*}"
 SRC=../../meshing_strat_trial/REV_midbath
-#        name       NB  NA   job       N  endTime writeInterval hours logEvery restart mode pad    mem
+#        name       NB  NA   job       N  endTime writeInterval hours logEvery restart mode pad    mem p0in   padin
 specs=( "R0_inlet   0   58   2eR0      4  3e-3    1e-04         12    20       no      -    -      16G"
         "B_layer    5   58   2eB       4  3e-3    1e-04         12    20       no      -    -      16G"
         "B_full     5   133  2eBfull   16 0.03    5e-04         72    100      yes     -    -      16G"
@@ -38,10 +47,11 @@ specs=( "R0_inlet   0   58   2eR0      4  3e-3    1e-04         12    20       n
         "Bbox_full  5   133  2eBboxF   16 0.03    5e-04         72    100      yes     box  -      16G"
         "Bband_cut  5   58   2eBbandC  4  0.012   2.5e-04       36    100      yes     band -      6G"
         "BbandP_cut 5   58   2eBbandPC 4  0.012   2.5e-04       48    100      yes     band 10x1.3 6G"
-        "Bband_full 5   133  2eBbandF  16 0.03    5e-04         72    100      yes     band -      16G" )
+        "Bband_full 5   133  2eBbandF  16 0.03    5e-04         72    100      yes     band -      16G"
+        "BfullP_cut 5   58   2eBfullPC 12 0.012   2.5e-04       36    100      yes     -    12x1.5 8G  0.9836 yes" )
 only=" $* "
 for spec in "${specs[@]}"; do
-    read -r name NB NA job N endTime wInt hours logEvery restart mode pad mem <<< "$spec"
+    read -r name NB NA job N endTime wInt hours logEvery restart mode pad mem p0in padin <<< "$spec"
     [ $# -gt 0 ] && [[ "$only" != *" $name "* ]] && continue
     [ "$mode" = - ] && mode=""
     padenv=""
@@ -55,6 +65,33 @@ for spec in "${specs[@]}"; do
     touch "$name/$name.foam"
     sed 's/^\(\s*\)"(outlet|inletPad)"/\1"(outlet|inletPad|bathWall)"/' -i "$name/0.orig/U" "$name/0.orig/p"
     grep -q 'outlet|inletPad|bathWall' "$name/0.orig/U" && grep -q 'outlet|inletPad|bathWall' "$name/0.orig/p"
+    if [ -n "$p0in" ] && [ "$p0in" != - ]; then
+        # the inlet gets its own total pressure (bath at rest at 0 Pa at the bath plane); top/bottom keep 0
+        ../../.venv/bin/python - "$name/0.orig/p" "$p0in" <<'PYEOF'
+import sys
+p, p0 = sys.argv[1:3]
+s = open(p).read()
+old = '    "(inlet|top|bottom)"\n    {\n        type            totalPressure;\n        p0              uniform 0;\n    }\n'
+new = ('    "(top|bottom)"\n    {\n        type            totalPressure;\n        p0              uniform 0;\n    }\n'
+       '    // bath (study 2e, makeCases.sh p0in): water at 0 Pa at the bath plane y0, i.e. rho g dy above the inlet\n'
+       f'    inlet\n    {{\n        type            totalPressure;\n        p0              uniform {p0};\n    }}\n')
+assert s.count(old) == 1, "inlet entry of 0.orig/p not found"
+open(p, "w").write(s.replace(old, new))
+PYEOF
+    fi
+    if [ "$padin" = yes ]; then
+        # inletPad = the padding part of the bath bottom: open like the inlet (U, p) and water-only (J)
+        sed -i -e 's/^\(\s*\)"(inlet|top|bottom)"/\1"(inlet|inletPad|top|bottom)"/' \
+               -e 's/^\(\s*\)"(outlet|inletPad|bathWall)"/\1"(outlet|bathWall)"/' "$name/0.orig/U"
+        sed -i -e 's/^\(\s*\)inlet$/\1"(inlet|inletPad)"/' \
+               -e 's/^\(\s*\)"(outlet|inletPad|bathWall)"/\1"(outlet|bathWall)"/' "$name/0.orig/p"
+        sed -i 's|^\(\s*\)// the bath face (inletPad)$|\1// the bath face (inletPad: open here, see the inlet entry)|' "$name/0.orig/p"
+        sed -i 's/^waterOnlyPatches (inlet);/waterOnlyPatches (inlet inletPad);/' "$name/constant/transportProperties"
+        grep -q '"(inlet|inletPad|top|bottom)"' "$name/0.orig/U"
+        grep -q '"(inlet|inletPad)"' "$name/0.orig/p"
+        grep -q '^waterOnlyPatches (inlet inletPad);' "$name/constant/transportProperties"
+        ! grep -q 'inletPad|bathWall' "$name/0.orig/U" "$name/0.orig/p"
+    fi
     sed "s#^N .*;#N $N;   // study 2e: set by ../makeCases.sh#" -i "$name/caseSetup"
     grep -q "^N $N;" "$name/caseSetup"
     sed 's#^\. \.\./tools/runTools\.sh#. ../../../meshing_strat_trial/tools/runTools.sh#' "$SRC/run" > "$name/run"

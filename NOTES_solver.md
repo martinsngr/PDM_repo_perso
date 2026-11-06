@@ -45,7 +45,8 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
 - **Installed (laptop, 2026-11-05):** `hybridPorousInterFoam` = `4bb5d2e` (A–L + T, docs `11d060b`), byte-identical to the
   tested `hybridPorousInterFoam_T` (md5 `ceb6faf0…`: only relinked under the final name), so the checks of
   `verification/tensorK` apply to it as they are; previous binary kept as `hybridPorousInterFoam_8a97d02`. Pushed
-  (2026-11-05, user); mini03 still has `8a97d02`: pull + `wmake` there after the `Bbox_full` check (user, 2026-11-05).
+  (2026-11-05, user). **mini03: `4bb5d2e` since 2026-11-05 15:28** (user: pull to `11d060b`, `wmake`; previous binary kept
+  as `hybridPorousInterFoam_8a97d02`), before the study 2e jobs 3090/3091; `B_full` and `Bbox_full` ran on `8a97d02`.
 - **Before (laptop, 2026-10-30):** `hybridPorousInterFoam` = `8a97d02` (A–L with the H fix), previous binary kept as
   `hybridPorousInterFoam_be1a3ab`. Keyword on: bit-identical to the K2 scratch binary (cut REV, T12 configuration, 150
   steps, 4 cores). Keyword off: bit-identical to `be1a3ab` (cut REV 100 steps, 4 cores; 2D bench 90 steps, serial).
@@ -536,6 +537,9 @@ Solver behaviour:
   mid-gap bath (job 3068): calm to 30 ms after a 1 ms transient of the same kind below yarn 6 (15 m/s at 0.5 ms), while
   the gaps drained. With the bath inside the mesh (study 2e, `B_full`) the same transient comes earlier and shorter (12–15
   m/s at 0.20–0.35 ms, partly filled cell α 0.25–0.42) and stops once the gap fills: water-filled cells do not pump. The phase-pressure inconsistency itself (G2b) remains.
+  At the base pc it also appears away from the bath: `Bbox_full` (job 3078) 6–9 m/s at the writes 15–20 ms (11.9 m/s in the
+  log), partly filled free cells with 2 faces on y-yarns at S 0.22–0.45 around crossing yarn 8 while the front passes (job 3068,
+  same values and bath plane, calm then); cause not known.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
@@ -565,6 +569,10 @@ Solver behaviour:
   With the bath inside the mesh (study 2e, `B_full`, job 3072, 2026-11-04: 5 water rows below the plane, inlet at their
   bottom) the first gap row stays water at every write and the gaps hold ~12,000 cell volumes: the closure is the cause.
   That run leaks through the open padding beside the bath (its README), so the fix of the bath setup is still open.
+  The bath under the fabric box only (`Bbox_full`, job 3078, 2026-11-05) delays the leak to 8 ms (the outermost box layers,
+  open space next to the padding, flood and feed it) and feeds the gaps through a loop at its surface (up through the outer
+  layers' bath-surface cells, down through the inner plane faces; air collects at the bath bottom, where J closes 17–21 faces).
+  Next: the bath under the yarn band only (study 2e option 2, jobs 3090/3091, `NOTES_cases.md`).
   The 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
 - Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
   `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face
