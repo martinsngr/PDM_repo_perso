@@ -699,13 +699,59 @@ drops (7–15 per µs) while air now enters through the faces under the gaps (19
 swaps with its air across the flat bath surface); bath air 1,188 cell volumes by 18 µs, 565 of 747 bath cells under crests α < 0.5,
 13–26 m/s for 100+ steps. **Horizontal case on hold** (`REV_pipeline/README.md`; its `job.slurm` stops at its first line): two air
 leaks into a bath that cannot vent; options (a bath that lets air out, a solver change for the first leak, the waterline inside a
-submerged fabric layer) to study later with predictions.
+submerged fabric layer) to study later with predictions. Proposed solver rule (not written): no air from a yarn into a free cell
+with α > 0.5, in `updateVariables.H` next to L (factor on `kr2f` of porous/free Darcy faces, ramp α 0.4–0.6, keyword, off by
+default). Flux analysis of the two runs (README): it would stop the first leak at its start, but the pre-wet run shows a second
+route (air vented normally into the gaps, 95–131 cell volumes per µs, then 34–100 per µs down into the bath through its flat
+surface) that it would not touch: needed for a dry fabric on water, probably not sufficient. Nothing launched; user to decide.
+**Study 2f (`verification/study2f_horizontalAir/`, 2026-11-09, run by Claude alone on the laptop at the user's request: scratch
+solver changes only, solver repo untouched, physics-first rule): the horizontal case runs to 0.5 ms.** Findings: (1) the failure is
+seeded at the first contact: a dry crest cell (S 0.002, Van Genuchten pc 2.5 MPa, the curve's dry-end divergence, not a fibre
+bundle's suction) drives a water Darcy flux of order m/s across its face with a bath cell, tearing the flat bath surface beside
+the crests (start transient 31–43 m/s); air enters from above and the study 2c pump takes over. (2) Scratch change M1
+(`porousFreeAirFraction`: air mobility of yarn/gap faces × the free cell's air fraction 1 − α; physical: no air out of a yarn
+into water) is harmless where it should not act (keyword off byte-identical on the REV and the bench; bench unchanged with it on;
+vertical cut REV of job 3068 unchanged within 0.5 % over 0.2 ms) but does not fix the dry start (R1 fails as R0, 25 steps later).
+(3) **A wet contact zone fixes it** (set-up: yarn cells of the bottom four fabric layers on a ramp S 0.84 / 0.64 / 0.35 / 0.15,
++6.3 % of the yarn capacity ≈ 4 g/m², the same practice as the bath of the vertical cases): R3 (ramp + M1) reaches 0.5 ms, no
+stopGuard, the bath cells under the crests water throughout, a transient bath sag (peak 2,405 cell volumes at 150 µs, refilled by
+350 µs: the thin fixed-pressure bath refills by hydrostatics only), gaps fed from below and filling bottom-up (54 % of the fabric's
+free cells water at 0.5 ms, the top surface layers dry), yarns S 0.91 uniform, uptake 137 g/m² at 0.5 ms (yarns 55, gaps 82); air
+out through the top = water in through the bath at every write; air velocities 3.7–5.6 m/s at mid-thickness = the displaced air
+venting through the narrow passages (fails the ≤ 3 m/s criterion as written, physical). **R3b (ramp, unchanged solver) = R3
+within 3 % from 100 µs (uptake 135.9 against 136.8 g/m² at 0.5 ms), no stopGuard: the horizontal case needs no solver change,
+only the wet contact zone.** M1 optional (less yarn air left in the bath, 39 against 122 cell volumes). Patches
+`solver/M1_porousFreeAirFraction.patch`, `M2_G2b_on_M1.patch` (built, not needed); conclusions in the study README. **Decided
+with the user 2026-11-09: the contact ramp adopted in `REV_pipeline/cases/horizontal` (`Allpre`: `initFields.py --free-fill 1e-4
+--sat-height 1e-4 --ramp 8e-5`, reproduces R3b's initial fields byte for byte), hold lifted, not submitted yet (predictions J1–J4
+for a 5 ms run on 16 cores in `REV_pipeline/README.md`); scratch binaries `_M/_M1/_M2` deleted; R3b kept in
+`~/PDM_results/study2f_R3b_ramp` (578 MB, includes repointed to the repo's tools).** User: a measured yarn pc curve (with a dry end
+bounded by the bundle's pores) is really needed, next to K and θ.
 **anisoImpesFoam: only as a cross-check (user, 2026-11-09)**: a yarn-only REV (`tensorA`'s yarns, gaps removed) against `tensorA`
 (plan item 5), g = 0 (its gravity-aware wall BC fails on OF9; symmetry walls are exact without gravity), far end open to air, μ_air
 ×1 and ÷100 (air venting route), bath water at 0 Pa as `tensorA`. **Built and smoke-tested the same day: `REV_pipeline/cases/anisoA`,
 `anisoA_mu100`** (`tools/toAnisoImpes.py`: subsetMesh of `tensorA`'s yarn cells, 78,489 cells, `yarnSurface` 39,115 faces as
 symmetry; laptop 50 µs: dt 1.26e-7 / 5.6e-8 s, water +124 / +133 cell volumes; ~16 / ~36 h on the laptop for 30 ms, so mini03 at 4
-cores each; predictions X1–X4 in the README). anisoImpesFoam to be built on mini03 first (none there).
+cores each; predictions X1–X4 in the README). anisoImpesFoam: porousMultiphaseFoam `of9-port` `c6e6578` (the user's fix: anisoImpesFoam
+had not compiled since `65ea0f9`, its symlinked `SEqn.H` uses impesFoam's fixedSb clamp variables; declared inactive; laptop
+regression bit-identical to the 2026-09-16 binary of check 4), built on mini03 the same day. **Submitted 2026-11-09 on mini03: job
+3109 (`anisoA`) and job 3110 (`anisoA_mu100`), 4 cores each** (with 3107, 3108 and another user's 20-core job: 44 of 46 CPUs).
+
+**Plan for 2026-11-10 (agreed with the user 2026-11-09 evening). START HERE.**
+1. **Fetch and compare the four mini03 runs** (all expected done by the morning): `tensorA` job 3107, `tensorB` job 3108,
+   `anisoA` job 3109, `anisoA_mu100` job 3110 (`REV_pipeline/cases/`). Fetch each with
+   `rsync -avz --exclude 'processor*' --exclude 'dynamicCode' msinegre@mini03.polito.it:PDM_repo_perso/REV_pipeline/cases/<case>/ ~/PDM_results/REV_pipeline_<case>/`
+   (user's terminal); for the tensor cases repoint the includes:
+   `sed -i 's#"\.\./\.\./\.\./tools/#"/home/martin_sng/PDM_repo_perso/REV_pipeline/tools/#' ~/PDM_results/REV_pipeline_<case>/system/controlDict`.
+   Score against the predictions in `REV_pipeline/README.md`: `tensorA` and `tensorB` against job 3068 with
+   `REV_pipeline/tools/compare3068.py <copy> ~/PDM_results/REV_midbath_run3068` (A1–A5, B1–B4; B2 = `tensorB` at t against `tensorA`
+   at 0.4245·t); `anisoA` / `anisoA_mu100` against `tensorA` (X1–X4): a comparison script is still to write (`Sb` on the yarn-only
+   mesh against `alpha.wetting` on `tensorA`'s porous cells; `subsetMesh` keeps the porous cells in their original order).
+   `compare3068.py` tolerates cases without `bathWall` since 2026-11-09.
+2. **Then a longer horizontal run:** `REV_pipeline/cases/horizontal` with the wet contact zone, 5 ms on 16 mini03 cores once the
+   cores are free (predictions J1–J4 in `REV_pipeline/README.md`); needs today's changes committed, pushed and pulled on mini03.
+Uncommitted on 2026-11-09 evening: `verification/study2f_horizontalAir/`, `NOTES_figures.md`, `REV_pipeline/cases/horizontal/Allpre`
+and `job.slurm`, `REV_pipeline/README.md`, `REV_pipeline/tools/compare3068.py`, `NOTES_cases.md`, `NOTES_solver.md`, `CLAUDE.md`.
 
 **2026-11-09: `BfullP_cut` (job 1600) fetched from mini01 and analysed** (REV case status, study 2e option 3; README scoring): gaps at the
 bath wet and the cut flooded by 7 ms (F2 passes), but the outer bath is not controlled (F1 fails: far bath emptied through `inletPad`

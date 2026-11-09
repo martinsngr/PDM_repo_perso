@@ -1,7 +1,4 @@
 #!/bin/bash
-# ON HOLD (2026-11-09): the laptop smoke test fails at 31 us (air leaks into the bath and cannot leave; ../../README.md,
-# horizontal). Do not submit before that is solved: the job stops here.
-echo "horizontal is on hold (../../README.md): not submitted"; exit 1
 # SLURM job of horizontal (REV_pipeline, ../../README.md): the fabric lying flat on a bath at rest, water rising through
 # the thickness (the previous student's set-up), REV values with theta 40 deg, gravity -z, x and y cyclic; 5 ms.
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.

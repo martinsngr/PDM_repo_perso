@@ -14,7 +14,7 @@ Working notes, loaded for the whole repo:
 - `verification/`: all verification evidence (paper tutorials, 1D similarity, benches) and `PLAN.md` (planned
   studies, their rules: predictions before runs, one recorded solver version per study, stop after each study).
 - `NOTES_cases.md` (cases) and `NOTES_solver.md` (solver): update them after each piece of work, measured results
-  kept apart from hypotheses.
+  kept apart from hypotheses. `NOTES_figures.md`: figures for the thesis (what each shows, data, script, status).
 
 ## Solver
 - `hybridPorousInterFoam`, OpenFOAM 9, source `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8`, branch

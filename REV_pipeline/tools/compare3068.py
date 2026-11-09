@@ -173,15 +173,16 @@ def main():
             continue
         sr = stats(R, t) if t in rtimes else None
         b, br = B.get(t), BR.get(t)
-        lost = -(float(b["in_top"]) + float(b["in_bottom"])) / V if b else np.nan
-        lostr = -(float(br["in_top"]) + float(br["in_bottom"])) / V if br else np.nan
+        col = lambda r, k: float(r[k]) if r and k in r else np.nan   # budget columns differ between cases (patches)
+        lost = -(col(b, "in_top") + col(b, "in_bottom")) / V
+        lostr = -(col(br, "in_top") + col(br, "in_bottom")) / V
         rows.append((float(t) * 1e3, s["front"], sr["front"] if sr else np.nan))
         print(f"{float(t)*1e3:6.2f} | {s['front']:.3f} ({sr['front'] if sr else np.nan:.3f}) | "
               f"{s['porw']:8.0f} ({s['porw']/sr['porw'] if sr else np.nan:.3f}) | {s['gap']:7.0f} ({sr['gap'] if sr else np.nan:5.0f}) | "
               f"{s['pad']:6.0f} | {s['row1']}/{s['nrow1']} | {s['layer']:.3f} | "
               f"{s['Ubox']:.2f} / {s['Upad']:.2f} / {s['Upor']:.2f} | {s['amin']:.2g}/{s['amax']:.4f} | "
-              f"{lost:8.1f} ({lostr:.1f}) | {float(b['in_inlet']) if b else np.nan:.3e} | "
-              f"{float(b['in_bathWall']) if b else np.nan:.2g} | {float(b['imbalance']) if b else np.nan:.2g}"
+              f"{lost:8.1f} ({lostr:.1f}) | {col(b, 'in_inlet'):.3e} | "
+              f"{col(b, 'in_bathWall'):.2g} | {col(b, 'imbalance'):.2g}"
               f" || {s['brow1']}/{s['nbrow1']} | {s['bgap']:6.0f} ({sr['bgap'] if sr else np.nan:5.0f}) | "
               f"{s['open_']:6.0f} ({sr['open_'] if sr else np.nan:5.0f})")
     rows = np.array(rows)

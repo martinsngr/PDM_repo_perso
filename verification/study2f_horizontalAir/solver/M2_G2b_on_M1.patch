@@ -1,0 +1,34 @@
+--- /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/d67a2d60-aac9-40cc-a35e-f8eb64c73244/scratchpad/solverM1/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H	2026-11-09 12:03:18.582387442 +0100
++++ solvers/hybridPorousInterFoam/updateVariables.H	2026-11-09 12:32:54.972255893 +0100
+@@ -136,6 +136,31 @@
+ {
+     pc *= Solid;
+     dPcdS *= Solid;
++
++    // Study 2c variant G2b (verification/study2c_nearSaturation), reused in study2f
++    // (scratch build only): free cells with an interface carry the VOF capillary
++    // pressure pc = -w(alpha)*sigma*K (K = -div(nHat), p_water - p_air = sigma*K) in
++    // the same mixture form as the porous cells (p = p_air - alpha*pc), so that the
++    // porous/free Darcy faces use the air and the water pressure of the free cell
++    // instead of its single VOF pressure for both. w = 0 outside an interface (alpha
++    // below alphaMin or above 1 - alphaMin, where the curvature of a trace of one
++    // phase is meaningless), 1 inside it (linear ramps). Keywords porousFreeVofPc
++    // (default off: solver unchanged), porousFreeVofPcAlphaMin (0.05),
++    // porousFreeVofPcAlphaRamp (0.1).
++    if (transportProperties.lookupOrDefault<Switch>("porousFreeVofPc", false))
++    {
++        const scalar aMin =
++            transportProperties.lookupOrDefault<scalar>("porousFreeVofPcAlphaMin", 0.05);
++        const scalar aRamp =
++            transportProperties.lookupOrDefault<scalar>("porousFreeVofPcAlphaRamp", 0.1);
++        const volScalarField w
++        (
++            (1. - Solid)
++           *min(max((alpha1 - aMin)/aRamp, scalar(0)), scalar(1))
++           *min(max((1. - aMin - alpha1)/aRamp, scalar(0)), scalar(1))
++        );
++        pc -= w*mixture.sigmaK();
++    }
+ }
+ PcCoeff = (  
+ 	-pc

@@ -55,14 +55,16 @@ m 0.5, ε 0.5, water/air, σ 0.072, G + H + F′ + I, J (`waterOnlyPatches`), L 
 |---|---|---|---|
 | `tensorA` | vertical wicking along y, bath plane mid-gap (job 3068's mesh, BCs and initial state) | job 3068: K diagonal in the yarn axes, Kpar 1e-11, Kperp 2.2e-12 (Gebart ratio 4.55): **anisotropy alone**, study (a) | 8 (job 3068's decomposition), 30 ms, every 0.5 ms |
 | `tensorB` | the same | job 3068: K from Gebart (hex, Vf 0.5, fibre radius 7.5 µm): Kpar 4.245e-12, Kperp 9.20e-13, study (b) | 8, 60 ms, every 1 ms |
-| `horizontal` | the previous student's set-up with our model: the fabric lying flat on a bath at rest, water rising through the thickness (z); x and y cyclic; 5 water rows (0.1 mm) under the fabric box fed from the bottom face (J, totalPressure 0.988 Pa = ρg·5Δz: water at 0 Pa at the bath surface), 5 air rows above it, top open; gravity −z; θ 40° (her value); fabric dry (yarns 0.002, gaps air, no pre-wetted rows) | new (her case: interFoam, impermeable body-fitted yarns, θ 40°, symmetry sides, g 0, inflow fixed at 1e-4 m/s; ours: bath at rest) | 16, 5 ms, every 0.1 ms |
+| `horizontal` | the previous student's set-up with our model: the fabric lying flat on a bath at rest, water rising through the thickness (z); x and y cyclic; 5 water rows (0.1 mm) under the fabric box fed from the bottom face (J, totalPressure 0.988 Pa = ρg·5Δz: water at 0 Pa at the bath surface), 5 air rows above it, top open; gravity −z; θ 40° (her value); gaps air, yarns 0.002 except a **wet contact zone** (yarn cells of the bottom four fabric layers on a ramp S 0.84 / 0.64 / 0.35 / 0.15, +6.3 % of the yarn capacity, adopted 2026-11-09 after study 2f) | new (her case: interFoam, impermeable body-fitted yarns, θ 40°, symmetry sides, g 0, inflow fixed at 1e-4 m/s; ours: bath at rest) | 16, 5 ms, every 0.1 ms |
 
 The horizontal case is the REV box of `inspect_stl.py` (91 × 133 × 14 cells, its cells identical to job 3051's box)
 with 5 + 5 free layers: 290,472 cells, 78,528 porous; `inlet` and `top` 12,103 faces each, all free (the bath touches
 the yarn crests: 747 of the 12,103 faces of the first box layer are porous). The bath surface has no edge (x, y cyclic):
 none of the outer-bath problems of study 2e.
 
-**Runs:** `tensorA` job 3107 and `tensorB` job 3108 on mini03 (8 cores each, submitted 2026-11-09); `horizontal` on hold.
+**Runs:** `tensorA` job 3107 and `tensorB` job 3108 on mini03 (8 cores each, submitted 2026-11-09); `anisoA` job 3109 and
+`anisoA_mu100` job 3110 (4 cores each, submitted the same day, ~30 min later); `horizontal` ready since 2026-11-09 (wet contact
+zone, hold lifted), not submitted.
 
 ### Laptop checks (2026-11-09, scratch copies, installed `4bb5d2e`)
 - `tensorA`, `tensorB`: `Allpre` from this folder; mesh (`blockMeshDict`, points, faces, owner, neighbour, boundary)
@@ -132,8 +134,12 @@ volumes, y-yarn front 0.271 → 0.311 mm above the bath. 30 ms ≈ 238,000 steps
 `anisoA_mu100` smoke test (50 µs, 4 cores): 918 steps, dt 5.3–6.0e-8 s (the freer air raises the capillary part of the
 Coats number: ÷2.2 against `anisoA`), 0.235 s per step, Sb in [0.002, 0.99]; water +133 cell volumes (`anisoA` +124), the
 same front row. 30 ms ≈ 545,000 steps: ~36 h on the laptop, ~15 h on 4 mini03 cores (estimate; within the 72 h limit).
-mini03 had no anisoImpesFoam (2026-11-09): to build in `~/porousMultiphaseFoam/solvers/anisoImpesFoam` (its sources and the
-libraries last changed in `7a99666`, the OF9 port; the laptop's `30adb89` changed impesFoam only).
+**Solver:** porousMultiphaseFoam fork, branch `of9-port`, **`c6e6578`** (2026-11-09, user). anisoImpesFoam had not compiled since
+`65ea0f9` (2026-09-22): its `SEqn.H` is a symlink to impesFoam's, which gained the opt-in fixedSb clamp, declared only in
+impesFoam's `createFields.H` (mini03 build failed on it). `c6e6578` declares the three clamp variables in anisoImpesFoam's
+`createFields.H`, constant and inactive. Regression (laptop, 2026-11-09): the `anisoA` 50 µs smoke test with the rebuilt binary
+= with the 2026-09-16 binary (the one of check 4, kept as `anisoImpesFoam_0916`): same 403 steps and deltaT sequence, `Sb`, `p`,
+`Ua`, `Ub`, `phi` byte-identical at both writes. mini03 had no anisoImpesFoam: built there from `c6e6578`.
 
 Predictions (before the runs; `tensorA` = job 3107):
 - X1: both reach 30 ms, Sb in [0.002, 0.99] (impesFoam gives NaN above Sbmax: a NaN is a failure).
@@ -148,7 +154,26 @@ Predictions (before the runs; `tensorA` = job 3107):
   carry the weave and density variants. X2 fails with X4 small = the hybrid's gaps or bath change the front: not a
   substitute. X4 large = a yarn-only model needs a vent (a Richards solver with a tensor K, or a venting boundary).
 
-### Horizontal: smoke test failed (2026-11-09), case on hold
+### Horizontal: resolved by a wet contact zone (2026-11-09, `../verification/study2f_horizontalAir/`)
+The dry start below fails because a dry yarn cell touching bath water gets the Van Genuchten dry-end capillary pressure (2.5 MPa at
+S 0.002) across one face; it tears the bath surface beside the crests in the first steps and the study 2c pump follows. With the yarn
+cells of the bottom four fabric layers starting on a ramp (S 0.84 / 0.64 / 0.35 / 0.15; `Allpre`: `initFields.py --free-fill 1e-4
+--sat-height 1e-4 --ramp 8e-5`, the same treatment as the bath of the vertical cases) the case runs to 0.5 ms **with the unchanged
+solver** (study 2f R3b, laptop, 4 cores, 3,865 steps, 1.7 h; copy `~/PDM_results/study2f_R3b_ramp`): uptake 135.9 g/m² at 0.5 ms
+(yarns ~55, gaps ~81), yarns S 0.92, gaps filling bottom-up (52 % of the fabric's free cells, the open surface layers dry), a
+transient sag of the thin bath (refilled by 350 µs), the displaced air leaving through the top at the water's inflow rate (3–5 m/s
+in the narrow mid-thickness passages). Adopted by the user the same day; `Allpre` reproduces R3b's initial fields byte for byte.
+Predictions H1–H4 above were written for the dry start and are superseded by these for the cluster run (written 2026-11-09, before
+it):
+- J1: 5 ms without stopGuard on 16 cores; to 0.5 ms within 3 % of R3b (another decomposition).
+- J2: yarn mean S ≥ 0.95 by 2 ms; gaps of layers 9–14 ≥ 90 % water by 2 ms; the open surface layers 15–18 below 20 % water at
+  5 ms (no confinement above the yarn crests, as S9 with closed yarns); no water out through the top beyond 10 cell volumes.
+- J3: uptake at 5 ms between 140 and 200 g/m² (everything full: 217).
+- J4: fastest fabric free cell below 1 m/s from 1.5 ms (the venting falls with the uptake rate); bath air below 200 cell volumes
+  from 0.4 ms on.
+- Cost estimate: 1–2 h per simulated ms on 16 mini03 cores (laptop 4 cores: 3.4 h per ms), 5 ms in 5–10 h.
+
+### Horizontal: smoke test failed (2026-11-09), case on hold (superseded, see above)
 
 Laptop, 4 cores (scratch copy). **600-step test: stopGuard at step 350, t = 31 µs** (dt 8.8e-15 s), α ≤ 1.0001, budget closed.
 dt rose from 3.6e-11 s (step 10, the dry crests taking bath water) to 1.4–2e-7 s at the Coats limit (steps 150–250), while a
@@ -169,6 +194,16 @@ cells under crests α < 0.5. **Not a fix.** Two air leaks into a bath that canno
 surface where the fabric draws water through part of it. Options (each a study with predictions, decided with the user): a bath
 that lets air out; a solver change (no air from a porous cell into a free cell with α > 0.5: the first leak only); the waterline
 inside a submerged fabric layer (no open bath surface under the fabric). `job.slurm` stops at its first line until then.
+**Would a solver rule "no air from a yarn into a mostly-water free cell" fix it? (analysis of the two runs above, 2026-11-09,
+not run with the rule):** air flowing out of yarns into free cells, split by the free cell's α, against the air entering the
+bath through its surface. Dry start: into wet cells (α > 0.5) 15–27 cell volumes per µs only in the first µs, which turns the
+bath cells under the crests air-rich; after that the venting (50–110 per µs) goes into those now air-rich cells, and 38–47 per
+µs enter the bath. The rule would act at the start, so the cells under the crests would stay water: it should stop this first
+leak. Pre-wetted crests: into wet cells only 2–37 per µs after 1.6 µs, but 95–131 per µs into air-filled gap cells (the normal,
+physical venting of the yarns), and 34–100 per µs of air still enter the bath through its flat surface under the gaps: the air
+vented into the gaps goes down into the bath instead of up and out. The rule would not touch that second route. Hypothesis:
+the rule is needed for a dry fabric on water but not sufficient; the flat bath surface under the open space under the fabric
+also has to go (the submerged-fabric set-up, waterline inside the fabric), or the second route needs its own fix.
 
 ## Commands
 

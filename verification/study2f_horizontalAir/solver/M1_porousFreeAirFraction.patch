@@ -1,0 +1,76 @@
+diff -ru -x Make -x lnInclude /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/d67a2d60-aac9-40cc-a35e-f8eb64c73244/scratchpad/solverM/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H solvers/hybridPorousInterFoam/createPorousMediaFields.H
+--- /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/d67a2d60-aac9-40cc-a35e-f8eb64c73244/scratchpad/solverM/OpenFoamV8/solvers/hybridPorousInterFoam/createPorousMediaFields.H	2026-11-05 12:01:14.000000000 +0100
++++ solvers/hybridPorousInterFoam/createPorousMediaFields.H	2026-11-09 12:03:18.582246781 +0100
+@@ -190,6 +190,22 @@
+     Info<< "porousFreeAirKrPorous: air kr of the porous/free Darcy faces from "
+         << "the porous cell" << endl;
+ }
++// Change M1 (scratch, study2f_horizontalAir; opt-in, updateVariables.H): air
++// mobility of the porous/free Darcy faces weighted by the air fraction of the free
++// cell, 1 - alpha. Air passes between the pore space of a yarn and a free cell only
++// through the part of the free cell that is air: a yarn's air does not enter the
++// water of a gap or bath cell (that would take the bubble entry pressure
++// 2 sigma/r_pore, tens of kPa for micrometre pores), and a water-filled free cell
++// has no air to give. Without the keyword the solver is unchanged.
++const Switch porousFreeAirFraction
++(
++    transportProperties.lookupOrDefault<Switch>("porousFreeAirFraction", false)
++);
++if (porousFreeAirFraction)
++{
++    Info<< "porousFreeAirFraction: air mobility of the porous/free Darcy faces "
++        << "weighted by the air fraction (1 - alpha) of the free cell" << endl;
++}
+ surfaceScalarField porousFace("porousFace", Solidf);
+ #include "porousFace.H"
+ // porous/free faces; a face on a coupled patch is seen from both sides and
+diff -ru -x Make -x lnInclude /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/d67a2d60-aac9-40cc-a35e-f8eb64c73244/scratchpad/solverM/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H solvers/hybridPorousInterFoam/updateVariables.H
+--- /tmp/claude-1000/-home-martin-sng-PDM-repo-perso/d67a2d60-aac9-40cc-a35e-f8eb64c73244/scratchpad/solverM/OpenFoamV8/solvers/hybridPorousInterFoam/updateVariables.H	2026-11-05 12:01:14.000000000 +0100
++++ solvers/hybridPorousInterFoam/updateVariables.H	2026-11-09 12:03:18.582387442 +0100
+@@ -57,6 +57,46 @@
+     }
+ }
+ 
++// Change M1 (scratch, study2f_horizontalAir): on porous/free Darcy faces the air
++// kr times the air fraction of the free cell (1 - alpha): air crosses the yarn
++// surface only where the free side is air (no air into water, no air out of water)
++if (porousFreeAirFraction)
++{
++    const labelUList& own = mesh.owner();
++    const labelUList& nei = mesh.neighbour();
++    forAll(nei, facei)
++    {
++        if (porousFace[facei] > 0.5 && Solidf[facei] < 0.5)
++        {
++            // the free cell of the face (the other one is the porous cell)
++            const label cf = Solid[own[facei]] > 0.5 ? nei[facei] : own[facei];
++            kr2f[facei] *= max(1. - alpha1[cf], 0.);
++        }
++    }
++    forAll(kr2f.boundaryField(), patchi)
++    {
++        if (!mesh.boundary()[patchi].coupled())
++        {
++            continue;
++        }
++        const fvsPatchScalarField& pfp = porousFace.boundaryField()[patchi];
++        const fvsPatchScalarField& sfp = Solidf.boundaryField()[patchi];
++        const scalarField SolidI(Solid.boundaryField()[patchi].patchInternalField());
++        const scalarField aI(alpha1.boundaryField()[patchi].patchInternalField());
++        const scalarField aN(alpha1.boundaryField()[patchi].patchNeighbourField());
++        fvsPatchScalarField& k2 = kr2f.boundaryFieldRef()[patchi];
++        forAll(pfp, i)
++        {
++            if (pfp[i] > 0.5 && sfp[i] < 0.5)
++            {
++                // alpha of the free side: the neighbour if this side is porous
++                const scalar af = SolidI[i] > 0.5 ? aN[i] : aI[i];
++                k2[i] *= max(1. - af, 0.);
++            }
++        }
++    }
++}
++
+ // Change J: no air through the porous faces of the water-only reservoir
+ // patches: zero air mobility, so the face carries the water Darcy flux only
+ forAllConstIter(labelHashSet, waterOnlyPatchIDs, iter)

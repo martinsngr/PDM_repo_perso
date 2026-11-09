@@ -14,8 +14,13 @@ cd "${0%/*}" || exit 1
 #              cells) + 5 free layers below (the bath, 0.1 mm) and 5 above (air). Patches: sideA/sideB cyclic in x,
 #              frontA/frontB cyclic in y, inlet = bottom face of the bath rows (water only, J), top = open to air
 #   fields     eps, K (scalar 1e-11, binary cut cells), fYarn, yarnID; alpha.wetting by ../../tools/initFields.py:
-#              the 5 bath rows water (--free-fill 1e-4: cell centres within 0.1 mm of the inlet), the fabric dry
-#              (yarns 0.002, gaps air; --ramp 0: no pre-wetted yarn rows, the bath touches the yarn crests)
+#              the 5 bath rows water (--free-fill 1e-4: cell centres within 0.1 mm of the inlet), gaps air, yarns
+#              0.002 except a wet contact zone: the yarn cells of the bottom four fabric layers on a ramp, S 0.84 / 0.64 /
+#              0.35 / 0.15 (--sat-height 1e-4 --ramp 8e-5: the ramp starts at the bath surface, 0.1 mm above the inlet),
+#              +6.3 % of the yarn capacity (~4 g/m2). Adopted 2026-11-09 (user) after verification/study2f_horizontalAir: a
+#              dry yarn cell touching bath water gets the Van Genuchten dry-end pc (2.5 MPa at S 0.002) across one face and
+#              the run fails at 31 us; with the wet contact zone it runs to 0.5 ms (R3b, unchanged solver). Same treatment as
+#              the bath of the vertical cases: the first instants of contact are not resolved
 #   BCs        0.orig: inlet = bath at rest (totalPressure rho g 5 dz, water at 0 Pa at the bath surface), top = air
 #              at rest (totalPressure 0); x and y cyclic
 
@@ -33,7 +38,7 @@ rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCent
 runApplication blockMesh
 runApplication checkMesh
 runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
-"$PY" ../../tools/initFields.py --free-fill 1e-4 --ramp 0 \
+"$PY" ../../tools/initFields.py --free-fill 1e-4 --sat-height 1e-4 --ramp 8e-5 \
     > log.initFields 2>&1 || { cat log.initFields; exit 1; }
 cat log.initFields
 rm -f 0/C 0/Cx 0/Cy 0/Cz

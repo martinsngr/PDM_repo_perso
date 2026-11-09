@@ -549,7 +549,11 @@ Solver behaviour:
   bath (J at its bottom passes no air), air collects under every crest and a partly filled bath cell runs away (study 2c
   pattern). Possible fixes: a set-up that never puts water against a dry yarn (pre-wetted contact cells, as the vertical cases
   do at the bath), or a solver change: no air flux from a porous cell into a free cell with α > 0.5 (the internal-face
-  counterpart of J). Not decided.
+  counterpart of J). Not decided. **Study 2f (2026-11-09, `verification/study2f_horizontalAir/`, scratch builds only):** the rule
+  as M1 (`porousFreeAirFraction`, air kr × (1 − α) of the free cell, no threshold) is byte-identical off, leaves the 2D bench and
+  the vertical cut REV unchanged on, but does not fix the dry horizontal start: the seed there is the Van Genuchten dry end (pc 2.5
+  MPa at S 0.002) at a direct dry-yarn/water face, which tears the bath surface beside the crests. A wet contact zone (set-up) fixes
+  it; R3b (same ramp, unchanged solver) = R3 within 3 %: **M1 not needed**, an optional refinement (not proposed now).
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
