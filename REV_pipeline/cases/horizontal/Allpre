@@ -1,0 +1,39 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# horizontal (REV_pipeline, ../../README.md): the previous student's set-up with our model: the fabric lying flat on a
+# bath at rest, water rising through the thickness (z), gravity along -z, theta 40 deg (her value); yarns porous
+# (REV values: scalar K 1e-11, Van Genuchten pc0 5000 Pa, m 0.5; G + H + F' + I, J, L).
+# From the TexGen geometry to the initial fields; overwrites the mesh and 0/; then ./run. Python: $PY, else the
+# repo .venv (numpy, trimesh, rtree; embreex for speed).
+#
+#   geometry   ../../geometry/Textiles/PW-22-15-0.4-0.5.stl; REV box ../../geometry/rev_domain.json (inspect_stl.py: x 0-1.818,
+#              y 0-2.667, z -0.0705-0.2115 mm; exactly periodic in x and y)
+#   mesh       uniform 20 um hex mesh (../../tools/build_fields.py --wick-axis z --zpad 5): the REV box (91 x 133 x 14
+#              cells) + 5 free layers below (the bath, 0.1 mm) and 5 above (air). Patches: sideA/sideB cyclic in x,
+#              frontA/frontB cyclic in y, inlet = bottom face of the bath rows (water only, J), top = open to air
+#   fields     eps, K (scalar 1e-11, binary cut cells), fYarn, yarnID; alpha.wetting by ../../tools/initFields.py:
+#              the 5 bath rows water (--free-fill 1e-4: cell centres within 0.1 mm of the inlet), the fabric dry
+#              (yarns 0.002, gaps air; --ramp 0: no pre-wetted yarn rows, the bath touches the yarn crests)
+#   BCs        0.orig: inlet = bath at rest (totalPressure rho g 5 dz, water at 0 Pa at the bath surface), top = air
+#              at rest (totalPressure 0); x and y cyclic
+
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+
+./clean
+rm -rf constant/polyMesh 0 system/blockMeshDict
+cp -r 0.orig 0
+rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCentres log.initFields
+
+"$PY" ../../tools/build_fields.py . --stl ../../geometry/Textiles/PW-22-15-0.4-0.5.stl --domain ../../geometry/rev_domain.json \
+    --k-mode scalar --k-scalar 1e-11 --cut-cells binary --wick-axis z --zpad 5 \
+    > log.build_fields 2>&1 || { cat log.build_fields; exit 1; }
+runApplication blockMesh
+runApplication checkMesh
+runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
+"$PY" ../../tools/initFields.py --free-fill 1e-4 --ramp 0 \
+    > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+cat log.initFields
+rm -f 0/C 0/Cx 0/Cy 0/Cz

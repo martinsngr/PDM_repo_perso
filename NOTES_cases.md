@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-05.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-09.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -27,6 +27,7 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
 | `verification/` (repo root) | All verification: paper tutorials, 1D similarity solution, ddtCorr bench, inlet test (moved from `trialWicking/verification/` 2026-10-13; results in `NOTES_solver.md`), and **`PLAN.md`: the planned studies 1–3** |
 | `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (coded open-patch p BC of the 2D bench and slit cases; `REV/` and `REV_lowpc/` use `totalPressure` since 2026-10-27), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
+| `REV_pipeline/` (repo root) | **The REV runs from 2026-11-09 on, self-contained:** `geometry/` (`funge.py`, the STL, the REV boxes), `tools/` (copies of every script and function object the cases use; `build_fields.py` with `--stl`/`--domain` and `--wick-axis z`), `cases/` (`tensorA`, `tensorB`, `horizontal`). Target: one main script from the REV inputs to the launched run (its `README.md`) |
 
 ## Common setup and rules
 
@@ -571,7 +572,24 @@ solver ignores `waterOnlyPatches`.
   back up (the slit tests' empty gap above an inlet). The band's outer layers are mostly open (first row: layers 6 / 7 / 11 / 12 87 /
   51 / 42 / 59 % free); even layers 8–10 keep only 4–21 of 28–32 first-row cells wet. Yarns one row behind job 3068 to 3 ms, porous
   water 0.94–0.99 × (job 3068's yarns also took the initial water the band case removes from the open space). Air in the inlet row
-  (J holds those cells at α 0.5; α overshoot to 1.047 there at 4.5 ms). `BbandP_cut` (job 3091) still running.
+  (J holds those cells at α 0.5; α overshoot to 1.047 there at 4.5 ms). `BbandP_cut` (job 3091, graded padding) = `Bband_cut` (Next
+  steps, 2026-11-06).
+- **Study 2e option 3, `BfullP_cut` (job 1600, mini01 12 cores, `4bb5d2e`, 2026-11-06 10:43 to 2026-11-07 00:34; copy
+  `~/PDM_results/study2e_BfullP_cut`, analysed 2026-11-09; scoring F1–F6 and details in the study README): the bath under everything
+  with the wide graded padding (12 layers ×1.5, 5.19 mm per side), `inletPad` open and water-only, inlet p0 0.9836 Pa. Reached 12 ms,
+  no stopGuard, budget closed (one-time 4.6e-17 m³). **The gaps at the bath stay wet (F2 passes) and the whole cut floods:** band first
+  row 307/307 at every write, band gap water 3,140 at 1 ms (`Bbox_full` 970, `Bband_cut` 290), all box free cells water by 7.25 ms,
+  yarns full from ~6 ms; the band gaps rise with the outer water body (≥ 50 % water up to 0.23 / 0.45 / 0.83 / 1.15 mm above the plane
+  at 1 / 2 / 5 / 6 ms, padding next to the box 0.15 / 0.39 / 0.77 / 0.97 mm): not separable which lifts which. y-yarn front 1.005 /
+  1.306 mm at 1 / 2 ms, closed end at 2.75 ms (job 3068: 5.0 ms), porous water 1.35–1.41 × job 3068 at 1–3 ms. **But the outer bath is
+  not controlled (F1 fails):** the outer meniscus climbs to the closed outlet (cut 1.163 mm above the plane, static meniscus ~1.4 mm at
+  θ 60°) by 7.25 ms and spreads ~0.6 mm out under it (0.9 million cell volumes in the padding against ~55,000 in the fabric), then
+  drains back from ~10 ms, through the fabric into the bath (plane faces net down at 10–12 ms; F4 fails from 10 ms); the far bath
+  (0.1 mm deep, ~1 Pa hydrostatic margin) flows out through `inletPad` from 0.5 ms and is empty under the outermost padding layer by
+  4 ms (layers 10–11 by 10–12 ms), and J keeps those faces closed; air then recirculates through the far open faces at 15–30 m/s,
+  water leaves as traces in that air: 4,633 cell volumes by 12 ms (fail ≥ 1,000), and the p solve takes 220–540 GAMG iterations per
+  step from 4–5 ms (0 before), ~4,300 s per simulated ms (2,200 before). Hypothesis, not tested: small air pressures over the far bath
+  (−5 to +18 Pa, from the air the rising water displaces) empty it.
 - **Tensor K, planned (decided with the user 2026-10-27; solver change not written, plan in `NOTES_solver.md`,
   "Planned: diagonal tensor K"):** yarn-aligned diagonal K (`build_fields.py --k-mode tensor`, `ORIENTATION "axis"`),
   harmonic face values. Gebart with the script's inputs (Vf 0.5, fibre radius 7.5 µm, both to measure; hex): Kpar
@@ -657,14 +675,61 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 the data, for a blind first prediction. Left out unless the gaps turn out to matter: G2b, 10 µm, gap tuning, `verification/PLAN.md` Studies 1, 2a, 2b. Cores: about 8–10 usable on mini03 (cap 46), the user
 expects more in the coming days and can also use mini01. Test planned: vertical wicking, front and uptake vs time, same yarn in different weaves and densities, then other yarns.
 
+**2026-11-09 (later): `REV_pipeline/` set up (decided with the user).** New self-contained folder at the repo root (layout, tool
+provenance, checks, predictions in its `README.md`); the user's target is one main script from the REV inputs (weave → STL → case
+from a reference → mesh → fields → set-up → launch), not written yet (open point: TexGen's Python is only inside the Windows GUI).
+Three cases built and checked on the laptop: **`tensorA`** (job 3068 with K diag, Kpar 1e-11, Kperp 2.2e-12: study (a)) and
+**`tensorB`** (Gebart Kpar 4.245e-12, Kperp 9.20e-13: study (b), 60 ms), both on job 3068's mesh, fields and BCs (byte-identical
+except K), to run side by side on mini03 (8 cores each; user); **`horizontal`**: the previous student's set-up with our model
+(fabric lying flat on a bath at rest, water rising through the thickness, x and y cyclic, gravity −z, θ 40° her value; user's
+choices: bath at rest, g −z, θ 40°), 16 cores, 5 ms. Smoke tests: tensor cases dt 2.74e-7 / 6.41e-7 s at the Coats limit (×2.2 /
+×5.1 job 3068), tensor K read and guarded; horizontal: stiff start (dSmax-limited dt while the dry yarn crests take up bath water).
+**Horizontal smoke test failed (600 steps, 4 cores): stopGuard at step 350, t = 31 µs** (dt 8.8e-15 s; α ≤ 1.0001, budget closed).
+Diagnosis (rerun with `dsLocator` and writes every 20 steps, face fluxes across the bath surface): **the dry yarn crests vent their
+air down into the bath water** through the 747 crest contact faces (porous/free G faces, air mobility of the dry yarn, nothing
+against air entering a water-filled free cell), 18–41 cell volumes per µs from 1 µs, and 5–19 per µs more through the faces under the
+gaps; the bath cannot vent it (J at its bottom passes no air): bath air 373 → 1,684 cell volumes by 31 µs, all 747 bath cells under
+the crests α < 0.5 by 5 µs, the crests' water uptake then ~0 from 8 µs (the bath feeds only the gaps, +18 → +83 per µs). A partly filled
+bath cell under a crest (α 0.24 → 0.10) runs away: 6 m/s at step 160, 25 at 240, 750 at 276, 9e4 at 300 (study 2c pump pattern), then
+dt collapses. The vertical cases avoid it by construction (the yarns touch the bath only through J boundary faces, saturated rows at the
+bath). Hypothesis, not tested: the same leak (dry yarn next to water-filled free cells) behind the currents of study 2d S5/S11 and job
+3065. Test with the 747 crest cells at S 0.99 (369 cell volumes): 300 steps (18 µs) without stopGuard, but not a fix: the crest venting
+drops (7–15 per µs) while air now enters through the faces under the gaps (19–125 per µs: water rising into the first fabric layer
+swaps with its air across the flat bath surface); bath air 1,188 cell volumes by 18 µs, 565 of 747 bath cells under crests α < 0.5,
+13–26 m/s for 100+ steps. **Horizontal case on hold** (`REV_pipeline/README.md`; its `job.slurm` stops at its first line): two air
+leaks into a bath that cannot vent; options (a bath that lets air out, a solver change for the first leak, the waterline inside a
+submerged fabric layer) to study later with predictions.
+**anisoImpesFoam: only as a cross-check (user, 2026-11-09)**: a yarn-only REV (`tensorA`'s yarns, gaps removed) against `tensorA`
+(plan item 5), g = 0 (its gravity-aware wall BC fails on OF9; symmetry walls are exact without gravity), far end open to air, μ_air
+×1 and ÷100 (air venting route), bath water at 0 Pa as `tensorA`. Not built yet.
+
+**2026-11-09: `BfullP_cut` (job 1600) fetched from mini01 and analysed** (REV case status, study 2e option 3; README scoring): gaps at the
+bath wet and the cut flooded by 7 ms (F2 passes), but the outer bath is not controlled (F1 fails: far bath emptied through `inletPad`
+and J-closed, outer meniscus up to the closed outlet and back, air recirculating at 15–30 m/s through the far open faces, 4,633 cell
+volumes lost). Four bath set-ups now show that wet gaps at the bath need water beside the fabric, and every version of that so far
+leaks or sloshes on this domain; the 1.163 mm cut is shorter than the outer meniscus. **Decided with the user 2026-11-09: the bath
+line (study 2e) is closed; the tensor K runs use the job 3068 set-up (mid-gap bath, J) with job 3068 as the scalar reference.**
+Reasons: the yarns lead in every run; fully wet gaps at the bath (`B_full`) shift the y-yarn front by a constant 0.24 mm (0.02 / 0.10 /
+0.16 / 0.20 / 0.22 / 0.24 / 0.24 mm at 1 / 2 / 3 / 5 / 10 / 15 / 20 ms; both fronts advance 0.26 mm from 15 to 20 ms), an offset, not
+a rate; every bath that kept the gaps wet also leaked or sloshed; a fabric continued below the waterline with walls beside it is
+`Bbox` / job 3068 with a deeper wet layer (study 2d S5's deeper column retracted), water around it is `BfullP_cut`. Known
+limitation of the set-up: dry gaps at the waterline (J closes the drained free bath faces; a VOF meniscus cannot sit on a boundary
+face), front offset ≤ 0.24 mm, but the uptake is underestimated if a test weighs at long times (gaps near the bath can fill once the
+yarn flux drops, Jurin 24–46 mm). The gaps will matter for the horizontal set-up (user). Fit fronts with a free offset (front = k√t + c).
+
 **2026-11-06:** `Bband_cut` (job 3090) analysed: no leak, but the band gaps' menisci sit on the bath plane (REV case status, study 2e
-option 2); S1 failed, S2/S3 passed. `BbandP_cut` (job 3091) ended the same morning, not fetched yet (S6, no longer decisive).
+option 2); S1 failed, S2/S3 passed. `BbandP_cut` (job 3091, ended 10:00, copy `~/PDM_results/study2e_BbandP_cut`): = `Bband_cut` within 0.1 % (front, yarn water) and 1–7 % (band gap water), lost through top/bottom 0.01 against 3.9 cell volumes: the graded padding changes nothing near the fabric, and the traces of water carried out by air need open faces close to the fabric (job 3063 hypothesis supported).
 **Decided with the user 2026-11-06: option 3, the bath under everything (as `B_full`) with a wide graded padding** (12 layers ×1.5,
 5.19 mm per side), the whole bath bottom fed (`inletPad` open and water-only), inlet total pressure 0.9836 Pa (water at 0 Pa at
 the bath plane: the solver solves the full p, gravity as a body force, `pEqn.H:31`). Reason: the gaps at the bath stayed wet only
 where the bath also reached the open space beside the yarns (`B_full`, `Bbox_full`), as in a real dip; `B_full` leaked only because
 its padding is 60 µm. `BfullP_cut` (217,854 cells, 12 ms, 12 cores) built, checked and smoke-tested; design, checks and predictions
-F1–F6 in the study README; to submit on mini03 after commit and pull. Set aside: `Bbox` + wide padding (keeps the loop corner),
+F1–F6 in the study README. **Running on mini01 (mini03 full): job 1600, 12 cores, started 2026-11-06 10:43** (mini01 brought up
+to date the same morning: solver pulled from `c3dbf48` to `11d060b` and rebuilt, thesis repo pulled from `f2f31f6`; confirmed: solver repo
+at `11d060b`, binary rebuilt 10:40 (1,785,848 bytes, as mini03's `4bb5d2e` build; previous one kept as
+`hybridPorousInterFoam_old`, 1,747,520 bytes, the size of the `be1a3ab` build), job log `B: 217,854
+cells, 5 layer rows (17,290 cells, water)` as on the laptop; mini01 repo `.venv` OK, trimesh
+5.1.0 with embreex; partition `global`, cap 46). Measured: 1 ms in 2,253 s of solver time (as mini03), end expected ~18:00–18:30 the same day. Set aside: `Bbox` + wide padding (keeps the loop corner),
 top/bottom cyclic (user: changes the whole set-up), the band bath with yarns continued below the plane (would likely end as
 `Bband_cut`). If the bath line needs it later, the REV can be lengthened (y planes periodic; cost ~L³).
 

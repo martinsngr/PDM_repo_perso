@@ -92,3 +92,8 @@ verification/study2e_bathLayer/*/system/topoSetDict
 verification/study2e_bathLayer/*/system/createPatchDict
 verification/study2e_bathLayer/*/logs/
 verification/study2e_bathLayer/_r0_*/
+# REV_pipeline: generated per case by Allpre / the run (mesh, initial fields, logs, budgets)
+REV_pipeline/cases/*/0/
+REV_pipeline/cases/*/system/blockMeshDict
+REV_pipeline/cases/*/logs/
+REV_pipeline/cases/*/*.csv

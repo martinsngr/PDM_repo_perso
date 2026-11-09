@@ -5,7 +5,9 @@ Working notes, loaded for the whole repo:
 @NOTES_solver.md
 
 ## Layout
-- `meshing_strat_trial/`: current work, fabric REV. Self-contained: `2D_bench/` (thick-wall slit bench),
+- `REV_pipeline/`: the REV runs from 2026-11-09 on, self-contained (`geometry/`, `tools/`, `cases/`); target: one main
+  script from the REV inputs to the launched run (its `README.md`).
+- `meshing_strat_trial/`: fabric REV work up to 2026-11-09. Self-contained: `2D_bench/` (thick-wall slit bench),
   `REV/` (geometry, mesh, fields and solver case in one folder), `slit_test/`, `2D_bench_strip/` (first bench,
   archive), `tools/` (shared scripts, function objects, `runTools.sh`).
 - `trialWicking/`: 1D column and single-yarn cases. Reference work: read it when needed, don't add new work there.

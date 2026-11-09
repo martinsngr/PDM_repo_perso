@@ -399,7 +399,7 @@ yarn comparisons to 3 ms only.
 | S3 | Yes: net up at every write from 0.5 ms |
 | S4 | No: front one row behind job 3068 at 1 / 2 / 3 ms, porous water 0.94–0.99 × (the removed initial water) |
 | S5 | Partly: no stopGuard, dt at the Coats limit, \|U\| ≤ 3 m/s from 1.5 ms, no flux through `bathWall`, imbalance ≤ 8e-20 m³; bath min α 0.5, not > 0.9 (air at the inlet row) |
-| S6 | Waits for `BbandP_cut` (job 3091) |
+| S6 | Mostly yes (`BbandP_cut`, job 3091, ended 2026-11-06 10:00, ~18 h on 4 cores; copy `~/PDM_results/study2e_BbandP_cut`): front and porous water within 0.1 % of `Bband_cut` at every write, open space 48 against 46, band gap water within 1–3 % to 8 ms and up to +7 % at 9–12 ms (532 against 498); lost through top/bottom 0.01 cell volume by 12 ms against 3.9: the traces of water carried out by air leave only through open faces close to the fabric (supports the job 3063 hypothesis); the graded padding changes nothing near the fabric |
 
 **Reading.** The band bath removes the leak and the loop: the open space beside the yarns gets no bath water and stays nearly
 dry, the padding stays dry. It does not keep the gaps at the bath wet: the reading table's last case (S1 fails although fed),
@@ -459,3 +459,68 @@ the yarns' suction empties the gaps at the bath whatever the bath (the `Bband_cu
 **Commands.** After commit, push and `git pull` on mini03: `cd verification/study2e_bathLayer/BfullP_cut && sbatch job.slurm`
 (12 cores, 8G; estimate 7–8 h from `Bband_cut`'s ~2,900 s per simulated ms at 27k cells per core, here 18k). Fetch and point the
 includes as for the other cases (end of option 2).
+
+### Results `BfullP_cut`, job 1600
+
+**Run** (mini01, 12 cores, solver `4bb5d2e`, 2026-11-06 10:43 to 2026-11-07 00:34, 13.9 h; copy `~/PDM_results/study2e_BfullP_cut`,
+fetched and analysed 2026-11-09 with `compare3068.py`, `leakFaces.py`, `../study2d_gapRise/connected.py` and one-off scripts in the
+session scratchpad: water level per padding layer from 20 µm × Σα per column, plane face fluxes, band gaps against the padding water,
+pressures in the far bath). Reached 12 ms, no stopGuard. ~2,200 s per simulated ms to 4 ms (as mini03), then ~4,300 s per ms
+although dt grew to 4.8–6.1e-7 s (yarns saturated, Coats limit relaxed): the second p solve of a step took 0 GAMG iterations to 3 ms
+and 220–540 on average from 4–5 ms (max 748), once the far bath had drained (below). Budget: one-time 4.6e-17 m³ in the first
+0.25 ms, constant after. Note: the cut end is 1.163 mm above the bath plane (y0 0.333 mm, last row 1.486 mm); the 1.26 mm of F3 is the
+height above the inlet.
+
+- **The fabric floods.** Band first row 307/307 at every write; band gap water 3,140 / 3,505 / 3,949 / 10,440 cell volumes at 1 / 2 /
+  3 / 7.25 ms (`Bbox_full` 970 / 1,023 / 1,328; `Bband_cut` 290 / 296 / 334); all box free cells (gaps and open space beside the yarns,
+  ~37,000) water by 7.25 ms, porous water constant from ~6 ms (17,600 cell volumes, yarn mean S 0.97). Band gaps ≥ 50 % water up to
+  0.23 / 0.45 / 0.49 / 0.63 / 0.83 / 1.15 mm above the plane at 1 / 2 / 3 / 4 / 5 / 6 ms, the padding layer next to the box 0.15 / 0.39
+  / 0.51 / 0.59 / 0.77 / 0.97 mm: **the gaps rise with the outer water body, 0–0.18 mm ahead of it**; the y-yarn front ahead of both
+  (0.67 mm at 1 ms) until the closed end. Whether the gaps lift the outer water or the outer meniscus lifts the gaps: not separable here.
+- **The outer meniscus overshoots to the lid.** Water level next to the box (padding layer 1) 0.09 / 0.41 / 0.61 / 0.85 mm above the
+  plane at 0.5 / 2 / 4 / 5.25 ms, at the closed outlet (top row) from 7.25 ms over padding layers 1–7 (~0.6 mm out from the box), a
+  plateau rather than a decaying meniscus; from ~10 ms it drains back (outflow through `inletPad` under layers 1–8 at 12 ms). Bath
+  feed through `inletPad`: 798,800 cell volumes in by 7.25 ms (6.4e-9 m³, ~0.34 mm over the padding area), 378,600 left at 12 ms;
+  through `inlet` 44,270 by 8.5 ms, 14,050 at 12 ms. From ~8 ms the full fabric is a conduit: at 10 / 12 ms the plane faces under the
+  band gaps carry −1,000 / −5,600 cell volumes per ms of water down, the open space −2,700 / −16,700, while the box water stays at
+  ~72,700: padding water enters the fabric sideways and leaves through the bath.
+- **The far bath drains and J locks it.** Under the rising meniscus the bath runs at −8 to −42 Pa; the air just above the far bath
+  (layers 8–12) is at −0.1 to +0.8 Pa at 0.25–1 ms, mostly positive and falling towards the open faces (displaced air leaving there),
+  −5 to +7 Pa at 3 ms (+18 Pa 0.5 mm above the plane next to the box); the bottom bath row of the far layers at 0.90–0.93 Pa at
+  0.25 ms against 0.886 Pa hydrostatic for a surface at the plane. The far bath (0.1 mm deep, ~1 Pa hydrostatic margin) flows out
+  through `inletPad` (−400 to −700 cell volumes per ms under layers 10–12 from 0.5 ms): under the
+  outermost layer (12, 1.745 mm wide) the bath is at −0.087 mm by 4 ms and all its 455 bath cells are air from then on, `inletPad`
+  faces there closed (inflow 0, J); layers 10–11 the same by 10–12 ms. Bottom bath row min α 0.49 at 4 ms, 0 from 5.25 ms.
+- **Leak and air currents.** Lost through top/bottom 9 / 77 / 879 / 1,597 / 3,491 / 4,633 cell volumes at 3.75 / 5 / 6 / 7 / 10 / 12
+  ms (`B_full` 76,800 by 10 ms). At 3.75–4 ms 99.6 % of it leaves within 0.1 mm of the plane through faces of air cells (α < 0.05):
+  traces in the outgoing air next to the drained far bath; from 5 ms at all heights up to 1.5 mm, with air crossing each far patch at
+  2–4e-6 m³/s in and out (recirculation). Padding air 15–30 m/s from 4.75 ms, in the far layers 10–12 over the drained bath (0.4–0.9
+  m/s there to 2 ms); air ρ 1, so ½ρU² ≈ 100–450 Pa against the 1 Pa of the bath layer. Box free |U| ≤ 1.4 m/s from 1.5 ms except
+  2.2 / 2.0 / 2.7 m/s at 3.5 / 4.75 / 5 ms.
+- **Yarns:** front 1.005 / 1.306 / 1.486 mm at 1 / 2 / 3 ms (job 3068 0.985 / 1.185 / 1.306; `B_full` 1.005 / 1.286 / 1.466), closed
+  end at 2.75 ms (job 3068 5.0 ms); porous water 1.39 / 1.41 / 1.35 × job 3068 at 1 / 2 / 3 ms. No front fit (2 points before the end).
+
+| | Scoring |
+|---|---|
+| F1 | No: lost 4,633 cell volumes by 12 ms (fail ≥ 1,000), from 3.75 ms; the far bath does not stay at the plane (empty under the outermost layer by 4 ms, J-closed); net inflow through `inletPad` negative from 7.25 ms |
+| F2 | Yes: band first row 307/307 at every write; band gap water ≥ 3,140 from 1 ms |
+| F3 | Partly: the padding water against the box reaches the cut end (1.163 mm) at 7.25 ms and spreads ~0.6 mm out under the closed outlet; not rising at 12 ms (draining back from ~10 ms) |
+| F4 | No from 10 ms: net up at every write from 0.5 to 7.5 ms (940–3,300 per ms), net down at 10 and 12 ms (the fabric drains into the bath, not a loop) |
+| F5 | No, by a little: front = `B_full` at 1 ms, one row ahead of it at 2 and 3 ms; porous water 1.41 / 1.35 × job 3068 at 2 / 3 ms (1.00–1.36 predicted) |
+| F6 | Partly: no stopGuard, box free \|U\| ≤ 3 m/s from 1.5 ms, \|imbalance\| 4.6e-17 m³, dt 1.25e-7 s at the Coats limit to 5 ms (then 4.8–6.1e-7, yarns saturated); bottom bath row min α 0 from 5.25 ms (J closure at the far bath) |
+
+**Reading.** F2 passes: with water around the fabric the gaps at the bath stay wet (third run after `B_full` and `Bbox_full`), and here
+the gaps fill the whole cut by 6–7 ms. F1 fails, but not as the reading table expected (open faces meeting a flat bath surface): the
+far bath does not stay flat. Hypothesis, not tested: the air displaced by the rising outer water leaves through the far open faces at
+small pressures (−5 to +18 Pa), which empties the 0.1 mm far bath (1 Pa of hydrostatic margin) through `inletPad`; J then keeps those
+faces closed, air circulates through the open faces over the empty bath (15–30 m/s, stiff p solve) and carries water out. Two
+features of the domain make the outer water dynamics dominate: the cut (1.163 mm) is shorter than the static outer meniscus at θ 60°
+(~1.4 mm; up to l_c√2 ≈ 3.8 mm on a fully wetting face), so the meniscus reaches the closed outlet over the padding and spreads under
+it; and the outer water body (≈ 0.9 million cell volumes at 7.25 ms against ~55,000 in the fabric) rises and falls with inertia.
+"Closing the far faces up to a few rows above the plane" (the fallback above) would not remove the drained bath, the lid or the
+slosh. Next decision with the user (`NOTES_cases.md`, Next steps).
+
+**Study closed (decided with the user 2026-11-09).** The tensor K runs use the job 3068 set-up with job 3068 as the scalar reference.
+Fully wet gaps at the bath (`B_full`) move the y-yarn front by a constant ~0.24 mm from 15 ms (an offset, not a rate), and every bath
+that kept the gaps wet leaked or sloshed on this domain. Dry gaps at the waterline stay a known limitation of the set-up (front
+offset ≤ 0.24 mm; uptake underestimated at long times); the gaps come back with the horizontal set-up.

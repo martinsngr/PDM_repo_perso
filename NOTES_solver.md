@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-05. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-09. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -47,6 +47,8 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   `verification/tensorK` apply to it as they are; previous binary kept as `hybridPorousInterFoam_8a97d02`. Pushed
   (2026-11-05, user). **mini03: `4bb5d2e` since 2026-11-05 15:28** (user: pull to `11d060b`, `wmake`; previous binary kept
   as `hybridPorousInterFoam_8a97d02`), before the study 2e jobs 3090/3091; `B_full` and `Bbox_full` ran on `8a97d02`.
+  **mini01: `4bb5d2e` since 2026-11-06 10:40** (user: pull from `c3dbf48` to `11d060b`, the three libraries and the solver
+  rebuilt; previous binary kept as `hybridPorousInterFoam_old`, the size of the `be1a3ab` build), before study 2e job 1600.
 - **Before (laptop, 2026-10-30):** `hybridPorousInterFoam` = `8a97d02` (A–L with the H fix), previous binary kept as
   `hybridPorousInterFoam_be1a3ab`. Keyword on: bit-identical to the K2 scratch binary (cut REV, T12 configuration, 150
   steps, 4 cores). Keyword off: bit-identical to `be1a3ab` (cut REV 100 steps, 4 cores; 2D bench 90 steps, serial).
@@ -540,6 +542,14 @@ Solver behaviour:
   At the base pc it also appears away from the bath: `Bbox_full` (job 3078) 6–9 m/s at the writes 15–20 ms (11.9 m/s in the
   log), partly filled free cells with 2 faces on y-yarns at S 0.22–0.45 around crossing yarn 8 while the front passes (job 3068,
   same values and bath plane, calm then); cause not known.
+- **Air from a dry yarn into a water-filled free cell (found 2026-11-09, `REV_pipeline/cases/horizontal` smoke test,
+  `NOTES_cases.md`):** a porous/free Darcy face (G) lets the air of a dry porous cell into a free cell full of water with the
+  porous cell's air mobility (L; C would upwind the same cell); physically a bubble would need the capillary entry pressure
+  2σ/r_pore (tens of kPa) to form at the pore exit. With the bath inside the mesh under a dry fabric, the yarns vent into the
+  bath (J at its bottom passes no air), air collects under every crest and a partly filled bath cell runs away (study 2c
+  pattern). Possible fixes: a set-up that never puts water against a dry yarn (pre-wetted contact cells, as the vertical cases
+  do at the bath), or a solver change: no air flux from a porous cell into a free cell with α > 0.5 (the internal-face
+  counterpart of J). Not decided.
 - ~~H wrong on processor boundaries~~ (found and fixed 2026-10-26, `verification/parallel_H/`): `calculateK` sets α of the porous
   cells to the mean α of their free neighbours cell by cell but does not refresh the processor patch values, so a free
   cell next to a porous cell across a processor boundary sees the yarn saturation (H undone on those faces; cyclic
@@ -572,7 +582,10 @@ Solver behaviour:
   The bath under the fabric box only (`Bbox_full`, job 3078, 2026-11-05) delays the leak to 8 ms (the outermost box layers,
   open space next to the padding, flood and feed it) and feeds the gaps through a loop at its surface (up through the outer
   layers' bath-surface cells, down through the inner plane faces; air collects at the bath bottom, where J closes 17–21 faces).
-  Next: the bath under the yarn band only (study 2e option 2, jobs 3090/3091, `NOTES_cases.md`).
+  The bath under the yarn band only (`Bband_cut`, job 3090): no leak, but the menisci of the band gaps sit on the bath plane.
+  The bath under everything with a wide graded padding (`BfullP_cut`, job 1600, 2026-11-09): gaps wet, but J now acts on the far
+  bath: 0.1 mm deep there, it flows out through the water-only `inletPad` and its drained faces stay closed (as the drained free
+  inlet faces above), after which air recirculates through the open faces next to it (`NOTES_cases.md`, REV case status).
   The 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
 - Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
   `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face
