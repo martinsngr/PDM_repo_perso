@@ -1,0 +1,37 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# anisoA (REV_pipeline, ../../README.md): cross-check of tensorA with stock anisoImpesFoam (porousMultiphaseFoam,
+# decided with the user 2026-11-09: a cross-check only). The yarns of tensorA alone: tensorA's mesh, K (diagonal,
+# Kpar 1e-11, Kperp 2.2e-12) and initial saturation, the free cells (gaps, padding) removed. Differences from tensorA,
+# by construction: no gaps (the yarn surfaces are zero-flux symmetry patches), no gravity (the gravity-aware wall BC
+# of anisoImpesFoam fails on OpenFOAM 9), the yarn ends at y 3.0 mm open to air (tensorA: closed; the air of the
+# yarns needs an exit once the gaps are gone), the bath water at 0 Pa as tensorA. Python: $PY, else the repo .venv.
+
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+
+./clean
+rm -rf constant/polyMesh constant/K 0 system/blockMeshDict
+mkdir -p 0
+rm -f log.blockMesh log.checkMesh* log.build_fields log.postProcess.writeCellCentres log.initFields log.topoSet \
+      log.subsetMesh log.toAnisoImpes
+
+# 1. tensorA's mesh and fields (same options as ../tensorA/Allpre)
+"$PY" ../../tools/build_fields.py . --stl ../../geometry/Textiles/PW-22-15-0.4-0.5.stl --domain ../../geometry/rev_domain_midbath.json \
+    --k-mode tensor --k-par 1e-11 --k-perp 2.2e-12 --cut-cells binary --wick-axis y --zpad 3 \
+    > log.build_fields 2>&1 || { cat log.build_fields; exit 1; }
+runApplication blockMesh || { tail -20 log.blockMesh; exit 1; }
+runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
+"$PY" ../../tools/initFields.py --closed-patch outlet --closed-patch inletPad --free-fill 1e-4 --sat-height 1e-4 --porous-in 1 \
+    > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+rm -f 0/C 0/Cx 0/Cy 0/Cz
+
+# 2. keep the yarn cells (eps <= 0.99), convert the fields for anisoImpesFoam
+runApplication topoSet || { tail -20 log.topoSet; exit 1; }
+runApplication subsetMesh porous -overwrite || { tail -20 log.subsetMesh; exit 1; }
+"$PY" ../../tools/toAnisoImpes.py . > log.toAnisoImpes 2>&1 || { cat log.toAnisoImpes; exit 1; }
+cat log.toAnisoImpes
+runApplication checkMesh
+grep -E "^\s+cells:|Mesh OK|Failed" log.checkMesh

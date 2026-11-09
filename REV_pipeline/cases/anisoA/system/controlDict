@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// anisoA: anisoImpesFoam, settings of ../../../verification/tensorK/C4_aniso_impes (check 4 of change T): CFL Coats
+// (impesFoam's Todd limit never applies: ../../../NOTES_cases.md), no minDeltaT floor in effect. 30 ms as tensorA.
+
+application     anisoImpesFoam;
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.03;
+deltaT          1e-8;
+adjustTimeStep  yes;
+writeControl    adjustableRunTime;
+writeInterval   5e-4;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   9;
+runTimeModifiable yes;
+
+CFL             Coats;
+maxCo           0.5;
+prefactor       0.1666;
+dSmax           0.01;
+maxDeltaT       1e-3;
+minDeltaT       1e-14;
+
+// ************************************************************************* //

@@ -1,0 +1,28 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+. ../../tools/runTools.sh
+
+# anisoImpesFoam on the yarns of tensorA, N cores from caseSetup (scotch). Needs ./Allpre first. Deletes previous
+# results (./clean), not the mesh or 0/. Solver log outside the workspace during the run (../../tools/runTools.sh).
+
+N=$(foamDictionary -entry N -value caseSetup)
+if [ ! -f constant/polyMesh/owner ] || [ ! -f 0/Sb ] || [ ! -f constant/K ]; then
+    echo "ERROR: no mesh, 0/Sb or constant/K: run ./Allpre first."
+    exit 1
+fi
+./clean
+if [ "$N" -gt 1 ]; then
+    runApplication decomposePar -constant     # constant/K is a field: decomposed only with -constant
+    echo "Running anisoImpesFoam on $PWD using $N cores"
+    runTmpLog log.anisoImpesFoam mpirun -np "$N" anisoImpesFoam -parallel
+    status=$?
+    runApplication reconstructPar
+else
+    runTmpLog log.anisoImpesFoam anisoImpesFoam
+    status=$?
+fi
+if [ "$status" -ne 0 ]; then
+    echo "ERROR: anisoImpesFoam failed (see log.anisoImpesFoam)."
+    exit 1
+fi

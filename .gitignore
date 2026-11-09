@@ -97,3 +97,4 @@ REV_pipeline/cases/*/0/
 REV_pipeline/cases/*/system/blockMeshDict
 REV_pipeline/cases/*/logs/
 REV_pipeline/cases/*/*.csv
+REV_pipeline/cases/*/constant/K

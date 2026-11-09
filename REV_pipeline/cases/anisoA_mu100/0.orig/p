@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// p = air pressure (porousMultiphaseFoam: the water flux carries +Mb grad(pc), water pressure p - pc).
+// Bath: water at 0 Pa as in tensorA (totalPressure 0 with alpha 1 on the yarn faces), i.e. air at
+// pc(0.99) = 5000 ((0.99/0.999)^-2 - 1)^0.5 = 675.7 Pa. Outlet (the yarn ends at y 3.0 mm): air at 0 Pa.
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 675.7;
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+    ".*"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //

@@ -680,7 +680,8 @@ provenance, checks, predictions in its `README.md`); the user's target is one ma
 from a reference → mesh → fields → set-up → launch), not written yet (open point: TexGen's Python is only inside the Windows GUI).
 Three cases built and checked on the laptop: **`tensorA`** (job 3068 with K diag, Kpar 1e-11, Kperp 2.2e-12: study (a)) and
 **`tensorB`** (Gebart Kpar 4.245e-12, Kperp 9.20e-13: study (b), 60 ms), both on job 3068's mesh, fields and BCs (byte-identical
-except K), to run side by side on mini03 (8 cores each; user); **`horizontal`**: the previous student's set-up with our model
+except K), to run side by side on mini03 (8 cores each; user). **Submitted 2026-11-09 on mini03: job 3107 (`tensorA`) and job
+3108 (`tensorB`), 8 cores each, next to another user's 20-core job (36 of 46 CPUs); expected ~12–16 h (a), ~10–14 h (b);** **`horizontal`**: the previous student's set-up with our model
 (fabric lying flat on a bath at rest, water rising through the thickness, x and y cyclic, gravity −z, θ 40° her value; user's
 choices: bath at rest, g −z, θ 40°), 16 cores, 5 ms. Smoke tests: tensor cases dt 2.74e-7 / 6.41e-7 s at the Coats limit (×2.2 /
 ×5.1 job 3068), tensor K read and guarded; horizontal: stiff start (dSmax-limited dt while the dry yarn crests take up bath water).

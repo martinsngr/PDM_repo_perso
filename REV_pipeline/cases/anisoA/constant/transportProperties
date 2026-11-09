@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// anisoA (REV_pipeline, ../../README.md): the yarns of tensorA alone, anisoImpesFoam (porousMultiphaseFoam).
+// REV values as tensorA / job 3068: eps 0.5 (every cell of this mesh is a yarn cell), Brooks-Corey n 3,
+// Van Genuchten pc0 5000 Pa, m 0.5, Sb in [0, 0.999] (as alpha.wettingmin/max of the hybrid); a = air, b = water.
+// Dictionary of ../../../verification/tensorK/C4_aniso_impes (check 4 of change T).
+
+activateCapillarity 1;
+
+eps             eps [0 0 0 0 0 0 0] 0.5;
+
+phase.a
+{
+    rho         rho [1 -3 0 0 0 0 0] 1e0;
+    mu          mu [1 -1 -1 0 0 0 0] 1.76e-5;
+}
+
+phase.b
+{
+    rho         rho [1 -3 0 0 0 0 0] 1e3;
+    mu          mu [1 -1 -1 0 0 0 0] 1e-3;
+}
+
+relativePermeabilityModel  BrooksAndCorey;
+
+BrooksAndCoreyCoeffs
+{
+    n           3;
+    Sbmin       0;
+    Sbmax       0.999;
+}
+
+capillarityModel  VanGenuchten;
+
+VanGenuchtenCoeffs
+{
+    pc0         5000;
+    m           0.5;
+    Sbmin       0;
+    Sbmax       0.999;
+}
+
+// ************************************************************************* //

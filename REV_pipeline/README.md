@@ -27,6 +27,7 @@ change T for the tensor K). Rules as everywhere in the repo: predictions before 
 | `tools/check.py` | per-write checks of a REV run along y (fronts, gaps, |U|, budget) |
 | `tools/compare3068.py` (+ `analyseCut.py`) | a run against job 3068 on the cells above the bath plane |
 | `tools/zLayers.py` | water per z layer of the free cells (through-thickness runs) |
+| `tools/toAnisoImpes.py` | after `subsetMesh`: a tensor-K hybrid case → an anisoImpesFoam case of its yarns (`cases/anisoA`) |
 | `cases/<case>` | one OpenFOAM case per run: `0.orig`, `constant`, `system`, `caseSetup` (N cores), `Allpre`, `run`, `clean`, `job.slurm`, `job_restart.slurm` |
 
 Where the tools come from (copied 2026-11-09; the originals stay where they were, for the older cases):
@@ -60,6 +61,8 @@ The horizontal case is the REV box of `inspect_stl.py` (91 × 133 × 14 cells, i
 with 5 + 5 free layers: 290,472 cells, 78,528 porous; `inlet` and `top` 12,103 faces each, all free (the bath touches
 the yarn crests: 747 of the 12,103 faces of the first box layer are porous). The bath surface has no edge (x, y cyclic):
 none of the outer-bath problems of study 2e.
+
+**Runs:** `tensorA` job 3107 and `tensorB` job 3108 on mini03 (8 cores each, submitted 2026-11-09); `horizontal` on hold.
 
 ### Laptop checks (2026-11-09, scratch copies, installed `4bb5d2e`)
 - `tensorA`, `tensorB`: `Allpre` from this folder; mesh (`blockMeshDict`, points, faces, owner, neighbour, boundary)
@@ -110,6 +113,35 @@ after 2 ms; α ≤ 1.0017; free |U| ≤ 1.1 m/s from 2 ms; dt 1.25e-7 s; 3,440 s
   top at 0.18 mm). **Fails if the free box cells above the first box layer hold < 20 % water at 5 ms**: the yarn suction
   would then empty even gaps fed by the bath over their whole area.
 - H4 uptake (water above the bath surface) at 5 ms 120–200 g/m² (yarns full: 65 g/m²; all free box cells full: +152).
+
+### Cross-check: `anisoA`, `anisoA_mu100` (anisoImpesFoam, set up 2026-11-09; a cross-check only, decided with the user)
+
+The yarns of `tensorA` alone (plan item 5, yarn-only REV against the hybrid), stock anisoImpesFoam of porousMultiphaseFoam
+(laptop: `30adb89`). `Allpre` builds `tensorA`'s mesh and fields, keeps the yarn cells (`topoSet` eps ≤ 0.99, `subsetMesh`),
+and `tools/toAnisoImpes.py` writes `0/Sb` (`tensorA`'s initial saturation), `constant/K` (its tensor), the BCs. 78,489 cells
+(= `tensorA`'s yarn cells), patches: `inlet` 330 faces (the bath: Sb 0.99, air pressure p = pc(0.99) = 675.7 Pa so the water is
+at 0 Pa as in `tensorA`, no air through it), `outlet` 329 faces (the yarn ends at y 3.0 mm: air at 0 Pa, no water out),
+`sideA`/`sideB` cyclic, `yarnSurface` 39,115 faces (`tensorA`'s yarn/gap faces) as `symmetry` (zero flux without gravity).
+Differences from `tensorA` by construction: no gaps (no gap water, no venting of the yarns' air into the gaps: the air
+leaves through the yarn ends, the crossing yarns through their contacts), **no gravity** (anisoImpesFoam's gravity-aware wall
+BC fails on OpenFOAM 9; ρgL ≈ 26 Pa against pc0 5000 Pa, ~1 %), the outlet open to air (closed in `tensorA`), Coats dt from
+the full face tensor (Kpar on every face: dt 1.26e-7 s, half of `tensorA`'s). `anisoA_mu100`: `anisoA` with μ_air 1.76e-7
+(÷100): how much the venting route matters. `decomposePar -constant` (K lives in `constant/`).
+Laptop checks: checkMesh OK; smoke test 50 µs on 4 cores (403 steps, 0.25 s per step): Sb in [0.002, 0.99], water +124 cell
+volumes, y-yarn front 0.271 → 0.311 mm above the bath. 30 ms ≈ 238,000 steps: ~16 h on the laptop, so mini03 (4 cores each).
+
+Predictions (before the runs; `tensorA` = job 3107):
+- X1: both reach 30 ms, Sb in [0.002, 0.99] (impesFoam gives NaN above Sbmax: a NaN is a failure).
+- X2 front: `anisoA`'s y-yarn front fit (2–20 ms, free offset) within −3 to +6 % of `tensorA`'s (impesFoam ahead by 1.8 % in
+  the 1D twins and 2.5 % in check 4; no gravity, up to +1 %; the missing gap water costs 1–2 rows early, mostly in the offset).
+- X3 water: `anisoA`'s yarn water below `tensorA`'s by 2,000–3,500 cell volumes at 1–2 ms (`tensorA`'s yarns also take part
+  of the initial gap column, 4,715 cell volumes, which `anisoA` does not have), the ratio rising to 0.95–1.08 by 10–20 ms
+  (impesFoam holds 4–9 % more water in the twins).
+- X4 venting: `anisoA_mu100` within +0 to +3 % of `anisoA` in front, +0 to +5 % in yarn water (1D: the air back-pressure
+  cost ~2.5 % of the uptake); more than 5 %: the yarns' trapped or slowly vented air matters once the gaps are gone.
+- Reading: X2 and X3 hold = the REV front is set by the yarn network, and anisoImpesFoam (yarn-only, ~10× cheaper) can
+  carry the weave and density variants. X2 fails with X4 small = the hybrid's gaps or bath change the front: not a
+  substitute. X4 large = a yarn-only model needs a vent (a Richards solver with a tensor K, or a venting boundary).
 
 ### Horizontal: smoke test failed (2026-11-09), case on hold
 

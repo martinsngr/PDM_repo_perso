@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      Sb;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Water saturation. Internal field written by ../../tools/toAnisoImpes.py from tensorA's initial alpha.wetting
+// (yarns 0.99 over the first 0.1 mm, the 0.2 mm ramp, then 0.002); the BCs below.
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform 0.002;
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+    inlet           // bath: saturated yarn faces (impesFoam: Sb must stay below Sbmax 0.999)
+    {
+        type            fixedValue;
+        value           uniform 0.99;
+    }
+    ".*"
+    {
+        type            zeroGradient;
+    }
+}
+
+// ************************************************************************* //
