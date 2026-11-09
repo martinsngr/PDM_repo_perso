@@ -702,7 +702,10 @@ leaks into a bath that cannot vent; options (a bath that lets air out, a solver 
 submerged fabric layer) to study later with predictions.
 **anisoImpesFoam: only as a cross-check (user, 2026-11-09)**: a yarn-only REV (`tensorA`'s yarns, gaps removed) against `tensorA`
 (plan item 5), g = 0 (its gravity-aware wall BC fails on OF9; symmetry walls are exact without gravity), far end open to air, μ_air
-×1 and ÷100 (air venting route), bath water at 0 Pa as `tensorA`. Not built yet.
+×1 and ÷100 (air venting route), bath water at 0 Pa as `tensorA`. **Built and smoke-tested the same day: `REV_pipeline/cases/anisoA`,
+`anisoA_mu100`** (`tools/toAnisoImpes.py`: subsetMesh of `tensorA`'s yarn cells, 78,489 cells, `yarnSurface` 39,115 faces as
+symmetry; laptop 50 µs: dt 1.26e-7 / 5.6e-8 s, water +124 / +133 cell volumes; ~16 / ~36 h on the laptop for 30 ms, so mini03 at 4
+cores each; predictions X1–X4 in the README). anisoImpesFoam to be built on mini03 first (none there).
 
 **2026-11-09: `BfullP_cut` (job 1600) fetched from mini01 and analysed** (REV case status, study 2e option 3; README scoring): gaps at the
 bath wet and the cut flooded by 7 ms (F2 passes), but the outer bath is not controlled (F1 fails: far bath emptied through `inletPad`

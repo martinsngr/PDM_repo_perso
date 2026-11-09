@@ -129,6 +129,11 @@ the full face tensor (Kpar on every face: dt 1.26e-7 s, half of `tensorA`'s). `a
 (÷100): how much the venting route matters. `decomposePar -constant` (K lives in `constant/`).
 Laptop checks: checkMesh OK; smoke test 50 µs on 4 cores (403 steps, 0.25 s per step): Sb in [0.002, 0.99], water +124 cell
 volumes, y-yarn front 0.271 → 0.311 mm above the bath. 30 ms ≈ 238,000 steps: ~16 h on the laptop, so mini03 (4 cores each).
+`anisoA_mu100` smoke test (50 µs, 4 cores): 918 steps, dt 5.3–6.0e-8 s (the freer air raises the capillary part of the
+Coats number: ÷2.2 against `anisoA`), 0.235 s per step, Sb in [0.002, 0.99]; water +133 cell volumes (`anisoA` +124), the
+same front row. 30 ms ≈ 545,000 steps: ~36 h on the laptop, ~15 h on 4 mini03 cores (estimate; within the 72 h limit).
+mini03 had no anisoImpesFoam (2026-11-09): to build in `~/porousMultiphaseFoam/solvers/anisoImpesFoam` (its sources and the
+libraries last changed in `7a99666`, the OF9 port; the laptop's `30adb89` changed impesFoam only).
 
 Predictions (before the runs; `tensorA` = job 3107):
 - X1: both reach 30 ms, Sb in [0.002, 0.99] (impesFoam gives NaN above Sbmax: a NaN is a failure).
