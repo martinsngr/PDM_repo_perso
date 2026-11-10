@@ -1,0 +1,6 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+# Mesh and initial fields of R0_J (study 2g, ../README.md): ../../study2e_bathLayer/buildCase.sh with NB = 0 rows of
+# bath layer below the bath plane and NA = 58 fabric rows above it (= R0_inlet of study 2e: job 3068 cut at y 1.496 mm).
+./clean
+../../study2e_bathLayer/buildCase.sh . 0 58

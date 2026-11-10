@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-09.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-10.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -105,6 +105,17 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
   crimped fabric.
 - **Yarns:** thickness median 6 cells (120 µm), max 7–8; width ~15 cells (300 µm); yarns 0/4 and 5/9 are halves cut by
   the periodic boundaries. A yarn flank facing an in-plane gap is ~8 cells deep, a face facing a crimp pocket ~3.
+  **One-cell edge sheets (seen by the user in ParaView, measured 2026-11-10 on the mid-gap mesh; same x discretisation in
+  every REV mesh):** yarn 1's flank facing yarn 2 (x column 30, x 0.61 mm) and yarn 3's (column 60, x 1.21 mm) carry a
+  sheet one cell thick in z (one z layer, layers 6–12 with the crimp) on 112 of 133 rows, fYarn 0.50–0.61 (median 0.53):
+  the lens edge covers just over half of that column at mid-thickness; jagged where it falls below 0.5. Plus 11 cells
+  each on facing flanks of crossing yarns 7 and 8; 246 cells, 0.3 % of the yarn cells. Cause: the yarn spacing (0.4545 mm
+  = 22.73 cells) is not a whole number of cells, so yarns 1 and 3 sit 0.27 cell off yarn 2's position and round
+  differently (yarn 2's flanks are symmetric, 3 cells thick at the edge). Not a meshing error: no detached piece of any
+  yarn, no isolated cell, every porous cell has a neighbour of its own yarn; with the sheets all four in-plane gaps between
+  the y-yarns are 7 cells at mid-thickness against 7.3–7.4 cells from the yarn fractions (without them the two gaps
+  beside yarn 2 would be 8). Option for the variants (not decided): a cell size that divides the yarn spacings, so that all
+  yarns of a family are discretised alike.
 - **Gaps** (narrowest free run between yarns along x, y or z, per free cell): median 15 cells (300 µm), p25 9, p10 6, p5 4;
   ≤ 4 cells 6 %, ≤ 8 cells 20 %. Narrow throats at mid-thickness where warp and weft cross; near the surfaces medians
   18–58 cells. 82 % of the free cells inside the fabric envelope, 1 % enclosed. TexGen model, not the real fabric.
@@ -736,6 +747,30 @@ cores each; predictions X1–X4 in the README). anisoImpesFoam: porousMultiphase
 had not compiled since `65ea0f9`, its symlinked `SEqn.H` uses impesFoam's fixedSb clamp variables; declared inactive; laptop
 regression bit-identical to the 2026-09-16 binary of check 4), built on mini03 the same day. **Submitted 2026-11-09 on mini03: job
 3109 (`anisoA`) and job 3110 (`anisoA_mu100`), 4 cores each** (with 3107, 3108 and another user's 20-core job: 44 of 46 CPUs).
+
+**2026-11-10: `tensorA` (job 3107) and `tensorB` (job 3108) fetched and scored** (details, numbers and scoring in
+`REV_pipeline/README.md`, "Results"; `REV_pipeline/tools/compareTensor.py`): both stable to the end (30 / 60 ms, Coats dt
+2.4–2.8e-7 / 5.4–6.5e-7 s, free |U| ≤ 1.3 m/s from 2 ms). **B2 holds:** the porous part of (b) at t is (a) at 0.4245·t (front
+within 0.028 mm at every write, fit ratio within 0.6 % of √0.4245, porous water within 0.3 % from 20 ms): at fixed pc0 and
+anisotropy ratio, a K magnitude is a time rescaling; the gaps do not scale (gap water of (b) rises 184 → 508 cell volumes near
+the bath from 39 ms: thin partial layers on yarn surfaces that the yarns absorb, and water-filled pockets below crossing yarn 6
+at −750 to −850 Pa that draw water out of yarn cells at S ≥ 0.987, pc < 770 Pa: the S_eq condition in narrow corners;
+README "What that gap water is"). **A2 fails:** `tensorA` (Kpar 1e-11 along the yarns, Kperp 2.2e-12) is slower than job 3068 (fit 2–20 ms
+12.97 against 14.44 mm/√s, REV/1D 0.72 against 0.80), with less water in both the y-yarns (0.90–0.94 ×) and the crossing yarns
+(0.87–0.89 ×): the crossing-yarn sink alone does not explain 0.80. Candidates (not tested): the isotropic crossing yarns of job
+3068 also carry water along y; the crimp staircase (z-faces at Kperp). Proposed cheap test: saturated Darcy conductance along y
+of the porous cells for the K variants (scipy, no solver run). Both runs cost ~45 % more per step than job 3068 (0.61–0.63 against
+0.425 s; node load likely, not checked). **`anisoA` (job 3109, yarn-only anisoImpesFoam, fetched later the same day,
+`REV_pipeline/tools/compareAniso.py`):** 30 ms, Sb bounded (X1 passes), 12.7 h on 4 cores; front behind `tensorA` at every
+write (fit 2–20 ms −3.5 %: X2 fails by 0.5 %), yarn water 0.84 → 0.93 × `tensorA` (X3 fails), lower S near the bath. Candidates
+(not tested): no lateral air exit for the yarns without gaps (`anisoA_mu100`, X4, still running), and the hybrid's yarns also fed
+through the gaps (~12 % of the bath inflow). **Lucas–Washburn:** the REV uptake grows as √t with a constant coefficient
+(job 3068 2.32–2.38, `tensorA` 2.02–2.19 mm/√s per window over 2–30 ms), the front as h² = k²(t + t0) within one row (k 15.0 /
+13.6 / 9.0 mm/√s for 3068 / A / B); per-window front coefficients scatter (one-cell front, jumps at crossings): use the uptake
+(`REV_pipeline/README.md`). **Study 2g (`verification/study2g_noJ/`, the mid-gap cut REV without J, set up the same day; smoke
+tests 0.1 ms on the laptop):** without J and with α `inletOutlet` 1 (N1) air vents into the bath from 60 µs (11,000 cell volumes
+per ms at 100 µs, half of the free-face outflow: the 2026-10-26 failure's signature); with α `fixedValue` 1 (N2) no venting and
+more first-row water (788 of 944 at 100 µs against 580 with J), no negative α yet. Longer runs on mini03 to decide (user).
 
 **Plan for 2026-11-10 (agreed with the user 2026-11-09 evening). START HERE.**
 1. **Fetch and compare the four mini03 runs** (all expected done by the morning): `tensorA` job 3107, `tensorB` job 3108,

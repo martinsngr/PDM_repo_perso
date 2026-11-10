@@ -92,6 +92,11 @@ verification/study2e_bathLayer/*/system/topoSetDict
 verification/study2e_bathLayer/*/system/createPatchDict
 verification/study2e_bathLayer/*/logs/
 verification/study2e_bathLayer/_r0_*/
+# study 2g: same, the cases are built by ../study2e_bathLayer/buildCase.sh
+verification/study2g_noJ/*/0/
+verification/study2g_noJ/*/system/blockMeshDict
+verification/study2g_noJ/*/system/rev_domain.json
+verification/study2g_noJ/*/logs/
 # REV_pipeline: generated per case by Allpre / the run (mesh, initial fields, logs, budgets)
 REV_pipeline/cases/*/0/
 REV_pipeline/cases/*/system/blockMeshDict

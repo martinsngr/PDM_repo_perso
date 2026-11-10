@@ -26,6 +26,8 @@ change T for the tensor K). Rules as everywhere in the repo: predictions before 
 | `tools/coatsTimeStep`, `liquidBalance`, `stopGuard`, `waterBudget` | function objects included by every `system/controlDict` |
 | `tools/check.py` | per-write checks of a REV run along y (fronts, gaps, |U|, budget) |
 | `tools/compare3068.py` (+ `analyseCut.py`) | a run against job 3068 on the cells above the bath plane |
+| `tools/compareAniso.py` | `anisoA` / `anisoA_mu100` against `tensorA`, cell by cell (the aniso mesh keeps `tensorA`'s yarn cells in order): front, yarn water, crossing-yarn S, row profiles, log statistics |
+| `tools/compareTensor.py` | `tensorA` and `tensorB` against job 3068 (same mesh): per-write table with each crossing yarn's S, fits, the B2 time scaling, log statistics (dt limit, implied |U|, cost) |
 | `tools/zLayers.py` | water per z layer of the free cells (through-thickness runs) |
 | `tools/toAnisoImpes.py` | after `subsetMesh`: a tensor-K hybrid case → an anisoImpesFoam case of its yarns (`cases/anisoA`) |
 | `cases/<case>` | one OpenFOAM case per run: `0.orig`, `constant`, `system`, `caseSetup` (N cores), `Allpre`, `run`, `clean`, `job.slurm`, `job_restart.slurm` |
@@ -105,6 +107,73 @@ after 2 ms; α ≤ 1.0017; free |U| ≤ 1.1 m/s from 2 ms; dt 1.25e-7 s; 3,440 s
 - B3 front fit 2–40 ms 9.1–10.8 mm/√s (0.652 × 13.9–16.6); the closed end not reached by 60 ms (front ~2.8 mm).
 - B4 dt 5.5–7e-7 s (Coats, then dSmax 1.3e-6 and the capillary waves 1.5e-6 close); 60 ms in 10–14 h on 8 cores.
 
+### Results: `tensorA` (job 3107) and `tensorB` (job 3108), analysed 2026-11-10
+Copies `~/PDM_results/REV_pipeline_tensorA`, `REV_pipeline_tensorB` (fetched 2026-11-10, includes repointed);
+`tools/compareTensor.py <A> <B>` (per-write table, per-crossing-yarn S, B2, log statistics) and `tools/compare3068.py`.
+Both on mini03, 8 cores, started 2026-11-09 10:40 next to `anisoA`, `anisoA_mu100` and another user's 20-core job (44 of 46 CPUs).
+- **`tensorA`, 30 ms, no stopGuard, 70,580 s (19.6 h).** dt median 2.4–2.8e-7 s, at the Coats limit on every sampled step
+  after 0.5 ms; α ≤ 1.0014 (sampled log), free |U| ≤ 1.3 m/s at the writes from 2 ms (3.0 / 2.9 m/s at 0.5 / 1 ms; job
+  3068: 15 / 7), imbalance −1.9e-18 m³ once in the first 0.5 ms, constant after. **y-yarn front behind job 3068 from 2 ms**
+  (+0.02 mm at 0.5–1 ms, −0.04 / −0.10 / −0.14 / −0.22 mm at 2 / 10 / 20 / 30 ms; 2.769 mm at 30 ms, closed end not reached);
+  fit 13.47 / 12.97 / 12.81 mm/√s over 2–10 / 2–20 / 2–25 ms (job 3068 14.36 / 14.44 / 14.15), REV/1D 0.72 (0.80). Porous
+  water 0.90 × job 3068 from 2 ms; split: y-yarns 0.90–0.94 ×, crossing yarns 0.87–0.89 × (5–30 ms). Crossing yarn 6 mean
+  S 0.890 at 5 ms (0.920), yarn 7 0.092 / 0.450 at 5 / 10 ms (0.215 / 0.584). Gap water 296 at 1 ms (179), then 115–214
+  cell volumes, slowly rising (job 3068 81–98); first fabric row 19 of 944 free cells water (17): the J cut-off as before.
+  Lost through top/bottom 7.4 cell volumes by 30 ms (11).
+- **`tensorB`, 60 ms, no stopGuard, 62,796 s (17.4 h).** dt median 5.4–6.5e-7 s at the Coats limit (not dSmax nor the
+  capillary waves); free |U| ≤ 1.25 m/s at the writes from 2 ms; imbalance −8.6e-19 m³ once. α above 1.001 in three
+  episodes (sampled log: 12 of 91 steps at 0–5 ms, 70 of 184 at 30–40 ms, 79 of 153 at 50–60 ms; max 1.0067 / 1.013 /
+  1.017), never in porous cells at the writes: free cells at the lower flank of crossing yarn 6 (x 0.33–0.61, y 0.52–0.58,
+  z 0.02–0.06 mm; near the job 3067/3068 pump site, but |U| ≤ 1.3 m/s). Front 1.386 / 1.967 / 2.569 mm at 10 / 30 / 60 ms,
+  fit 8.50 / 8.20 / 8.24 mm/√s over 2–20 / 2–40 / 2–60 ms. Gap water 158 cell volumes at 20–30 ms, **184 → 508 from 39 to
+  60 ms**, all within 0.5 mm of the bath plane (y 0.34–0.83 mm, z 0–0.14 mm: the yarn band), 260 cells α > 0.5 at 60 ms;
+  first row 18 of 944 throughout (no refill from the bath).
+  **What that gap water is (2026-11-10, after the user saw water films on yarn surfaces near the bath; face fluxes
+  `alphaPhi0.wetting` across the yarn/gap faces, 45 and 60 ms):** 1,640 free box cells α > 0.05 at 60 ms (`tensorA` at 30 ms
+  698, job 3068 279), 1,317 touching a yarn, half at y 0.43–0.53 mm (below crossing yarn 6), none above 0.9 mm. Two kinds:
+  (1) thin partial layers on the yarn surfaces, two thirds of the cells at α 0.05–0.2: the yarns absorb them (gap p −34 to +20
+  Pa, yarn pc 810–935 Pa at S 0.982–0.986; on 672 / 915 faces at 45 / 60 ms); at 20 µm such a layer is smeared water in
+  transit, not a resolved film (H also holds θ 60° on wet yarn surfaces); (2) water-filled pockets (164 cells α > 0.9 at 60 ms)
+  at gap p −750 to −850 Pa that **draw water out of the yarns** where the yarn pc is lower (674–767 Pa at S 0.987–0.990, yarn
+  air p ~95 Pa: not trapped air) on 83 / 203 faces: the S_eq condition (yarn pc below the meniscus suction; 800 Pa ≈ 2σcosθ/w
+  for w ≈ 90 µm, a narrow corner). Net over all wet gap cells the yarns still take water (−23 / −22 cell volumes per ms); in
+  the band below yarn 6 the yarns give (+14 / +31 per ms, gross out 67 / 159, back in 53 / 128). The 18 open free bath faces
+  feed the gaps 30 cell volumes per ms (15 % of the bath inflow; porous faces 164–183). `tensorA` at the same porous state
+  (25.5 and 30 ms) has no such outflow (0–1 face): the gap side has 2.4 × more physical time in (b) (bath feed through the
+  free faces ~1,800 against ~1,300 cell volumes). Hypothesis, not tested: the narrow pockets near the bath fill first once
+  the yarn rows beside them pass S_eq, as expected for gaps behind the front. The free-cell α overshoot episodes (1.013–1.017)
+  sit in the same band (x 0.33–0.61, y 0.52–0.58 mm).
+- **B2, the time scaling, holds:** front of (b) at t against (a) at 0.4245·t (interpolated) within 0.028 mm for every write
+  1–60 ms; arrival times of the front, 0.4245·t_b / t_a = 0.996–1.005 from y 1.3 mm (0.91–1.10 below, rows at 20 µm against
+  writes 0.5 ms apart); fits of (b) over (a)'s windows ÷ 0.4245: k_b / k_a = 0.6552 / 0.6478 / 0.6501 (√0.4245 = 0.6515,
+  within 0.6 %), same offset c within 0.007 mm; porous water ratio 1.046 / 1.010 / 1.002 / 0.997 at 1 / 5 / 20 / 60 ms;
+  crossing yarns 6 and 7 S within 0.003 from 10 ms. **The porous part is a pure time rescaling of (a)**: at fixed pc0 and
+  anisotropy ratio the gaps and the porous/free coupling do not change the yarn wicking; the gaps do not scale (gap water
+  of (b) 2.5 × (a)'s at the scaled time at 60 ms).
+- **Scoring.** A1 pass. **A2 fails** (12.97 < 14.0 mm/√s, −10 % instead of +3 to +15 %). A3: yarn 6 at 5 ms 0.890 > 0.85
+  fails, yarn 7 at 10 ms 0.450 ≤ 0.50 passes. A4 pass (296 at 1 ms; the gaps then keep ~2 × job 3068's water). A5: dt
+  pass (2.37e-7 at 10–20 ms, 5 % below the range), cost fails (19.6 h; 0.61 s per step against 0.425 for job 3068; the
+  laptop smoke tests showed no per-step difference, so likely the node load, not checked). B1 pass (α 1.017 ≤ 1.02, in
+  free cells). **B2 passes.** B3 fails as written (8.20 below 9.1–10.8 mm/√s, a consequence of A2: 0.652 × 12.97 = 8.45);
+  closed end not reached, passes. B4: dt pass, cost fails (17.4 h; 0.63 s per step, as `tensorA`).
+- **Lucas–Washburn check (2026-11-10, `compareTensor.npz` of the three copies; scratch script):** the uptake (water above the
+  bath plane, yarns + gaps, per fabric cross-section 1.82 × 0.28 mm²) grows as √t with a constant coefficient over 2–30 ms:
+  per window (2–5 / 5–10 / 10–15 / 15–20 / 20–25 / 25–30 ms) job 3068 2.38 / 2.32 / 2.37 / 2.36 / 2.37 / 2.37 mm/√s, `tensorA`
+  2.19 / 2.02 / 2.13 / 2.12 / 2.12 / 2.13, `tensorB` 1.30–1.49 over 2–60 ms (rising from 40 ms with the gap water). The front
+  (highest y-yarn cell at S > 0.1, from the bath plane) follows h² = k²(t + t0) within one cell row (rms 23 / 36 / 30 µm):
+  k 15.0 / 13.6 / 9.0 mm/√s, t0 1.5 / 2.4 / 4.3 ms (the initial wet rows); a power law without the time origin gives exponents
+  0.40–0.43 only because of that offset. Per-window front coefficients scatter (job 3068 12.6–15.0, `tensorA` 8.4–14.2): the
+  front is one cell on 20 µm rows and jumps at the crossing yarns (0.67 mm period), so the front coefficient needs windows of
+  ≥ 10 ms; the uptake coefficient is the robust one. Gravity is negligible at these heights (ρgh ≈ 25 Pa against kPa).
+- **Reading.** A2's failure line: the crossing-yarn sink does not explain REV/1D 0.80 on its own. The crossing yarns do
+  take less water with Kperp across (A3 partly, 0.87–0.89 ×), but the y-yarns hold less too (0.90–0.94 ×) and their front
+  is slower although K_yy along them is unchanged and every bath face is a y-yarn face at Kpar. Candidates, not tested:
+  (1) in job 3068 the crossing yarns (45 % of the porous cells, isotropic 1e-11) also carry water along y between y-yarn
+  segments; in `tensorA` their K_yy is Kperp; (2) the crimp staircase: a y-yarn steps in z through z-faces at Kperp. Cheap
+  test without a solver run: the saturated single-phase Darcy conductance along y of the porous cells (scipy, 78,489
+  cells) for scalar K, `tensorA`'s K, and two variants (crossing yarns K_yy = Kpar; y-yarns K_zz = Kpar). The weave factor
+  (REV front ÷ 1D front along the yarn axis) depends on the anisotropy: 0.80 isotropic, 0.72 at Kpar/Kperp 4.55.
+
 `horizontal` (written before the smoke test; **the case is on hold**, see "Horizontal: smoke test failed" below):
 - H1 stability: no stopGuard to 5 ms; α ≤ 1.02; free |U| ≤ 3 m/s at the writes from 0.5 ms (study 2d S9, closed yarns,
   the same direction: early peaks 8 m/s); |imbalance| ≤ 1e-16 m³; water out through `top` ≤ 10 cell volumes.
@@ -150,6 +219,21 @@ Predictions (before the runs; `tensorA` = job 3107):
   (impesFoam holds 4–9 % more water in the twins).
 - X4 venting: `anisoA_mu100` within +0 to +3 % of `anisoA` in front, +0 to +5 % in yarn water (1D: the air back-pressure
   cost ~2.5 % of the uptake); more than 5 %: the yarns' trapped or slowly vented air matters once the gaps are gone.
+- **Result `anisoA` (job 3109, analysed 2026-11-10; copy `~/PDM_results/REV_pipeline_anisoA`; `tools/compareAniso.py`):**
+  30 ms, 45,648 s on 4 cores (12.7 h; `tensorA` 19.6 h on 8: ~3 × fewer core-hours, not 10 ×), dt 1.25e-7 s (half of
+  `tensorA`'s, full-tensor Coats as expected), Sb in [0.002, 0.99], no NaN: **X1 passes.** Front behind `tensorA` at every write
+  (−0.06 / −0.06 / −0.12 / −0.04 / −0.10 / −0.14 mm at 1 / 2 / 5 / 10 / 20 / 30 ms); fits 13.33 / 12.51 / 12.68 mm/√s over 2–10 /
+  2–20 / 2–25 ms (−1.0 / −3.5 / −1.0 %): **X2 fails as written** (2–20 ms −3.5 % against −3 to +6 %; the other windows inside),
+  and the sign is the opposite of the 1D twins (impesFoam ahead there). Yarn water below `tensorA` by 788 / 998 cell volumes at
+  1 / 2 ms (predicted 2,000–3,500) and by 1,311 / 1,695 at 10 / 30 ms, ratio 0.84 → 0.91 / 0.92 / 0.93 at 1 → 10 / 20 / 30 ms
+  (predicted 0.95–1.08 by 10–20 ms): **X3 fails.** Row-mean S lower than `tensorA` from the second 0.2 mm above the bath at every
+  time (10 ms: 0.907 / 0.879 / 0.801 against 0.960 / 0.932 / 0.836 at y 0.54 / 0.74 / 0.94 mm; 30 ms: 0.942 against 0.981 at
+  0.54 mm); crossing yarns 6 and 7 wet later (yarn 6 S 0.884 against 0.943 at 10 ms). Candidates, not tested: (1) the air of
+  the yarns has no lateral exit in `anisoA` (only the yarn ends at y 3.0 mm and the crossing-yarn contacts; in `tensorA` it
+  leaves into the gaps through 39,115 yarn/gap faces), so near-saturated rows near the bath keep air; `anisoA_mu100` (X4)
+  tests it; (2) the hybrid's yarns also take water from the gaps (the initial column, and the bath water entering through
+  the few open free bath faces: 47–52 cell volumes per ms against 349–378 through the yarn faces at 26–30 ms, ~12 %).
+  X4 waits for `anisoA_mu100` (job 3110).
 - Reading: X2 and X3 hold = the REV front is set by the yarn network, and anisoImpesFoam (yarn-only, ~10× cheaper) can
   carry the weave and density variants. X2 fails with X4 small = the hybrid's gaps or bath change the front: not a
   substitute. X4 large = a yarn-only model needs a vent (a Richards solver with a tensor K, or a venting boundary).
