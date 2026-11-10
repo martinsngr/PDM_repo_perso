@@ -16,16 +16,20 @@ change T for the tensor K). Rules as everywhere in the repo: predictions before 
 |---|---|
 | `geometry/funge.py` | TexGen script that writes the STL (`Textiles/<weave>-<D1>-<D2>-<v>-<rf>.stl`); needs TexGen's Python (`TexGen.Core`), today only inside the TexGen GUI on Windows |
 | `geometry/Textiles/PW-22-15-0.4-0.5.stl` | the plain weave of all REV runs so far (cm; scale 0.01) |
+| `geometry/Textiles/TW-22-15-0.4-0.5.stl` | twill 1/3, same yarns and densities (`twillA`); regenerated 2026-11-10 with the fixed twill block of `funge.py` (the first version was not periodic: Weave test below) |
 | `geometry/inspect_stl.py` | REV box of an STL → `rev_domain.json` (in metres) |
 | `geometry/rev_domain.json` | REV box of `inspect_stl.py`: x 0–1.818, y 0–2.667, z −0.0705–0.2115 mm (exactly periodic in x and y) |
 | `geometry/rev_domain_midbath.json` | the same box moved by half a crossing-yarn spacing along y (y 0.333–3.0 mm): bath plane mid-gap, job 3068 |
-| `geometry/check_periodicity.py` | checks that the x and y planes of a built REV are periodic |
+| `geometry/rev_domain_TW.json`, `rev_domain_TW_midbath.json` | the same two boxes for the twill STL (z −0.080–0.227 mm) |
+| `geometry/check_periodicity.py` | checks that the x and y planes of a built REV are periodic (first = last cell layer: valid only for a weave mirror-symmetric about the box planes, as the plain weave) |
+| `geometry/stl_periodicity.py` | checks that an STL is periodic over its REV box, any weave: STL vertices near the box planes moved by one period, distance to the surface, per yarn (2026-11-10) |
 | `tools/build_fields.py` | mesh (`system/blockMeshDict`) + eps, K, fYarn, yarnID from the STL and a REV box |
 | `tools/initFields.py` | initial `alpha.wetting` (bath water, dry yarns, ramps) and its boundary field |
 | `tools/runTools.sh` | `runTmpLog`: solver log outside the workspace, `LOG_EVERY` filtering |
 | `tools/coatsTimeStep`, `liquidBalance`, `stopGuard`, `waterBudget` | function objects included by every `system/controlDict` |
 | `tools/check.py` | per-write checks of a REV run along y (fronts, gaps, |U|, budget) |
 | `tools/compare3068.py` (+ `analyseCut.py`) | a run against job 3068 on the cells above the bath plane |
+| `tools/conductance.py` | saturated Darcy conductance of the yarn network of a built case (periodic, harmonic face K), K variants from the yarn axes: effective K and w_sat in seconds |
 | `tools/compareAniso.py` | `anisoA` / `anisoA_mu100` against `tensorA`, cell by cell (the aniso mesh keeps `tensorA`'s yarn cells in order): front, yarn water, crossing-yarn S, row profiles, log statistics |
 | `tools/compareTensor.py` | `tensorA` and `tensorB` against job 3068 (same mesh): per-write table with each crossing yarn's S, fits, the B2 time scaling, log statistics (dt limit, implied |U|, cost) |
 | `tools/zLayers.py` | water per z layer of the free cells (through-thickness runs) |
@@ -57,6 +61,7 @@ m 0.5, ε 0.5, water/air, σ 0.072, G + H + F′ + I, J (`waterOnlyPatches`), L 
 |---|---|---|---|
 | `tensorA` | vertical wicking along y, bath plane mid-gap (job 3068's mesh, BCs and initial state) | job 3068: K diagonal in the yarn axes, Kpar 1e-11, Kperp 2.2e-12 (Gebart ratio 4.55): **anisotropy alone**, study (a) | 8 (job 3068's decomposition), 30 ms, every 0.5 ms |
 | `tensorB` | the same | job 3068: K from Gebart (hex, Vf 0.5, fibre radius 7.5 µm): Kpar 4.245e-12, Kperp 9.20e-13, study (b) | 8, 60 ms, every 1 ms |
+| `twillA` | as `tensorA`, on the twill 1/3 STL (box `rev_domain_TW_midbath.json`, its own mesh and decomposition) | `tensorA`: **the weave alone** (set up 2026-11-10, Weave test below) | 8, 20 ms, every 0.5 ms |
 | `horizontal` | the previous student's set-up with our model: the fabric lying flat on a bath at rest, water rising through the thickness (z); x and y cyclic; 5 water rows (0.1 mm) under the fabric box fed from the bottom face (J, totalPressure 0.988 Pa = ρg·5Δz: water at 0 Pa at the bath surface), 5 air rows above it, top open; gravity −z; θ 40° (her value); gaps air, yarns 0.002 except a **wet contact zone** (yarn cells of the bottom four fabric layers on a ramp S 0.84 / 0.64 / 0.35 / 0.15, +6.3 % of the yarn capacity, adopted 2026-11-09 after study 2f) | new (her case: interFoam, impermeable body-fitted yarns, θ 40°, symmetry sides, g 0, inflow fixed at 1e-4 m/s; ours: bath at rest) | 16, 5 ms, every 0.1 ms |
 
 The horizontal case is the REV box of `inspect_stl.py` (91 × 133 × 14 cells, its cells identical to job 3051's box)
@@ -66,7 +71,7 @@ none of the outer-bath problems of study 2e.
 
 **Runs:** `tensorA` job 3107 and `tensorB` job 3108 on mini03 (8 cores each, submitted 2026-11-09); `anisoA` job 3109 and
 `anisoA_mu100` job 3110 (4 cores each, submitted the same day, ~30 min later); `horizontal` ready since 2026-11-09 (wet contact
-zone, hold lifted), not submitted.
+zone, hold lifted), not submitted. `twillA` ready since 2026-11-10 (8 cores, 20 ms), not submitted.
 
 ### Laptop checks (2026-11-09, scratch copies, installed `4bb5d2e`)
 - `tensorA`, `tensorB`: `Allpre` from this folder; mesh (`blockMeshDict`, points, faces, owner, neighbour, boundary)
@@ -234,9 +239,122 @@ Predictions (before the runs; `tensorA` = job 3107):
   tests it; (2) the hybrid's yarns also take water from the gaps (the initial column, and the bath water entering through
   the few open free bath faces: 47–52 cell volumes per ms against 349–378 through the yarn faces at 26–30 ms, ~12 %).
   X4 waits for `anisoA_mu100` (job 3110).
+- **Result `anisoA_mu100` (job 3110, analysed 2026-11-10; copy `~/PDM_results/REV_pipeline_anisoA_mu100`):** 30 ms, Sb in
+  [0.002, 0.99]; dt 5.4e-8 s (÷2.3 against `anisoA`, the freer air raises the Coats capillary term), 81,329 s on 4 cores (22.6 h,
+  90 core-hours; `anisoA` 51, `tensorA` 157). Against `anisoA`: front fits −0.1 / +1.4 / +0.7 % (2–10 / 2–20 / 2–25 ms), yarn
+  water +4.8 / +6.9 / +8.7 / +9.9 / +7.5 / +5.5 / +4.8 % at 0.5 / 1 / 2 / 5 / 10 / 20 / 30 ms: **X4 passes for the front, fails
+  for the water** (above +5 % from 1 to 20 ms). Against `tensorA`: yarn water 0.88 / 0.93 / 0.97 / 0.976 / 0.975 / 0.974 at 0.5 /
+  2 / 5 / 10 / 20 / 30 ms, front fits −1.1 / −2.3 / −0.3 % (X2 passes), row-mean S near the bath now as `tensorA` (10 ms, y 0.54 /
+  0.74 / 0.94 mm: 0.968 / 0.939 / 0.834 against 0.960 / 0.932 / 0.836; `anisoA` 0.907 / 0.879 / 0.801). **Reading:** `anisoA`'s
+  deficit near the bath is air that cannot leave the yarns sideways; with the air nearly free the yarn-only model gives
+  `tensorA`'s yarn water within 2.5 % from 5 ms and its front within 2.3 %. The early deficit (0.88–0.93 to 2 ms) is the initial
+  gap column that `tensorA`'s yarns absorb. So in the hybrid the gaps act for the yarns mainly as an air vent (they hold little
+  water at the bath, J); a yarn-only model needs a vent, and freeing the air in anisoImpesFoam costs 2.3 × the steps (not
+  cheaper than the hybrid per core-hour: 90 against 157 for the same 30 ms, the hybrid also carrying the gaps).
 - Reading: X2 and X3 hold = the REV front is set by the yarn network, and anisoImpesFoam (yarn-only, ~10× cheaper) can
   carry the weave and density variants. X2 fails with X4 small = the hybrid's gaps or bath change the front: not a
   substitute. X4 large = a yarn-only model needs a vent (a Richards solver with a tensor K, or a venting boundary).
+
+### Effective conductance of the yarn network (`tools/conductance.py`, 2026-11-10)
+Question: is the weave factor w a geometric property of the yarn network, so that a linear solve on the REV mesh (seconds)
+could give it for any weave, density or anisotropy instead of a REV run? Saturated single-phase Darcy flow through the
+yarn cells only (gaps dry, as in the fabric-scale Richards model), two-point fluxes with the harmonic mean of the normal K
+components (as the solver), periodic in x and y with a mean pressure drop per period along y; K_eff per cross-section of the
+fabric box, w_sat = K_eff/(φ_y·Kpar). K variants from the yarn axes: `scalar` (Kpar everywhere, job 3068), `tensor` (Kpar
+along the yarn, Kperp across, `tensorA`), `tensor_crossKyy` (crossing yarns K_yy = Kpar: their conduit along y restored),
+`tensor_yarnKzz` (y-yarns K_zz = Kpar: the crimp staircase without its penalty), `*_yonly` (crossing yarns impermeable).
+Runs to compare with (h² fit and uptake coefficient, both measures agree within 1 %): w_run 0.70 (job 3068), 0.56 (`tensorA`),
+ratio 0.80.
+**Predictions (written before computing):**
+- C1: `scalar` w_sat between 0.6 and 0.95 (the saturated network has no sink and no lagging crossing yarns, so ≥ w_run).
+- C2: `tensor`/`scalar` between 0.75 and 0.90; within ±0.05 of 0.80 = the geometry alone explains the slower front of
+  `tensorA`, and the conductance can stand in for REV runs for the anisotropy dependence of w.
+- C3: the crossing yarns carry 20–40 % of the flux in `scalar`, under 10 % in `tensor`.
+- C4: restoring the crossing yarns' K_yy recovers more of the `scalar` value than restoring the y-yarns' K_zz.
+**Result (2026-11-10, job 3068's mesh = `tensorA`'s, 28 s for the six variants; solver checked first on synthetic cases:
+uniform, rows in series, columns in parallel, a detached blob: exact):** yarn cells 78,489 (43,410 along y, 35,079 crossing),
+φ_y 0.4632, one connected group spanning the period, the same flux through every plane to 1e-12.
+
+| Variant | K_eff [m²] | w_sat | / `scalar` | flux share: along y / crossing / mixed faces |
+|---|---|---|---|---|
+| `scalar` | 2.74e-12 | 0.591 | 1 | 0.841 / 0.154 / 0.005 |
+| `tensor` | 2.14e-12 | 0.461 | 0.780 | 0.921 / 0.075 / 0.004 |
+| `tensor_crossKyy` | 2.25e-12 | 0.486 | 0.821 | 0.882 / 0.110 / 0.007 |
+| `tensor_yarnKzz` | 2.47e-12 | 0.533 | 0.901 | 0.925 / 0.071 / 0.003 |
+| `scalar_yonly` | 2.29e-12 | 0.493 | 0.834 | 1 / 0 / 0 |
+| `tensor_yonly` | 1.93e-12 | 0.417 | 0.705 | 1 / 0 / 0 |
+
+- **C1 fails:** w_sat 0.59 is below the runs' 0.70 (job 3068; the saturated network is 15–20 % less conductive than the wicking
+  rate implies). Cause not known; candidates, not tested: the bath also feeds the yarn flanks through the gap water near the
+  bath (8–12 % of the inflow in the runs), the unsaturated network is not the saturated one scaled by kr.
+- **C2 passes:** `tensor`/`scalar` 0.780 against 0.81–0.82 from the runs (h² fit 0.816, offset fit 2–20 ms 0.807, uptake 0.807):
+  the geometry of the saturated network reproduces the anisotropy effect within 0.04.
+- **C3 half:** the crossing yarns carry 15 % of the flux in `scalar` (predicted 20–40 %), 7.5 % in `tensor` (under 10 %).
+- **C4 fails:** restoring the y-yarns' K_zz recovers 55 % of the gap between `tensor` and `scalar`, the crossing yarns' K_yy 19 %.
+  Without the crossing yarns the anisotropy still costs 15.5 % (`tensor_yonly`/`scalar_yonly` 0.845): most of the drop is inside
+  the y-yarns, where the crimp makes the flow step in z through faces at Kperp. That penalty may partly be a representation
+  effect of the axis-aligned K on the staircase (the real fibres follow the crimp, crimp angle ~11°); not quantified.
+- **Reading:** the conductance reproduces ratios (the anisotropy effect), not the absolute w. Use: w of a new geometry =
+  w_run of a reference × the ratio of the conductances; the twill run tests that across geometries.
+
+### Weave test: twill 1/3 (`twillA`, set up 2026-11-10, not run yet)
+Question (user, 2026-11-10): does the weave alone change the REV result noticeably? If not, w is close to one number for
+these yarns and densities, and the upscaling strategy changes. `twillA` = `tensorA` with one change, the STL: twill 1/3 from
+`geometry/funge.py` (same yarns, densities 22 / 15 per cm, v 0.4, r_f 0.5); the same construction of the mid-gap bath (the
+`inspect_stl.py` box moved by half a weft spacing along y), K diagonal in the yarn axes (Kpar 1e-11, Kperp 2.2e-12), 20 ms,
+compared with `tensorA` over the same windows.
+- **First STL (generated by the user 2026-11-10 with the original twill block of `funge.py`): not periodic.** Built in a
+  scratch copy: box z −0.083–0.231 mm (0.314 mm, PW 0.282: the cubic spline through the 1/3 pattern dips below the floats),
+  91 × 133 × 16 box cells (dz 19.6 µm) + 3 + 3 padding layers = 266,266 cells, 79,298 porous, checkMesh OK, yarn volume
+  0.623 mm³ (PW 0.633). Periodicity (`geometry/stl_periodicity.py`: STL vertices within 150 µm of an x or y plane of the box,
+  moved by one period, distance to the STL surface): max 15.1 µm (weft 7), 11.9 (wefts 5, 9), 10.6–11.6 (warps 0, 2, 4),
+  1.6–4.4 µm for warps 1, 3 and wefts 6, 8; 4.6 / 2.0 % of those vertices above 10 µm at the x / y planes. Plain weave, same
+  check: max 0.7 µm (facet error).
+- **Cause:** the twill node lists ran over −1 to 5 spacings (1.5 periods of the 4-spacing pattern) with repeat vectors of 5
+  spacings, so the yarn ends shape the cubic spline inside the box. Centreline check (scipy cubic splines of the node
+  heights against the infinite pattern, inside the box): 4–17 µm off, depending on the end condition.
+- **Fix (2026-11-10, `geometry/funge.py`):** the twill block builds its nodes from the 1/3 pattern over −4 to 8 spacings (3
+  whole periods), repeat vectors 13 spacings; the same check gives ≤ 0.33 µm (natural and not-a-knot ends), 0 (periodic
+  ends). The block now tests the function argument `weave` like the other blocks. The basket (BW) block has the same
+  1.5-period node lists (not changed). The defect (up to 0.75 cell where the yarn cells on both sides of the cyclic planes
+  should line up) has an effect not quantified against an expected difference of a few %, hence the regeneration.
+- **Regenerated STL (user, 2026-11-10, replaces the first one in `geometry/Textiles/`):** 10 closed bodies, yarns twice as long
+  (only the part in the box is used). Periodic: max 0.55 µm at the x planes, 0.06 µm at the y planes (plain weave 0.69 / 0.27
+  µm). Box (`inspect_stl.py` → `rev_domain_TW.json`; `rev_domain_TW_midbath.json` with job 3068's y shift): z −0.0804–0.2272
+  mm (0.3075 mm; first STL 0.314, PW 0.282), the same z range inside the box as over the whole STL (the yarn ends do not set
+  it). Mesh (`Allpre`, 33 s): 91 × 133 × (3 + 15 + 3) = 254,163 cells of 20.0 × 20.05 × 20.5 µm, 75,936 porous (0.624 mm³; PW
+  78,489 cells, 0.633 mm³), 178,227 free, inlet 1,365 faces (322 porous, 1,043 free; PW 330 + 944), checkMesh OK; crossing
+  yarn 5 outside the box as in job 3068.
+- **Conductance (`tools/conductance.py`, 19 s):** φ_y 0.418 (PW 0.463); w_sat `scalar` 0.581 (0.591), `tensor` 0.498 (0.461):
+  twill/plain 1.080 with the tensor K, 0.983 with the scalar K; `tensor`/`scalar` 0.857 (PW 0.780: longer floats, fewer z-steps
+  at Kperp in the y-yarns, see C4); the crossing yarns carry 4.1 % of the flux (PW 7.5 %). The first STL gave the same w_sat
+  within 0.001 (its defect sat at the planes only).
+
+**Predictions (written 2026-11-10, before the run).** Reference `tensorA` (job 3107: same K, bath construction and initial
+state; values at 1 / 5 / 10 / 20 ms: front 1.005 / 1.486 / 1.847 / 2.409 mm, fit 2–20 ms 12.97 mm/√s, h² fit k 13.6 mm/√s;
+uptake per fabric width (water above the bath plane, yarns + gaps, ÷ 1.818 mm) per window 0.619 / 0.574 / 0.601 / 0.599
+mm²/√s over 2–5 / 5–10 / 10–15 / 15–20 ms; crossing yarn 6 S 0.890 at 5 ms, yarn 7 0.450 at 10 ms, yarn 8 0.255 at 20 ms;
+gap water 296 cell volumes at 1 ms, 115–214 after). Ratio method of the conductance section: w_twill = w_tensorA × 1.080,
+front ×√1.080 = 1.039, uptake per width × 0.985 (yarn volume per fabric area) × 1.039 = 1.024.
+- T1 stability: no stopGuard to 20 ms; α ≤ 1.02; free |U| ≤ 3 m/s at the writes from 2 ms; |imbalance| ≤ 1e-16 m³; lost
+  through top/bottom ≤ 20 cell volumes (`tensorA` 7.4 by 30 ms).
+- T2 front: fit 2–20 ms 13.2–13.8 mm/√s (ratio 1.02–1.06), h² fit k 13.9–14.4 mm/√s; front at 20 ms 2.43–2.52 mm; closed
+  end (2.99 mm) not reached.
+- T3 uptake per width: ratio to `tensorA` 1.00–1.05 in each window 5–10, 10–15, 15–20 ms.
+- T4 crossing yarns: yarn 6 S at 5 ms 0.80–0.95, yarn 7 at 10 ms 0.35–0.60, yarn 8 at 20 ms 0.15–0.40.
+- T5 gaps: drained by 2 ms (gap water at 1 ms 150–1,500 cell volumes, 50–500 after); first fabric row ≤ 50 of the 1,043
+  free cells water (the J cut-off; `tensorA` 19 of 944).
+- T6 dt 2.3–2.8e-7 s at the Coats limit (cells within 2 % of the plain mesh, same K); 20 ms in 10–15 h on 8 cores (254k
+  cells, +5 %; `tensorA` 0.61 s per step under load, job 3068 0.425).
+**Reading.** T2 and T3 inside their ranges: the saturated conductance carries the weave effect across geometries (so far
+tested on the anisotropy only, C2), so w of another weave of these yarns comes from a linear solve in seconds and REV runs
+serve as checks; and the weave changes w by ~8 % here (front +4 %, uptake +2 %), small against the scatter of repeated
+strip tests (Parada 2018), so for these yarns and densities the weave is a second-order input. Front or uptake ratio
+outside the ranges by more than their width: the weave also acts through what the saturated network leaves out
+(crossing-yarn sinks, gap water, air venting), and w needs a REV run per weave.
+- **Smoke test (laptop, scratch copy, 4 cores, 60 steps, after the predictions):** J, L and T active (precompile log); dt at
+  the Coats limit from step 30, 2.71e-7 s (CFL 0.499; dSmax limit 1.28e-6 s, capillary waves 1.51e-6 s; `tensorA` 2.74e-7);
+  α in [−4.9e-19, 1.0006]; imbalance −2.9e-21 m³; 1.54 s per step on 4 cores.
 
 ### Horizontal: resolved by a wet contact zone (2026-11-09, `../verification/study2f_horizontalAir/`)
 The dry start below fails because a dry yarn cell touching bath water gets the Van Genuchten dry-end capillary pressure (2.5 MPa at

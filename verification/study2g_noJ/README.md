@@ -80,6 +80,11 @@ together), no stopGuard, dt 1.29e-7 s mean after step 100 (identical in the thre
   once a first-row cell drains to α 0 with an outflow: not reached at 100 µs.
 - Cost: 0.1 ms in 26 min on the laptop with the three together; 2–3 ms needs the cluster.
 
+## Runs
+Decided with the user after the smoke tests (2026-11-10): `R0_J` and `N2_noJfix` to 3 ms on mini03, **jobs 3111 (`R0_J`) and
+3112 (`N2_noJfix`)**, 4 cores each, submitted 2026-11-10 next to another user's 20-core job; `N1_noJ` not run (its venting is
+shown by the smoke test and is not a physical bath).
+
 ## Analysis (after the runs)
 `../study2e_bathLayer/compare3068.py <case>` (per write against job 3068: front, porous and gap water, first row and band,
 budget); inlet fluxes per face type (water and air, porous and free faces, φ and `alphaPhi0.wetting` on the inlet patch):
