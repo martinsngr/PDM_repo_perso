@@ -1,0 +1,98 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+# Mesh and initial fields of N2c_full (study 2g, ../README.md): ../../study2e_bathLayer/buildCase.sh with NB = 0 rows of
+# bath layer below the bath plane and NA = 133 fabric rows above it (y 0.333-3.0 mm: the domain of job 3068).
+./clean
+../../study2e_bathLayer/buildCase.sh . 0 133
+# study 2g, N2c_full: the bath faces under the z layers CLOSE_Z of the fabric box (z layers of the padded grid, 3 padding
+# layers below the box) are closed: moved from the patch inlet to bathWall (closed walls in 0.orig/U and p: noSlip,
+# fixedFluxPressure; alpha zeroGradient). Then 0/alpha.wetting is rebuilt by initFields.py with the narrowed inlet (the
+# options of ../../study2e_bathLayer/buildCase.sh plus the closed bathWall): the initial 0.1 mm water column is set only
+# across the inlet's extent, so those layers start dry (no bath under them). createPatch works on the mesh only: the
+# fields of 0/ that name their patches one by one (eps, K, fYarn, yarnID) get a bathWall entry (zeroGradient).
+CLOSE_Z="3 16"
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+[ -f constant/polyMesh/owner ] && [ -f 0/alpha.wetting ] || { echo "ERROR: buildCase.sh did not build the case."; exit 1; }
+rm -f log.topoSet.closeBath log.createPatch.closeBath log.checkMesh.closeBath log.postProcess.closeBath \
+      log.initFields.closeBath
+"$PY" - $CLOSE_Z <<'PYEOF' || exit 1
+import re, sys
+layers = [int(k) for k in sys.argv[1:]]
+v = open("system/blockMeshDict").read()
+pts = [tuple(map(float, t.split())) for t in re.findall(r"\(\s*([-\d.e+]+\s+[-\d.e+]+\s+[-\d.e+]+)\s*\)",
+                                                         v.split("vertices", 1)[1].split(");", 1)[0])]
+y0 = min(p[1] for p in pts)                                   # the bath plane (inlet)
+z = sorted({p[2] for p in pts})                               # padding, box, box, padding
+npad = int(re.findall(r"hex \(0 1 2 3 4 5 6 7\) \(\d+ \d+ (\d+)\)", v)[0])
+nbox = int(re.findall(r"hex \(4 5 6 7 8 9 10 11\) \(\d+ \d+ (\d+)\)", v)[0])
+dz = (z[2] - z[1]) / nbox
+boxes = []
+for k in layers:
+    b = k - npad
+    assert 0 <= b < nbox, f"z layer {k} is not a layer of the fabric box ({npad} to {npad + nbox - 1})"
+    # face centres of layer k on the plane y0: z = z[1] + (b + 0.5) dz
+    boxes.append(f"(-1 {y0 - dz / 4:.9g} {z[1] + (b + 0.25) * dz:.9g}) (1 {y0 + dz / 4:.9g} {z[1] + (b + 0.75) * dz:.9g})")
+    print(f"closeBath: z layer {k} (box layer {b}): z {z[1] + b * dz:.6g} to {z[1] + (b + 1) * dz:.6g} m, y0 {y0:.6g} m")
+open("system/topoSetDict", "w").write(
+    "FoamFile { version 2.0; format ascii; class dictionary; object topoSetDict; }\nactions\n(\n"
+    f"    {{ name closeBath; type faceSet; action new;    source boxToFace;   sourceInfo {{ boxes ({' '.join(boxes)}); }} }}\n"
+    "    { name closeBath; type faceSet; action subset; source patchToFace; sourceInfo { name inlet; } }\n);\n")
+open("system/createPatchDict", "w").write(
+    "FoamFile { version 2.0; format ascii; class dictionary; object createPatchDict; }\npointSync false;\npatches\n(\n"
+    "    { name bathWall; patchInfo { type patch; } constructFrom set; set closeBath; }\n);\n")
+PYEOF
+runApplication -s closeBath topoSet || exit 1
+runApplication -s closeBath createPatch -overwrite || exit 1
+rm -rf constant/polyMesh/sets
+runApplication -s closeBath checkMesh || exit 1
+"$PY" - $CLOSE_Z <<'PYEOF' || exit 1
+import os, re, sys
+import numpy as np
+def strip(t):
+    return re.sub(r"FoamFile\s*\{.*?\}", "", re.sub(r"/\*.*?\*/", "", t, flags=re.S), count=1, flags=re.S)
+b = open("constant/polyMesh/boundary").read()
+pat = {m.group(1): (int(m.group(2)), int(m.group(3)))
+       for m in re.finditer(r"\n\s*(\w+)\s*\{[^}]*?nFaces\s+(\d+);[^}]*?startFace\s+(\d+);", b)}
+nx = int(re.findall(r"hex \(4 5 6 7 8 9 10 11\) \((\d+) \d+ \d+\)", open("system/blockMeshDict").read())[0])
+nw, sw = pat["bathWall"]
+assert nw == nx * (len(sys.argv) - 1), f"bathWall has {nw} faces, expected {nx} per closed layer"
+own = np.array(strip(open("constant/polyMesh/owner").read()).split("(", 1)[1].split(")", 1)[0].split(), int)
+eb = open("0/eps").read().split("internalField", 1)[1]
+ne = int(re.search(r"(\d+)\s*\(", eb).group(1))
+eps = np.array(eb.split("(", 1)[1].split(")", 1)[0].split()[:ne], float)
+assert (eps[own[sw:sw + nw]] > 0.99).all(), "a closed bath face lies under a yarn cell"
+ni, si = pat["inlet"]
+ein = eps[own[si:si + ni]]
+print(f"closeBath: bathWall {nw} faces (all free cells); inlet {ni} faces ({(ein <= 0.99).sum()} porous, "
+      f"{(ein > 0.99).sum()} free)")
+entry = "    bathWall\n    {\n        type zeroGradient;\n    }\n"
+for f in sorted(os.listdir("0")):
+    s = open(os.path.join("0", f)).read()
+    if f == "alpha.wetting" or "bathWall" in s or '".*"' in s:
+        continue
+    m = re.search(r"\n    inletPad\n    \{\n.*?\n    \}\n", s, re.S)
+    assert m, f"0/{f}: no inletPad entry to put bathWall next to"
+    open(os.path.join("0", f), "w").write(s[:m.end()] + entry + s[m.end():])
+    print(f"closeBath: 0/{f}: bathWall entry added (zeroGradient)")
+PYEOF
+runApplication -s closeBath postProcess -func writeCellCentres -time 0 || exit 1
+"$PY" ../../../meshing_strat_trial/tools/initFields.py --closed-patch outlet --closed-patch inletPad --closed-patch bathWall \
+    --free-fill 1e-4 --sat-height 1e-4 --porous-in 1 > log.initFields.closeBath 2>&1 || { cat log.initFields.closeBath; exit 1; }
+cat log.initFields.closeBath
+rm -f 0/C 0/Cx 0/Cy 0/Cz
+# study 2g, N2_noJfix: alpha fixedValue 1 on every inlet face (initFields.py writes inletOutlet 1)
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+"$PY" - <<'PYEOF'
+import re
+p = "0/alpha.wetting"
+s = open(p).read()
+head, bf = s.split("boundaryField", 1)
+new, n = re.subn(r"\n    inlet\n    \{\n.*?\n    \}\n",
+                 "\n    inlet\n    {\n        type fixedValue;\n        value uniform 1;\n    }\n", bf, count=1, flags=re.S)
+assert n == 1, "inlet entry of 0/alpha.wetting not found"
+open(p, "w").write(head + "boundaryField" + new)
+print("0/alpha.wetting: inlet fixedValue 1")
+PYEOF

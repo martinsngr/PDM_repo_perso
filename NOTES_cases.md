@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-10.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-11.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -681,6 +681,31 @@ yarn-network continuum (K_eff from the REV, yarn pc and kr as inputs) and use cm
 front in PET and PA supports one (yarn) continuum for synthetic fibres; our setup values (REV fronts 13–15 mm/√s) are
 5–10× faster than their PET/PA fronts (other yarns, indicative only).
 
+## Plan: fabric-scale 1D model (Richards), after Parada 2018 (agreed in principle with the user 2026-11-10)
+**Aim:** Parada's approach made predictive: the same kind of 1D Richards model of a vertical strip, but every coefficient
+from the REV runs and measured yarn inputs, none fitted to the cm test, which only validates. One continuum, the yarn
+network (gaps dry: the REV yarns lead in every run and the gaps near the bath are cut off; Parada's PET/PA show a single
+front); a second, void continuum with exchange (Parada's two-equation form) only if weighing shows the gaps filling.
+**Equation** (z height above the bath, S yarn saturation, air at 0 Pa):
+φ_y·ε·∂S/∂t = ∂/∂z[(K_f·kr/μ)·|dpc/dS|·∂S/∂z] + ρg·∂/∂z[K_f·kr/μ], with K_f = φ_y·w·Kpar.
+- From the REV: the weave factor w (fit h² = k²(t + t0): w = (k/18.04)²; job 3068 ~0.70 scalar, `tensorA` ~0.56) and the
+  yarn fraction φ_y (0.463 plain, 0.418 twill); front ∝ √w, uptake per fabric width ∝ φ_y·H·√w. For another weave: w =
+  w_run(reference) × conductance ratio (`REV_pipeline/tools/conductance.py`), if the twill run confirms it (job 3113, T2/T3).
+- Yarn inputs: pc(S), kr(S), ε, Kpar/Kperp: Van Genuchten pc0 5000 Pa / m 0.5 and Brooks–Corey n 3 as in the REV for
+  now (Se = S/0.999 clipped to [1e-4, 1 − 1e-4], as the solver); measured later (a pc curve with a bounded dry end: study 2f).
+- BCs: S = Smax at z = 0 (the bath), no flux at the top; initial S 0.002 (plus the REV's wet rows to compare at REV times).
+- Numerics (explained to the user 2026-11-10, steps 1–2): finite volumes, two-point face fluxes, kr upwinded (as change C),
+  backward Euler, Newton with a tridiagonal Jacobian.
+- Checks: the 1D similarity solution without gravity (front 18.04, uptake 6.105 mm/√s with w = 1, φ_y = 1); the 1D
+  OpenFOAM columns (`trialWicking/1D_vertical_impes_inletRes`: mean Sb 0.352 / 0.606 / 0.777 / 0.902 at 0.01 / 0.03 / 0.05
+  / 0.1 s); the hydrostatic profile pc(S(z)) = ρgz at long times; the REV row-mean S on y/√t (`verification/upscaling_REV`).
+- Output for the cm test: front and uptake against t up to the equilibrium height (pc0/ρg ≈ 0.5 m at pc0 5000 Pa), where
+  gravity bends the √t law (minutes to hours).
+- Open: the absolute w of the conductance is 15–20 % low (use ratios); w depends on the anisotropy (0.70 → 0.56), so the
+  yarn's real K tensor is needed; whether the gaps near the bath fill at long times (Jurin 24–46 mm); who writes the code
+  (the user, guided, or Claude with a line-by-line explanation): to decide when it starts. **Status: step 3 (code) postponed
+  by the user (2026-11-10) until the twill result.**
+
 ## Literature: solvers for capillary-driven wicking (web search 2026-10-12, mostly abstracts)
 No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porous yarns with pc(S) + free gaps) found.
 - Micro-continuum DBS two-phase (Soulaine 2018; Carrillo, Bourg & Soulaine 2020; Boubaker et al. 2026): stress
@@ -803,6 +828,35 @@ per ms at 100 µs, half of the free-face outflow: the 2026-10-26 failure's signa
 more first-row water (788 of 944 at 100 µs against 580 with J), no negative α yet. **Submitted on mini03 (user): job 3111
 `R0_J`, job 3112 `N2_noJfix`, 3 ms, 4 cores each** (N1 not run). Then: the effective K (saturated Darcy conductance of the yarn
 network along y for scalar K, `tensorA`'s K and two variants), discussed with the user before writing it.
+**Job 3113 (`twillA`, mini03, 8 cores, 20 ms; commit `5efce71`; submitted by the user 2026-11-10 ~12:00)**, next to 3111/3112
+and another user's 20-core job (36 of 46 CPUs); expected 10–15 h. **Study 2g, jobs 3111/3112 (3 ms, analysed the same day;
+`verification/study2g_noJ/README.md`, Results):** `R0_J` = job 3068 (front identical, gap water within 3 %, first row 17 of 944).
+`N2_noJfix` (J off, α `fixedValue` 1 on the bath): stable, α ≥ −5e-20, no venting; **the gaps at the bath stay wet** (762 of 944
+first-row free cells, all 307 of the yarn band; gap water 2,715 cell volumes at 3 ms against 81), the yarns gain (porous water
+1.059 × job 3068 at 3 ms, front one row ahead), so J's face closure alone kept the gaps dry. But the bath faces under the two
+outermost box layers (open space next to the padding) stay under air-rich cells and carry a parasitic circulation: air from the
+padding enters them against the pressure difference, the bath pushes in 960 → 1,590 cell volumes per ms (two thirds of the inflow
+at 3 ms), and water traces leave through top/bottom near the bath (26 cell volumes by 3 ms, the rate doubling every ms). Not
+settled: how much of the gap water and of the yarns' +6 % comes from that circulation; whether it stays bounded. Option, not
+decided: N2 with the bath faces of the two outermost layers closed. **Next:** fetch 3113 (`REV_pipeline/README.md`, Commands) and score T1–T6 against `tensorA` with a script that
+reads each run on its own mesh (to write; `compareTensor.py` assumes one mesh). Then the fabric-scale 1D model (section "Plan: fabric-scale 1D
+model" above).
+
+**2026-11-11: study 2g at full length, set up for mini03 (16 cores; user: a longer N2 run on the full REV, maybe with the
+outermost bath faces closed).** `verification/study2g_noJ/makeCases.sh` writes `N2_full` (job 3068 with J off and α `fixedValue` 1
+on the bath; mesh and initial fields byte-identical to job 3068's apart from that inlet entry) and `N2c_full` (the same with the
+182 bath faces under z layers 3 and 16, the outermost box layers next to the padding, moved to a closed patch `bathWall`, those
+layers starting dry); 30 ms, writes every 0.5 ms, crash restart as `Bbox_full`. Built and smoke-tested on the laptop (40 steps,
+dt 1.23e-7 s at the Coats limit, α bounded, budget closed). Measured in `N2_noJfix` at 3 ms (`bathRegions.py`): layers 4 and 15
+are inflow-only too (397 / 444 cell volumes per ms) and layers 5 and 14 carry the return flow, so the circulation spans the open
+space beside the yarns; predicted for `N2c_full`: it moves to layers 4 and 15 (outcome (a)) rather than stopping (b), decided by
+3 ms (predictions and reading in the study README). No further closure if (a) (user: the bath under the band only was
+`Bband_cut`, whose band gaps drained and never refilled; J sat 5 rows below the plane there, the band dried because the open space
+beside it was dry): (a) would make `N2c_full` = `N2_full` with the loop one layer in, so `N2_full` is the cleaner 30 ms run
+(does the loop stay bounded or flood as `Bbox_full`?), and both side by side on 8 cores each (~29 h) also answer whether the
+closure changes anything. **Decided with the user: both, side by side on mini03, 8 cores each (~29 h, up to ~42 h on a loaded
+node).** Early check at ~3 ms (~3 h into the runs) from `waterBudget.csv` and the per-layer fluxes (study README, Commands).
+Job numbers: to add at the submission.
 
 **Plan for 2026-11-10 (agreed with the user 2026-11-09 evening). START HERE.**
 1. **Fetch and compare the four mini03 runs** (all expected done by the morning): `tensorA` job 3107, `tensorB` job 3108,

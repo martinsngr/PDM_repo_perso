@@ -1,0 +1,20 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+# Mesh and initial fields of N2_full (study 2g, ../README.md): ../../study2e_bathLayer/buildCase.sh with NB = 0 rows of
+# bath layer below the bath plane and NA = 133 fabric rows above it (y 0.333-3.0 mm: the domain of job 3068).
+./clean
+../../study2e_bathLayer/buildCase.sh . 0 133
+# study 2g, N2_noJfix: alpha fixedValue 1 on every inlet face (initFields.py writes inletOutlet 1)
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+"$PY" - <<'PYEOF'
+import re
+p = "0/alpha.wetting"
+s = open(p).read()
+head, bf = s.split("boundaryField", 1)
+new, n = re.subn(r"\n    inlet\n    \{\n.*?\n    \}\n",
+                 "\n    inlet\n    {\n        type fixedValue;\n        value uniform 1;\n    }\n", bf, count=1, flags=re.S)
+assert n == 1, "inlet entry of 0/alpha.wetting not found"
+open(p, "w").write(head + "boundaryField" + new)
+print("0/alpha.wetting: inlet fixedValue 1")
+PYEOF

@@ -96,6 +96,8 @@ verification/study2e_bathLayer/_r0_*/
 verification/study2g_noJ/*/0/
 verification/study2g_noJ/*/system/blockMeshDict
 verification/study2g_noJ/*/system/rev_domain.json
+verification/study2g_noJ/*/system/topoSetDict
+verification/study2g_noJ/*/system/createPatchDict
 verification/study2g_noJ/*/logs/
 # REV_pipeline: generated per case by Allpre / the run (mesh, initial fields, logs, budgets)
 REV_pipeline/cases/*/0/
