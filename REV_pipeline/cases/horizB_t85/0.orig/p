@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Pressure: p_air - alpha*pc in the yarns, the fluid pressure in the gaps
+// (pc = 0 there); the solver solves the full p, gravity as a body force (no p_rgh).
+// Bath (inlet, bottom of the water rows) and air (top) at rest: totalPressure, p = p0
+// where fluid leaves, p0 - 0.5*rho*|U|^2 where it enters. No pressure difference is
+// imposed: capillarity drives the flow. The internal value is only the first guess.
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    #includeEtc "caseDicts/setConstraintTypes"
+    // bath, bottom face of the 5 water rows under the fabric (z = -0.1712 mm): total pressure rho g 5 dz
+    // = 1000 x 9.81 x 1.00714e-4 m, so the water is at 0 Pa at the bath surface (z = -0.0705 mm, the
+    // underside of the fabric box) with gravity along -z; p0 = 0 there would put it at -1 Pa
+    inlet
+    {
+        type            totalPressure;
+        p0              uniform 0.988;
+    }
+    // air above the fabric
+    top
+    {
+        type            totalPressure;
+        p0              uniform 0;
+    }
+}
+
+// ************************************************************************* //

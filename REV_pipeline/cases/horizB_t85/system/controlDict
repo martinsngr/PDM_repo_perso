@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+startTime       0;
+stopAt          endTime;
+// horizB: through 0.28 mm of fabric. With the Gebart K the 1D yarn front is 5.5 mm/sqrt(s) along z (Kperp, both yarn
+// families) and 11.7 mm/sqrt(s) along the yarns (Kpar): 0.28 mm at Kperp in ~2.6 ms (scalar K 1e-11: ~0.25 ms)
+endTime         0.010;
+deltaT          1e-8;
+writeControl    adjustableRunTime;
+writeInterval   2e-04;  // 58 MB per write with the tensor K (laptop smoke test, 2026-11-12): 50 writes, ~3 GB
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   12;
+runTimeModifiable yes;
+
+// Time step: solver limits on the total flux (free cells), then the
+// coatsTimeStep function object (porous cells + capillary waves) overwrites
+// maxDeltaT every step; setDeltaT.H grows dt by at most 1.2x per step.
+// Values as ../../trialWicking/singleYarn_vertical_hybrid.
+adjustTimeStep  yes;
+maxCo           0.75;
+maxAlphaCo      1;
+maxDeltaT       3e-8;   // first-step cap only
+CoatsMaxCo      0.5;
+dSmax           0.01;
+maxDeltaTCoats  1e-3;
+minDeltaTCoats  0;
+CapillaryMaxCo  0.5;
+
+// Stop guard (../../../tools/stopGuard): write and end after maxSteps steps
+// (-1: no limit) or when deltaT < minDeltaTStop (collapsed time step).
+maxSteps        -1;
+minDeltaTStop   1e-14;
+
+functions
+{
+    coatsTimeStep { #include "../../../tools/coatsTimeStep" }
+    liquidBalance { #include "../../../tools/liquidBalance" }
+    stopGuard     { #include "../../../tools/stopGuard" }
+    waterBudget   { #include "../../../tools/waterBudget" }
+}
+
+// ************************************************************************* //
