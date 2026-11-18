@@ -1,0 +1,118 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.1                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+// same end time as the impesFoam cases; ~9.5 min on one core
+endTime         2e-4;
+
+deltaT          1e-7;
+
+writeControl    adjustableRunTime;
+
+writeInterval   5e-5;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.75;
+maxAlphaCo      1;
+// setDeltaT.H only limits the Courant numbers of the total flux, not the
+// explicit capillary diffusion in alphaEqn. The coatsTimeStep function object
+// below applies the impesFoam limits instead (Coats CFL and dSmax, as in
+// ../1D_vertical_impes_inletRes/system/controlDict): at every step it
+// overwrites maxDeltaT in memory, and setDeltaT.H then grows dt by at most
+// 1.2x per step up to that limit. dt follows impesFoam's (6.2e-7 for most of
+// the run, up to 1.9e-6 at the end); 0.1 s takes ~9.5 min instead of ~18 min
+// with a fixed maxDeltaT 3e-7, same uptake within 0.3 %.
+// The value here is only the first-step cap.
+maxDeltaT       3e-7;
+
+CoatsMaxCo      0.5;    // maxCo of impesFoam's CFL Coats
+dSmax           0.01;   // max saturation change per step
+maxDeltaTCoats  1e-3;   // upper bound on the limit
+// lower bound on the limit. Before the porous-face changes (solver be54696)
+// a floor of 1e-7 was needed: without it the dSmax rule cut dt down to 1e-13
+// and the run blew up within 5e-5 s. With darcyFaceMaxDa the limit never
+// drops below ~3.4e-7, so no floor is needed (and a floor above the Coats
+// limit would make the explicit update unstable on finer meshes).
+minDeltaTCoats  0;
+
+// Liquid uptake (liquidBalance), written at every write time to
+// liquidBalance.csv in the same format as the impesFoam fork
+// (updateLiquidContent.H): liquid volume sum(eps*alpha.wetting*V) in mL,
+// liquid mass in g, and the volume-weighted mean saturation
+// sum(alpha.wetting*V)/sum(V).
+functions
+{
+    // transverse spread every step: max over rows (j) of max-min of alpha over the 5 x 3 cells of the row,
+    // max transverse |U| (x and z components), mean alpha. Cell order of the single block: i + nx*(j + ny*k).
+    transverseSpread
+    {
+        type            coded;
+        libs            ("libutilityFunctionObjects.so");
+        name            transverseSpread;
+        executeControl  timeStep;
+        writeControl    none;
+
+        codeExecute
+        #{
+            const volScalarField& a = mesh().lookupObject<volScalarField>("alpha.wetting");
+            const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+            const label nx = 5, ny = 172, nz = 3;
+            scalar spread = 0;
+            label jMax = -1;
+            for (label j = 0; j < ny; j++)
+            {
+                scalar mn = great, mx = -great;
+                for (label k = 0; k < nz; k++)
+                {
+                    for (label i = 0; i < nx; i++)
+                    {
+                        const scalar v = a[i + nx*(j + ny*k)];
+                        mn = min(mn, v);
+                        mx = max(mx, v);
+                    }
+                }
+                if (mx - mn > spread) { spread = mx - mn; jMax = j; }
+            }
+            scalar uT = 0;
+            forAll(U, c) { uT = max(uT, max(mag(U[c].x()), mag(U[c].z()))); }
+            Info<< "transverse: spread " << spread << " row " << jMax << " maxUt " << uT
+                << " meanAlpha " << a.weightedAverage(mesh().V()).value() << endl;
+        #};
+    }
+}

@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-09. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-18. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -42,6 +42,14 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   with α 1 on all inlet faces (then p = water pressure on the yarn faces; `verification/standardOpenBC`); the coded
   `tools/pOpenAir` (`reservoirWaterPressure`/`reservoirReferencePoint`) only where the bath surface is away from the
   patch (e.g. a vertical bath face) or the inlet keeps α 0.99.
+- **Solver frozen (user, 2026-11-18): the installed `4bb5d2e` (A–L + H fix + T; docs `11d060b`) is the production version of
+  the thesis.** No more solver fixing or investigation; the open issues below are limitations to state, not to fix. Checked the
+  same day on the laptop: `hybridPorousInterFoam` md5 `ceb6faf0ed0ebb018009002050a815b4` = `hybridPorousInterFoam_T`; its object
+  file compiled 2026-11-05 10:12 from the solver tree, no source newer than it and the tree clean at `11d060b` (code = `4bb5d2e`;
+  only `Make/files` touched after, the `_T` name reverted); it links `libporousInterfaceProperties.so` (built 2026-10-26 09:29,
+  last library commit `0f6c6d4`), `libporousModels.so` and `libporousImmiscibleIncompressibleTwoPhaseMixture.so` (2026-09-28,
+  unchanged since `be54696`). Uncommitted in the solver repo, not part of the build: two `tutorials/` files, `OpenFoamV8/hpif.tar.gz`.
+  mini03 and mini01 run `4bb5d2e` builds (below). Tag: to set by the user (thesis repo and solver repo, suggested `solver-freeze`).
 - **Installed (laptop, 2026-11-05):** `hybridPorousInterFoam` = `4bb5d2e` (A–L + T, docs `11d060b`), byte-identical to the
   tested `hybridPorousInterFoam_T` (md5 `ceb6faf0…`: only relinked under the final name), so the checks of
   `verification/tensorK` apply to it as they are; previous binary kept as `hybridPorousInterFoam_8a97d02`. Pushed
@@ -68,6 +76,9 @@ Repo `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam`, branch `of9-port` (for
   `hybridPorousInterFoam_K1` (`porousFreeKrPorous`: both kr of porous/free faces from the porous cell; changes the
   gap–yarn water exchange, not a fix), `_K2` (`porousFreeKrAirPorous`: the air kr only; **committed as L, `8a97d02`, 2026-10-30**), `_G2` (`porousFreeVofPc`, sharp band α > 1e-3: fails), `_G2b` (`porousFreeVofPc` with an
   α ramp: works, stiff exchange episodes; alternative in reserve). K1 and G2 can be deleted.
+- **`hybridPorousInterFoam_b0c0f67` (laptop, 2026-11-18):** A only, built from a `git archive` export of `b0c0f67` in a
+  session scratchpad (`EXE` renamed; nothing written in the solver repo), linking today's libraries (only H's `.C` changed since);
+  reproduces `verification/bench_ddtCorr/log.ii_A_c1` line for line. Used by `verification/bench_pcK`.
 - **Build:** `wmake libso` in `OpenFoamV8/libraries/porousInterfaceProperties` (H), `wmake` in
   `OpenFoamV8/solvers/hybridPorousInterFoam`. Every machine rebuilds after a pull (**mini01: pull, then both**).
   Keep the old binary first: `cp $FOAM_USER_APPBIN/hybridPorousInterFoam $FOAM_USER_APPBIN/hybridPorousInterFoam_<hash>`.
@@ -143,6 +154,28 @@ gave a staircase 1D profile. Bench: the 1D column widened to NX cells (symmetry 
   without `darcyFaceMaxDa` (= A + C vs A + B + C, only B differs): without B, spread 0.24 from 10 µs (transverse U 0.5 →
   5 → 300 m/s), uptake −2.4 → −5.7 %, α leaves [0, 1] and the run diverges at 1.28e-4 s; with B spread ≤ 3e-7 to 8.5e-4 s.
   A alone (no C, 10-07) stayed bounded to 2e-4 s: C makes the case without B worse. **B is needed; not a transient.**
+- **Is the high pc the cause of the A-only mode? (2026-11-18, `verification/bench_pcK/`, asked by the user):** same bench,
+  A only (`hybridPorousInterFoam_b0c0f67`, base run = `log.ii_A_c1` line for line), pc0 ÷ 10 / ÷ 100 and K ÷ 10 / ÷ 100, each
+  at fixed dt 1e-7 s and with dt × 10 / × 100 (same capillary step size Co ∝ dt·K·pc0), 2,000 steps each. **Only the base run
+  grows** (×1.064 per step to spread 0.2); all eight variants stay at 3e-8 to 2.3e-5 (A + B + C: 1.3e-7), no crash. My
+  predictions (inertia/drag per step Λ = ρK/(μεdt) as the control, worse at low Λ as the steady-state runs T1a/T1b) failed:
+  lowering Λ at fixed Co removes the mode; lowering Co at fixed Λ too. Interpretation, not tested on its own: the control is
+  dt-free, τ_I/τ_D = ρK²pc0/(μ²ε²Δy²) (inertial relaxation time of the momentum-path velocity ρK/(με) over the capillary time
+  of one cell): 5 at the base, ≤ 0.5 in every variant; every A run at 5 grows (ddtCorr variants, dt ÷ 2, tight p), every run at
+  ≤ 0.5 is calm over its 2,000 steps (threshold not located). **pc is part of the cause, not on its own: K ÷ 10 works as well as pc0 ÷ 10, K counts twice.** Not
+  explained: T1a/T1b (time derivative removed) crashed while K ÷ 100 with dt × 100 (inertia 2 % of the drag) is calm. With the
+  planned yarn values (Gebart Kpar, fibre-bundle pc) the number is ~1–3 at 20 µm, × 4 at 10 µm: A alone would not be safe on
+  the REV meshes, B removes the question. Design correction (Brinkman term: three numbers, not two), scoring: the study README.
+  **Follow-ups (same day, predictions passed):** pc0 × 100 with K ÷ 10 (Δt ÷ 10: Co and Λ as the base, Da ÷ 10) grows exactly as
+  the base (×1.065 per step, same mean α to 5 digits); pc0 × 10 with K ÷ 10 (50 kPa, 1e-12) is calm over the base's wicking time:
+  K²·pc0 controls the mode, not pc0 alone (Da does not matter at ≤ 0.025). **Slit (`2D_bench`) with the original solver**
+  (`be54696`, and `b0c0f67`, modified-solver keywords off): stopGuard at step 5–6 at base and safe values alike; in step 1 the wall
+  cells touching the gap jump (Solidf-bug pattern of 2026-10-12): the original cannot run the slit at either point. At any K²·pc0
+  is an argument, not a sweep (the bad face K comes from K_VOID, not the yarn K); E is the cause by pattern, Solidf not checked.
+  The installed solver at the safe values = the base `2D_bench` within one cell (the slit is set by K·pc0). Reviewer's controls
+  answered in the README. **Claims (user, 2026-11-18, README end):** the original cannot run a porous/free case (E by pattern; G
+  from the strip bench); B needed at the base parameters, kept for robustness; K²·pc0 controls the A-only mode (figure); **not
+  claimed: B unnecessary below some K²·pc0** (the ÷ 100 runs at Δt 1e-7 s over the stretched time are not covered and not run).
 - **B fix:** boundary Da used half a cell (4× too large): on 10 µm the inlet/outlet fell out of the Darcy set, GAMG
   stalled. Boundary Da now uses the cell size.
 - **Open lateral wall of the single yarn is ill-posed** (independent of A/B): on a patch with `Uwetting` fixed and `U`
@@ -569,7 +602,16 @@ Solver behaviour:
   mid-gap split. Hypothesis, not tested: something at the corner where the processor patch meets the inlet patch (inlet p BC
   `pOpenAir`, H, F′ there). Integrated results unaffected (meniscus, fronts within 0.05 µm). Possibly the one-time budget
   loss of the REV runs in their first 0.5 ms (job 3068: −8.6e-18 m³; scotch puts processor boundaries on yarn surfaces).
-- Gravity–capillarity equilibrium oscillation with A+B+C (counter-current, zero total flux): cause not isolated.
+- Gravity–capillarity equilibrium oscillation with A+B+C (counter-current, zero total flux): cause not isolated (suspect C;
+  Study 1 of `verification/PLAN.md` not run, not to be run: solver frozen). **Checked in the wicking runs by post-processing
+  (2026-11-18, `verification/oddEven_REV/`, 9 REV runs, every write):** the yarn saturation does not oscillate as in the
+  equilibrium case (there: 4-cell zig-zags on 51 % of the cells, steps up to 0.89 in S). REV: 0.09–0.37 % of the yarn cells
+  (vertical), 1.5–2.4 % (horizontal), steps ≤ 0.04, at a plateau. That is at or below the original solver in the equilibrium
+  case (≤ 4.8 %, ≤ 0.054) and anisoImpesFoam on the same yarns (3.3 %). **Limitation:** where nearly saturated yarn (S ≥ 0.95)
+  faces water-filled gap cells (waterline gaps of the N2 baths, the gaps of the horizontal case), the water exchange changes
+  sign from face to face on 4–17 % of the active surface triplets. It is bounded and carries 4–16 % of the gross exchange; its
+  net is opposite to the uptake, −2 to −8 % of the net yarn uptake, −46 % in horizB_t40 at 10 ms near saturation. Cause (C or
+  not) not known. My predictions R1 (≤ 0.1 %) and R2 (≤ 1 %) failed, scoring in the study README.
 - I: why the exact coupling (2·μ_air next to wet walls) gives fast air currents (I bounded meanwhile).
 - `Free_Flow_Cases/Capillary_Rise/porous_Boundary` tutorial: A and C change the free water by +0.40 / +0.11 % (mechanism
   not identified); not rerun with E, F, G, H–I. **Original vs E on this tutorial = the evidence of what E changes in
@@ -590,6 +632,18 @@ Solver behaviour:
   The bath under everything with a wide graded padding (`BfullP_cut`, job 1600, 2026-11-09): gaps wet, but J now acts on the far
   bath: 0.1 mm deep there, it flows out through the water-only `inletPad` and its drained faces stay closed (as the drained free
   inlet faces above), after which air recirculates through the open faces next to it (`NOTES_cases.md`, REV case status).
+  Without J (study 2g, `verification/study2g_noJ/`, cut REV, 3 ms, 2026-11-10): with α `inletOutlet` 1 the drained free bath
+  cells vent air into the bath (smoke test); with α `fixedValue` 1 (outflow booked as water, faces never closed) no venting, the
+  first-row gaps stay wet (762 of 944, with J 17) and α stays bounded, but the air-rich bath-surface cells of the two outermost
+  box layers (next to the padding) carry a parasitic circulation (air in from the padding against the pressure difference, two
+  thirds of the bath inflow at 3 ms, a top/bottom leak doubling every ms). Full REV, 30 ms (jobs 3119/3120, 2026-11-13): stable, the
+  waterline gaps wet throughout; the circulation floods the outermost box layers and loses 22 % of the bath inflow by 30 ms
+  (`N2_full`); with those layers' bath faces closed it moves one layer in and loses 5.7 % (`N2c_full`), **adopted for the vertical
+  REV runs (user, 2026-11-13)**. With J at the bottom of a 5-row bath under a horizontal fabric (`REV_pipeline/cases/horizB_*`), air
+  collects in the bottom bath rows (up to 2,561 cell volumes at 10 ms, still growing at θ 40°), the inlet-row cells at α ≈ 0.5 (J's
+  threshold); where it enters the bath is not measured. J switched off in the horizontal template (`REV_pipeline/cases/horizontal`,
+  user, 2026-11-13: α `fixedValue` 1 on the inlet), and the vertical template (`REV_pipeline/cases/vertical`) has the N2c bath: J is
+  no longer used in new REV cases.
   The 1D hybrid stays ~1.2 % below impesFoam in uptake (cause not isolated).
 - Porous boundary faces (measured 2026-10-27, `verification/standardOpenBC`): the mixture-pressure two-point flux of
   `alphaEqn.H`/`pEqn.H` equals the water-pressure flux plus (α_b − α_c)(pc_b − pc_c) (discrete chain rule with face

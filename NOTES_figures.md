@@ -51,6 +51,12 @@ evidence and its limits). Status: **exists** (2026-10-14).
 - `verification/oddEvenScan.png`: local-extremum scan of the 1D and single-yarn fields.
 - `verification/bench_ddtCorr/bench_ddtCorr_spread.png`, `bench_inertia_psolver_spread.png`: is B needed (ddtCorr, inertia,
   pressure tolerance).
+- `verification/bench_pcK/bench_pcK_spread.png` (2026-11-18, `benchPcK.py`, logs in the run folders): the A-only transverse
+  mode against pc0 and K (÷ 10, ÷ 100, fixed and scaled dt): only the base grows; (c) high pc with low K (pc0 × 100, K ÷ 10
+  grows as the base; pc0 × 10, K ÷ 10 calm); (d) max spread against τ_I/τ_D = ρK²pc0/(μ²ε²Δy²) with the earlier A runs.
+  **For the thesis (user, 2026-11-18)**, with one sentence: the A-only mode is controlled by K²·pc0, not by K, pc0 or the Darcy
+  number alone; B is needed at the base parameters and kept for robustness. Not to be read as a safe range for A alone (threshold
+  not located, ÷ 100 runs at Δt 1e-7 s not covered over the stretched time). τ_I/τ_D is an interpretation supported by (c).
 - `verification/slit_freeSurface/slit_verification.png`: slit rise against Bosanquet, porous walls against real walls.
 Status: **exists**.
 
