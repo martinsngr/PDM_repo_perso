@@ -33,6 +33,11 @@ if grep -Eq "^porousFreeAirKrPorous[[:space:]]+on" constant/transportProperties 
     echo "ERROR: this hybridPorousInterFoam ignores porousFreeAirKrPorous (older than of9-port 8a97d02): pull and rebuild."
     exit 1
 fi
+# J off since 2026-11-13: stop if the solver reports it active
+if grep -q "^waterOnlyPatches:" log.hybridPorousInterFoam.precompile; then
+    echo "ERROR: J is active (waterOnlyPatches) in the horizontal case (J off since 2026-11-13)."
+    exit 1
+fi
 runApplication decomposePar
 echo "Running hybridPorousInterFoam on $PWD using $N cores"
 runTmpLog log.hybridPorousInterFoam mpirun -np "$N" hybridPorousInterFoam -parallel

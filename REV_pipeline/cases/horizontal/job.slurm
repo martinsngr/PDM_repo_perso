@@ -1,6 +1,7 @@
 #!/bin/bash
 # SLURM job of horizontal (REV_pipeline, ../../README.md): the fabric lying flat on a bath at rest, water rising through
-# the thickness (the previous student's set-up), REV values with theta 40 deg, gravity -z, x and y cyclic; 5 ms.
+# the thickness (the previous student's set-up), REV values with theta 40 deg, gravity -z, x and y cyclic; 5 ms. Bath: J off,
+# alpha fixedValue 1 on the inlet (since 2026-11-13).
 # The job builds the case itself (./Allpre: mesh, eps/K, initial alpha) from the pulled repo, then runs it.
 # Needs on the cluster: the repo .venv with numpy, scipy, trimesh==5.1.0, rtree, embreex (at the repo root) and the
 # solver of9-port 8a97d02 or later (4bb5d2e installed).

@@ -1,0 +1,6 @@
+#!/bin/bash
+# O_base: pc0 5000 Pa, wall K 1e-11 m2, hybridPorousInterFoam_be54696 (keywords of the modified solver off)
+cd "$(dirname "$0")"
+. ../../../runTools.sh
+./clean
+runTmpLog log.O_base hybridPorousInterFoam_be54696

@@ -1,0 +1,13 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1
+# Results and solver logs only (keeps the mesh, 0 and 0.orig; ./Allpre rebuilds 0 and the mesh).
+# Time folders = names made only of digits, '.', 'e', '+', '-', except 0 (a plain "[0-9].*"
+# pattern would also delete 0.orig).
+for d in [0-9]* -[0-9]*; do
+    [ -d "$d" ] || continue
+    [ "$d" = 0 ] && continue
+    case "$d" in *[!0-9.e+-]*) continue ;; esac
+    rm -rf -- "$d"
+done
+rm -rf processor* postProcessing VTK dynamicCode
+rm -f log.hybridPorousInterFoam* log.decomposePar* log.reconstructPar log.precompile liquidBalance.csv

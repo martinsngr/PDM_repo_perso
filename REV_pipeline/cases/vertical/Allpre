@@ -1,0 +1,49 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# vertical (REV_pipeline, ../../README.md): the template of the vertical runs from 2026-11-13 on = tensorA (job 3068 with the
+# yarn-aligned diagonal K, Kpar 1e-11, Kperp 2.2e-12) with the N2c bath of study 2g (../../verification/study2g_noJ, N2c_full;
+# decided with the user 2026-11-13): J off, alpha fixedValue 1 on the bath faces, the bath faces under the outermost box
+# layer on each side closed (patch bathWall, ../../tools/closeBath.sh). Copy it for a new vertical case and change the
+# geometry (--stl, --domain), K (build_fields.py options), the cell counts checked in job.slurm, end time and cores.
+# From the TexGen geometry to the initial fields; overwrites the mesh and 0/; then ./run. Python: $PY, else the
+# repo .venv (numpy, trimesh, rtree; embreex for speed).
+#
+#   geometry   ../../geometry/Textiles/PW-22-15-0.4-0.5.stl (TexGen, funge.py); REV box ../../geometry/rev_domain_midbath.json
+#              (y 0.333-3.0 mm: the box of inspect_stl.py moved by half a crossing-yarn spacing, so the bath plane
+#              lies in the middle of a gap, as job 3068)
+#   mesh       uniform 20 um hex mesh (../../tools/build_fields.py): the REV box (91 x 133 x 14 cells) + 3 free layers
+#              below and above (--zpad 3). Patches: inlet = y min of the box (bath), inletPad = y min of the padding
+#              (closed), outlet = y max (closed), sideA/sideB cyclic in x, bottom/top = z faces of the padding (air)
+#   fields     eps, K (volTensorField, yarn axis x or y, binary cut cells), fYarn, yarnID; alpha.wetting by
+#              ../../tools/initFields.py as job 3068: yarns 0.99 over the first 0.1 mm, then the 0.2 mm ramp to 0.002,
+#              a 0.1 mm water column in the free box cells at the inlet, padding dry
+#   BCs        0.orig as job 3068: inlet = bath, top/bottom = air, at rest at 0 Pa (totalPressure); outlet and
+#              inletPad closed; water enters at alpha 1 also on the yarn faces (--porous-in 1)
+#   bath       N2c (study 2g): after blockMesh, ../../tools/closeBath.sh moves the bath faces under the outermost box layer
+#              on each side (all under free cells, else it stops) to bathWall, closed like inletPad (0.orig/U, p); the
+#              initial water column is then set only across the narrowed inlet (initFields.py --closed-patch bathWall), and
+#              ../../tools/alphaInletFixed.py sets alpha fixedValue 1 on the inlet (initFields.py writes inletOutlet).
+#              J off: no waterOnlyPatches in constant/transportProperties (./run stops if the solver reports J active)
+
+PY=${PY:-../../../.venv/bin/python}
+[ -x "$PY" ] || PY=python3
+
+./clean
+rm -rf constant/polyMesh 0 system/blockMeshDict
+cp -r 0.orig 0
+rm -f log.blockMesh log.checkMesh log.build_fields log.postProcess.writeCellCentres log.initFields
+
+"$PY" ../../tools/build_fields.py . --stl ../../geometry/Textiles/PW-22-15-0.4-0.5.stl --domain ../../geometry/rev_domain_midbath.json \
+    --k-mode tensor --k-par 1e-11 --k-perp 2.2e-12 --cut-cells binary --wick-axis y --zpad 3 \
+    > log.build_fields 2>&1 || { cat log.build_fields; exit 1; }
+runApplication blockMesh
+runApplication checkMesh
+../../tools/closeBath.sh
+runApplication -s writeCellCentres postProcess -func writeCellCentres -time 0
+"$PY" ../../tools/initFields.py --closed-patch outlet --closed-patch inletPad --closed-patch bathWall --free-fill 1e-4 --sat-height 1e-4 --porous-in 1 \
+    > log.initFields 2>&1 || { cat log.initFields; exit 1; }
+cat log.initFields
+"$PY" ../../tools/alphaInletFixed.py .
+rm -f 0/C 0/Cx 0/Cy 0/Cz

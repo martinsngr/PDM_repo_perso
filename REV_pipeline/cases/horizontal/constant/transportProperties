@@ -98,13 +98,11 @@ porousFreeFluxForce 1;
 // I : no-slip at the yarn surface (free-side viscosity, half-cell distance)
 porousFreeNoSlip 1;
 
-// Reservoir (inlet) that exchanges water only, as a bath (solver change J,
-// of9-port be1a3ab; ../../verification/waterOnlyReservoir): no air through the
-// inlet (no air mobility on its yarn faces, gap faces closed next to air-rich
-// cells). The bath pressure comes from 0/p (totalPressure 0). Without J the old
-// inlet let air out and the REV smoke test failed at 0.21 ms (dt collapse,
-// negative alpha in the gap inlet cells).
-waterOnlyPatches (inlet);
+// Bath: change J off since 2026-11-13 (user; no waterOnlyPatches): alpha fixedValue 1
+// on the inlet, 5 rows below the fabric (Allpre, ../../tools/alphaInletFixed.py; the N2
+// bath of ../../verification/study2g_noJ): every flux through the bath faces is booked
+// as water, without J's closure of air-rich inlet cells. With J (horizB_t40/t85) air
+// collected in the bottom bath rows, the inlet-row cells held at alpha ~0.5.
 
 // Change L (of9-port 8a97d02, 2026-10-30): air kr of the porous/free Darcy faces from
 // the porous cell. Without it REV_lowpc diverged at 6.553 ms (job 3059: air pump in

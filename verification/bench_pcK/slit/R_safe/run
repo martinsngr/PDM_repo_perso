@@ -1,0 +1,6 @@
+#!/bin/bash
+# R_safe: pc0 50000 Pa, wall K 1e-12 m2, hybridPorousInterFoam 
+cd "$(dirname "$0")"
+. ../../../runTools.sh
+./clean
+runTmpLog log.R_safe hybridPorousInterFoam

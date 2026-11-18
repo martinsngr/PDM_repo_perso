@@ -1,0 +1,5 @@
+#!/bin/bash
+# SK10: pc0 5000 Pa, K 1e-12 m2, dt 1e-06 s, end 0.002 s, hybridPorousInterFoam_b0c0f67
+cd "$(dirname "$0")"
+. ../../runTools.sh
+runTmpLog log.SK10 hybridPorousInterFoam_b0c0f67

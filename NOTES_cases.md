@@ -1,7 +1,7 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-11.
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-13.
 Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
@@ -27,7 +27,7 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
 | `verification/` (repo root) | All verification: paper tutorials, 1D similarity solution, ddtCorr bench, inlet test (moved from `trialWicking/verification/` 2026-10-13; results in `NOTES_solver.md`), and **`PLAN.md`: the planned studies 1–3** |
 | `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (coded open-patch p BC of the 2D bench and slit cases; `REV/` and `REV_lowpc/` use `totalPressure` since 2026-10-27), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
-| `REV_pipeline/` (repo root) | **The REV runs from 2026-11-09 on, self-contained:** `geometry/` (`funge.py`, the STL, the REV boxes), `tools/` (copies of every script and function object the cases use; `build_fields.py` with `--stl`/`--domain` and `--wick-axis z`), `cases/` (`tensorA`, `tensorB`, `horizontal`). Target: one main script from the REV inputs to the launched run (its `README.md`) |
+| `REV_pipeline/` (repo root) | **The REV runs from 2026-11-09 on, self-contained:** `geometry/` (`funge.py`, the STL, the REV boxes), `tools/` (copies of every script and function object the cases use; `build_fields.py` with `--stl`/`--domain` and `--wick-axis z`), `cases/` (templates since 2026-11-13: `vertical` with the N2c bath, `horizontal` without J; run records: `tensorA`, `tensorB`, `twillA`, `anisoA*`, `horizB_t40/t85`). Target: one main script from the REV inputs to the launched run (its `README.md`) |
 
 ## Common setup and rules
 
@@ -856,9 +856,64 @@ beside it was dry): (a) would make `N2c_full` = `N2_full` with the loop one laye
 (does the loop stay bounded or flood as `Bbox_full`?), and both side by side on 8 cores each (~29 h) also answer whether the
 closure changes anything. **Decided with the user: both, side by side on mini03, 8 cores each (~29 h, up to ~42 h on a loaded
 node).** Early check at ~3 ms (~3 h into the runs) from `waterBudget.csv` and the per-layer fluxes (study README, Commands).
-Job numbers: to add at the submission.
+**Submitted 2026-11-11 ~11:58 (user): job 3119 (`N2_full`) and job 3120 (`N2c_full`), next to another user's 20-core job
+(36 of 46 CPUs).**
 
-**Plan for 2026-11-10 (agreed with the user 2026-11-09 evening). START HERE.**
+**2026-11-13: study 2g at full length (jobs 3119, 3120) and the horizontal pair with the Gebart K (jobs 3124, 3125) analysed; the
+`N2c_full` bath adopted for the vertical runs (user). START HERE.** Tables and scoring: `verification/study2g_noJ/README.md` (Results of
+the full-length runs) and `REV_pipeline/README.md` (Horizontal with the Gebart K, Results; Cases, bath of the vertical runs).
+- **Horizontal pair** (set up with the user 2026-11-12: `REV_pipeline/cases/horizB_t40`, `horizB_t85` = `horizontal` with the Gebart
+  tensor K, Kpar 4.245e-12, Kperp 9.20e-13, θ 40° and 85°, pc0 5000 Pa in both: weakly wetting gap walls next to strongly wicking yarns
+  on purpose (user); 10 ms, 8 cores; predictions Z1–Z7 in the README). 10 ms in 1.7–1.8 h (dt at the capillary-wave limit 1.49e-6 s from
+  2–4 ms). Uptake above the bath 154 / 111 g/m² at 1 ms, 188 / 133 at 10 ms (θ 40 / 85°; everything full 212), of which the gaps 67 / 56 %.
+  The yarns end the same (S 0.96, 58–59 g/m²); θ decides how far the gaps fill: at 40° up to the valleys between the top crests, at 85°
+  up to the narrowest layer at mid-thickness (layer 11, 21 % free) and not above (hypothesis, not tested: pinning where the pores widen).
+  Against R3b (scalar K): gaps alike, yarns slower (S 0.90 at 1.25 against 0.45 ms, near K/Kpar). Boundary artefacts: air collecting at
+  the bottom of the bath next to the J inlet (2,561 / 796 cell volumes at 10 ms, still growing at 40°) and a mist of water leaving
+  through the open top (540 / 142 cell volumes, ≤ 1 g/m²). Z3, Z6 pass; Z5, Z7 fail (gap water underestimated in both); Z1, Z2, Z4 partly.
+  New tool `REV_pipeline/tools/horizUptake.py` (reproduces study 2f R3b).
+- **Study 2g full** (`N2_full`, `N2c_full`, 30 ms, 38 h each on 8 cores): both stable, the gaps at the waterline wet throughout.
+  `N2_full` floods its outermost box layers at 3.5–5.5 ms and loses 22 % of the bath inflow through top/bottom by 30 ms (accelerating);
+  `N2c_full` (bath faces of the outermost layers closed) moves the circulation one layer in (outcome (a)), those layers fill from ~9 ms,
+  5.7 % lost by 30 ms (still growing). Against job 3068: yarn water +8 % (`N2c_full`) / +10–11 % (`N2_full`), front fit 2–20 ms 15.12 /
+  15.67 against 14.44 mm/√s (REV/1D 0.84 / 0.87 against 0.80, weave factor w +10 / +18 %), closed end 26 / 25 against 28 ms; the front
+  lead grows (a rate effect, not `B_full`'s constant offset). The gap water stays within 0.5 mm of the waterline (top 0.825 mm from 20
+  ms, the opening above crossing yarn 6), 17 / 20 % of the fabric water at 30 ms (job 3068: 0.4 %).
+- **Decided with the user 2026-11-13: the `N2c_full` bath for the vertical REV runs** (J off, α `fixedValue` 1 on the bath, the bath
+  faces under the two outermost box layers closed), accepting its leak (5.7 % of the inflow by 30 ms). Reason (user): the gaps carry most
+  of the uptake in the through-thickness runs, so the difference between densities (more or less gap space) is what the REV has to show,
+  and with J the vertical runs hold almost no gap water. Supersedes the 2026-11-09 choice of job 3068's J bath. `tensorA`, `tensorB`,
+  `twillA`, `anisoA*` keep J: valid among themselves; comparisons with new runs need twins on the N2c bath. Measured, for the plan: in
+  vertical wicking the gap water is a waterline term (within 0.5 mm of the bath to 30 ms); in the through-thickness set-up the whole
+  thickness (0.28 mm) lies within that range.
+- **Templates (later the same day, user: the N2c bath for all next vertical set-ups, J off in the horizontal set-up):**
+  `REV_pipeline/cases/vertical` (= `tensorA` with the N2c bath; `REV_pipeline/tools/closeBath.sh` finds the outermost box layers from the
+  mesh, generalising study 2g's `closeZ 3,16`) rebuilds `N2c_full`'s mesh and initial fields byte for byte (K apart) and starts cleanly
+  (30 steps: J off, dt 2.75e-7 s, α ≤ 1.0011). `REV_pipeline/cases/horizontal`: J off, α `fixedValue` 1 on the inlet 5 rows below the
+  fabric (`REV_pipeline/tools/alphaInletFixed.py`), initial fields = R3b's, 30 steps clean; whether the bath-bottom air of the J runs
+  now leaves is only seen in a run. Not run (user: no runs for now). Study 2g's `makeCases.sh` unchanged (record of jobs 3119/3120).
+- **Gap water above the first crossing yarn (user, from ParaView, 2026-11-13: it starts to rise above crossing yarn 6 and may go on
+  into the next gap):** measured, the water connected to the bath reaches 0.825 mm at 20 ms and stays there to 30 ms in both N2 runs
+  (just below the opening above crossing yarn 6 at 0.84 mm; the bath plane at 0.333 mm); connected cells +3 % from 20 to 30 ms
+  (`N2c_full`). S10 (closed yarns) passed that opening (0.892 mm). Whether it rises further with time: open (a continuation from 30 ms
+  with `job_restart.slurm` and a later `endTime` would show it; not planned).
+- **Next (to decide with the user):** which runs get twins on the N2c bath (`tensorA`'s K, Gebart, scalar) and the density variants
+  from `cases/vertical`; `twillA` (job 3113, copy `~/PDM_results/REV_pipeline_twillA`) not scored in the README yet; the mist at the
+  horizontal case's open top before longer horizontal runs; the fabric-scale 1D model (postponed until the twill result). Uncommitted:
+  these notes, `NOTES_solver.md`, both READMEs, `REV_pipeline/tools/` `horizUptake.py`, `closeBath.sh`, `alphaInletFixed.py`,
+  `REV_pipeline/cases/vertical`, the J change in `REV_pipeline/cases/horizontal`.
+- **Plan from 2026-11-16 (user, 2026-11-13): no new simulations for now**; the vertical and horizontal set-ups and the solver are
+  taken as they are. Next week: understanding the solver (the planned walkthrough of the interface treatment, face fluxes per face
+  type) and writing the comparison tools (by the user, in another session: one for the vertical runs, started, one for the
+  horizontal runs; runs on their own meshes: `twillA` against `tensorA`, the density variants; per-run metrics per fabric area or
+  width, not cell by cell; `REV_pipeline/tools/horizUptake.py` has the horizontal per-write metrics). The experimental yarn
+  characterisation starts: pc(S) and the models for pc(S) and K(S) (kr); checklist of the inputs and validation tests:
+  `NOTES_experimental.md`. Before measured models go in: the solver library has pc `VanGenuchten`, `BrooksAndCorey`, `Linear` and kr
+  `BrooksAndCorey`, `VanGenuchten`; `tools/coatsTimeStep` (and the analysis scripts) assume Brooks–Corey kr and Van Genuchten pc
+  (`NOTES_solver.md`, Open issues, kr/pc models outside the solver); a pc with a bounded dry end (study 2f) is not in the library
+  (Van Genuchten and Brooks–Corey diverge as S → 0); water and air kr end points share one keyword.
+
+**Plan for 2026-11-10 (agreed with the user 2026-11-09 evening; item 1 done 2026-11-10, item 2 replaced by the Gebart pair of 2026-11-12).**
 1. **Fetch and compare the four mini03 runs** (all expected done by the morning): `tensorA` job 3107, `tensorB` job 3108,
    `anisoA` job 3109, `anisoA_mu100` job 3110 (`REV_pipeline/cases/`). Fetch each with
    `rsync -avz --exclude 'processor*' --exclude 'dynamicCode' msinegre@mini03.polito.it:PDM_repo_perso/REV_pipeline/cases/<case>/ ~/PDM_results/REV_pipeline_<case>/`
@@ -879,7 +934,8 @@ bath wet and the cut flooded by 7 ms (F2 passes), but the outer bath is not cont
 and J-closed, outer meniscus up to the closed outlet and back, air recirculating at 15–30 m/s through the far open faces, 4,633 cell
 volumes lost). Four bath set-ups now show that wet gaps at the bath need water beside the fabric, and every version of that so far
 leaks or sloshes on this domain; the 1.163 mm cut is shorter than the outer meniscus. **Decided with the user 2026-11-09: the bath
-line (study 2e) is closed; the tensor K runs use the job 3068 set-up (mid-gap bath, J) with job 3068 as the scalar reference.**
+line (study 2e) is closed; the tensor K runs use the job 3068 set-up (mid-gap bath, J) with job 3068 as the scalar reference.** (Superseded 2026-11-13: the `N2c_full` bath of study 2g
+for the vertical runs, Next steps.)
 Reasons: the yarns lead in every run; fully wet gaps at the bath (`B_full`) shift the y-yarn front by a constant 0.24 mm (0.02 / 0.10 /
 0.16 / 0.20 / 0.22 / 0.24 / 0.24 mm at 1 / 2 / 3 / 5 / 10 / 15 / 20 ms; both fronts advance 0.26 mm from 15 to 20 ms), an offset, not
 a rate; every bath that kept the gaps wet also leaked or sloshed; a fabric continued below the waterline with walls beside it is

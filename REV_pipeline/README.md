@@ -33,6 +33,9 @@ change T for the tensor K). Rules as everywhere in the repo: predictions before 
 | `tools/compareAniso.py` | `anisoA` / `anisoA_mu100` against `tensorA`, cell by cell (the aniso mesh keeps `tensorA`'s yarn cells in order): front, yarn water, crossing-yarn S, row profiles, log statistics |
 | `tools/compareTensor.py` | `tensorA` and `tensorB` against job 3068 (same mesh): per-write table with each crossing yarn's S, fits, the B2 time scaling, log statistics (dt limit, implied |U|, cost) |
 | `tools/zLayers.py` | water per z layer of the free cells (through-thickness runs) |
+| `tools/closeBath.sh` | the N2c bath of study 2g for a vertical case: moves the bath faces under the outermost box layer on each side (read from `system/blockMeshDict`) to a closed patch `bathWall`, adds its entry to the 0/ fields; stops if a closed face lies under a yarn cell (2026-11-13) |
+| `tools/alphaInletFixed.py` | the N2 bath: α `fixedValue` 1 on the inlet of `0/alpha.wetting` (after `initFields.py`), with J off (2026-11-13) |
+| `tools/horizUptake.py` | through-thickness runs: per write the uptake above the bath (g/m², yarns / gaps), yarn mean S, gap fill, bath air, crest bath cells, water out through the top, max α, fastest free cell; `--layers`: water and yarn S per z layer; dt by ms from the log (2026-11-13; reproduces study 2f R3b) |
 | `tools/toAnisoImpes.py` | after `subsetMesh`: a tensor-K hybrid case → an anisoImpesFoam case of its yarns (`cases/anisoA`) |
 | `cases/<case>` | one OpenFOAM case per run: `0.orig`, `constant`, `system`, `caseSetup` (N cores), `Allpre`, `run`, `clean`, `job.slurm`, `job_restart.slurm` |
 
@@ -62,7 +65,10 @@ m 0.5, ε 0.5, water/air, σ 0.072, G + H + F′ + I, J (`waterOnlyPatches`), L 
 | `tensorA` | vertical wicking along y, bath plane mid-gap (job 3068's mesh, BCs and initial state) | job 3068: K diagonal in the yarn axes, Kpar 1e-11, Kperp 2.2e-12 (Gebart ratio 4.55): **anisotropy alone**, study (a) | 8 (job 3068's decomposition), 30 ms, every 0.5 ms |
 | `tensorB` | the same | job 3068: K from Gebart (hex, Vf 0.5, fibre radius 7.5 µm): Kpar 4.245e-12, Kperp 9.20e-13, study (b) | 8, 60 ms, every 1 ms |
 | `twillA` | as `tensorA`, on the twill 1/3 STL (box `rev_domain_TW_midbath.json`, its own mesh and decomposition) | `tensorA`: **the weave alone** (set up 2026-11-10, Weave test below) | 8, 20 ms, every 0.5 ms |
-| `horizontal` | the previous student's set-up with our model: the fabric lying flat on a bath at rest, water rising through the thickness (z); x and y cyclic; 5 water rows (0.1 mm) under the fabric box fed from the bottom face (J, totalPressure 0.988 Pa = ρg·5Δz: water at 0 Pa at the bath surface), 5 air rows above it, top open; gravity −z; θ 40° (her value); gaps air, yarns 0.002 except a **wet contact zone** (yarn cells of the bottom four fabric layers on a ramp S 0.84 / 0.64 / 0.35 / 0.15, +6.3 % of the yarn capacity, adopted 2026-11-09 after study 2f) | new (her case: interFoam, impermeable body-fitted yarns, θ 40°, symmetry sides, g 0, inflow fixed at 1e-4 m/s; ours: bath at rest) | 16, 5 ms, every 0.1 ms |
+| `horizontal` | the previous student's set-up with our model: the fabric lying flat on a bath at rest, water rising through the thickness (z); x and y cyclic; 5 water rows (0.1 mm) under the fabric box fed from the bottom face (totalPressure 0.988 Pa = ρg·5Δz: water at 0 Pa at the bath surface; J until 2026-11-13, then off with α `fixedValue` 1 on the inlet, user), 5 air rows above it, top open; gravity −z; θ 40° (her value); gaps air, yarns 0.002 except a **wet contact zone** (yarn cells of the bottom four fabric layers on a ramp S 0.84 / 0.64 / 0.35 / 0.15, +6.3 % of the yarn capacity, adopted 2026-11-09 after study 2f) | new (her case: interFoam, impermeable body-fitted yarns, θ 40°, symmetry sides, g 0, inflow fixed at 1e-4 m/s; ours: bath at rest) | 16, 5 ms, every 0.1 ms |
+| `vertical` | **the template of the vertical runs from 2026-11-13 on**: `tensorA` with the N2c bath of study 2g (J off, α `fixedValue` 1 on the bath, the bath faces under the outermost box layer on each side closed: `tools/closeBath.sh`) | `tensorA`: the bath | 8, 30 ms, every 0.5 ms; not run |
+| `horizB_t40` | `horizontal` with the Gebart tensor K (Kpar 4.245e-12, Kperp 9.20e-13, as `tensorB`); θ 40° | `horizontal`: K (set up 2026-11-12, user; section below) | 8, 10 ms, every 0.2 ms |
+| `horizB_t85` | the same with θ 85° | `horizB_t40`: θ | 8, 10 ms, every 0.2 ms |
 
 The horizontal case is the REV box of `inspect_stl.py` (91 × 133 × 14 cells, its cells identical to job 3051's box)
 with 5 + 5 free layers: 290,472 cells, 78,528 porous; `inlet` and `top` 12,103 faces each, all free (the bath touches
@@ -71,7 +77,27 @@ none of the outer-bath problems of study 2e.
 
 **Runs:** `tensorA` job 3107 and `tensorB` job 3108 on mini03 (8 cores each, submitted 2026-11-09); `anisoA` job 3109 and
 `anisoA_mu100` job 3110 (4 cores each, submitted the same day, ~30 min later); `horizontal` ready since 2026-11-09 (wet contact
-zone, hold lifted), not submitted. `twillA` ready since 2026-11-10 (8 cores, 20 ms), not submitted.
+zone, hold lifted), not submitted. `horizB_t40`, `horizB_t85` set up 2026-11-12 (8 cores each, 10 ms); ran on mini03 as job 3124 (`horizB_t40`) and job 3125 (`horizB_t85`), 2026-11-13 02:34–04:46 (1.8 / 1.7 h on 8 cores); results below. `twillA` job 3113 on mini03 (8 cores, 20 ms; commit `5efce71`, submitted 2026-11-10 ~12:00 next to the study 2g jobs 3111/3112
+and another user's 20-core job: 36 of 46 CPUs).
+
+**Bath of the vertical runs from 2026-11-13 on (decided with the user): the bath of study 2g's `N2c_full`** (`../verification/study2g_noJ/`:
+J off, α `fixedValue` 1 on the bath faces, the bath faces under the two outermost box layers closed as a wall `bathWall`), accepting its
+leak (5.7 % of the bath inflow out through top/bottom by 30 ms). It keeps the gaps at the waterline wet (J closes them: job 3068 holds 98
+cell volumes of gap water at 30 ms, `N2c_full` 6,096). Reason (user): the gaps carry most of the uptake in the through-thickness runs
+(56–67 %, below), so the difference between fabrics of different densities (more or less gap space) is what the REV has to show. The
+vertical runs above (`tensorA`, `tensorB`, `twillA`, `anisoA*`) keep J (job 3068's bath): comparisons among them stay valid, comparisons
+with new runs need twins on the N2c bath. **Template: `cases/vertical`** (`tensorA` + the N2c bath, set up 2026-11-13): `Allpre` runs
+`tools/closeBath.sh` after `blockMesh` (it finds the outermost box layers from `system/blockMeshDict`, where study 2g's `makeCases.sh`
+gave z layers 3 and 16 by number, and stops if a closed face lies under a yarn cell), then `initFields.py --closed-patch bathWall` and
+`tools/alphaInletFixed.py`; `run` stops if the solver reports J active. Checked on the laptop (scratch copy, installed `4bb5d2e`): mesh
+(points, faces, owner, neighbour, boundary) and 0/ eps, fYarn, yarnID, alpha.wetting, U, p, Uwetting, UnonWetting byte-identical to
+`N2c_full`'s (K: `tensorA`'s tensor); 30 steps on 4 cores: J off, L and T active, all 39,115 porous/free faces Darcy faces, dt
+2.75e-7 s at the Coats limit (`tensorA` 2.74e-7), α in [−5e-19, 1.0011], flux through `bathWall` 2e-42 m³, imbalance 2e-24 m³.
+**The horizontal template without J** (`cases/horizontal`, user 2026-11-13: J off, α `fixedValue` 1 on the inlet 5 rows below the
+fabric, `tools/alphaInletFixed.py`; `run` stops if J is active): initial fields identical to R3b's (eps, fYarn, yarnID, K, α); 30 steps
+on 4 cores: J off, L active, α in [−4e-20, 1], dt 1.37e-7 s at the Coats limit, imbalance −3e-20 m³. Not known before a run: whether
+the air of the J runs' bath bottom (inlet-row cells held at α ≈ 0.5) now leaves the bath, and whether an air-rich inlet cell with
+outflow drives α below 0 (outflow is booked as water). `horizB_t40`/`horizB_t85` keep J (the record of jobs 3124/3125).
 
 ### Laptop checks (2026-11-09, scratch copies, installed `4bb5d2e`)
 - `tensorA`, `tensorB`: `Allpre` from this folder; mesh (`blockMeshDict`, points, faces, owner, neighbour, boundary)
@@ -297,7 +323,7 @@ uniform, rows in series, columns in parallel, a detached blob: exact):** yarn ce
 - **Reading:** the conductance reproduces ratios (the anisotropy effect), not the absolute w. Use: w of a new geometry =
   w_run of a reference × the ratio of the conductances; the twill run tests that across geometries.
 
-### Weave test: twill 1/3 (`twillA`, set up 2026-11-10, not run yet)
+### Weave test: twill 1/3 (`twillA`, set up 2026-11-10, job 3113)
 Question (user, 2026-11-10): does the weave alone change the REV result noticeably? If not, w is close to one number for
 these yarns and densities, and the upscaling strategy changes. `twillA` = `tensorA` with one change, the STL: twill 1/3 from
 `geometry/funge.py` (same yarns, densities 22 / 15 per cm, v 0.4, r_f 0.5); the same construction of the mid-gap bath (the
@@ -375,6 +401,125 @@ it):
   from 0.4 ms on.
 - Cost estimate: 1–2 h per simulated ms on 16 mini03 cores (laptop 4 cores: 3.4 h per ms), 5 ms in 5–10 h.
 
+### Horizontal with the Gebart K: θ 40° and 85° (`horizB_t40`, `horizB_t85`, set up 2026-11-12)
+Two copies of `horizontal` (user, 2026-11-12), changed alike: K from Gebart (`Allpre`: `--k-mode tensor`; hex, Vf 0.5, fibre
+radius 7.5 µm: Kpar 4.245e-12, Kperp 9.20e-13 m², as `tensorB`), 10 ms, a write every 0.2 ms (50 writes, ~3 GB per case), 8 cores
+each (`caseSetup`, `job.slurm`). They differ in θ only (`theta0` 40 and 85); mesh, contact ramp, BCs, pc0 5000 Pa and m 0.5 are
+`horizontal`'s. `horizontal` itself (scalar K) has not run; its reference to 0.5 ms is study 2f R3b (scalar K, θ 40°).
+- θ acts here on the free interface at the yarn surfaces only (H): the yarn pc is the same in both cases, although a fibre bundle's
+  pc scales with cosθ (estimate ≈ 19 kPa·cosθ, `../NOTES_cases.md`: ×0.11 from 40° to 85°). The pair isolates the gap menisci,
+  not a less wettable fibre: **intended (user, 2026-11-12)**, `horizB_t85` is weakly wetting gap walls next to strongly wicking
+  yarns, pc0 kept at 5000 Pa in both, to see what such a configuration does. H was validated on the slit up to θ 80° (`../NOTES_solver.md`, Verification).
+- K: both yarn families have Kperp along z (×0.092 of the scalar 1e-11) and Kpar along their axis (×0.42). 1D yarn fronts (similarity
+  solution, ∝ √K): 5.5 mm/√s along z (0.28 mm in ~2.6 ms; scalar K ~0.25 ms), 11.7 mm/√s along the yarns.
+- Laptop checks (2026-11-12, scratch copies, installed `4bb5d2e`, 4 cores): `Allpre` builds `horizontal`'s mesh (290,472 cells,
+  porous 78,528, free 211,944, checkMesh OK), `0/K` and `0/alpha.wetting` identical in the two cases; the solver reads the tensor,
+  guard passed (all 39,406 porous/free faces Darcy faces), J and L active. θ 40° 30 steps (9 µs), θ 85° 100 steps (63 µs): no
+  stopGuard, dt 5.9–8.6e-7 s at the Coats limit (dSmax limit 0.9–2.4e-6 s, capillary waves 1.5e-6 s; scalar `horizontal` 1.2e-7),
+  α in [−1.2e-18, 1.0001], imbalance ≤ 1.1e-22 m³, fastest cell ~2–3 m/s (log Courant number), 1.8–2.1 s per step.
+- Capacities (from the build, g/m² of fabric; z layers counted from the bottom as `tools/zLayers.py`: 0–4 bath, 5–18 fabric box,
+  19–23 air): yarns full 64.8 (initial contact ramp 4.1); free box cells full 150.0, of which layers 5–8 (94 → 48 % free, below the
+  bottom crests) 55.9, 9–13 (36 → 21 → 30 % free, mid-thickness) 27.4, 14 7.7, 15–18 (52 → 97 % free, above the top crests) 59.0.
+- Gap menisci 2σcosθ/w (w 300 / 160 µm): 368 / 690 Pa at 40°, 42 / 78 Pa at 85° (×8.8 weaker); yarn VG pc 676 Pa at S 0.99, 71 Pa
+  at the Se clip (1 − 1e-4). Statics alone would fill a confined gap at either angle (Jurin height at 85°, w 300 µm: 4.3 mm ≫ 0.28
+  mm) and a slit fills fast at either (Washburn 74 / 25 mm/√s, 0.28 mm in 14 / 130 µs). A difference has to come from the yarns
+  drawing the gap water (a meniscus beside an unsaturated yarn holds up to y ≈ 2σcosθ/w ÷ (qμ/K + ρg), `../NOTES_cases.md`: 8.8×
+  lower at 85°, and qμ/K is larger for the same flux with the lower K) and from contact lines pinning where a gap widens (an edge is
+  passed where the wall turns away by less than 90° − θ: 50° at 40°, 5° at 85°).
+
+Predictions (written before the runs, 2026-11-12, first for 20 ms and restated for 10 ms the same day when the end time was
+shortened; uptake = water above the bath surface minus the initial contact ramp, as in study 2f):
+- Z1 both: 10 ms without stopGuard; α ≤ 1.01; |imbalance| ≤ 1e-16 m³; ≤ 10 cell volumes out through `top`; dt 4e-7 to 9e-7 s at the
+  Coats limit throughout (`tensorB` 5.4–6.5e-7); 10 ms (~15,000 steps) in 3–6 h on 8 mini03 cores (`tensorA`: 0.61–0.63 s per step
+  on 8 cores for 242k cells).
+- Z2 both: bath cells under the crests water (≥ 700 of 747) at every write; bath air (Σ(1 − α) over layers 0–4) ≤ 3,000 cell volumes
+  at every write (R3b: peak 2,358 at 150 µs), ≤ 200 from 2 ms.
+- Z3 `horizB_t40` yarns: mean yarn S reaches 0.90 (R3b's state at 0.5 ms) between 1 and 6 ms; ≥ 0.95 at 10 ms. Reading: before
+  ~1.2 ms (R3b's time × K/Kpar) the gap water, which rises independently of K, feeds the yarns over their surface; 1.2–2.5 ms
+  spreading along the yarns (Kpar); after ~4 ms through-thickness transport at Kperp (R3b × K/Kperp: 5.4 ms).
+- Z4 `horizB_t40` gaps: fabric free cells ≥ 54 % water at 0.5 ms (R3b; the yarns draw less with the lower K, the gap rise does not
+  depend on K). **Fails if below**: the gap filling is then tied to the yarns (their air venting, their uptake), not to the gap
+  capillarity. At 10 ms (`zLayers.py`, free cells α > 0.5): layers 5–13 ≥ 90 % water, layers 17–18 < 20 % (open above the top
+  crests, as in R3b and study 2d S9); layers 14–16 not predicted.
+- Z5 `horizB_t85` gaps: fabric free-cell water ≤ 0.5 × `horizB_t40`'s at every write to 5 ms; at 10 ms layers 9–18 < 20 % water each
+  (water only near the bath, below the bottom crests). **Fails if the gaps fill as at 40° by 10 ms** (layers 5–13 ≥ 90 %): θ then
+  sets the time, not the end state (statics allows the fill at 85°), and pinning and drainage by the yarns are weak in this model.
+- Z6 `horizB_t85` yarns: yarn uptake below `horizB_t40`'s at every write from 0.5 ms (fed through the 747 crest faces and the contact
+  ramp, little through the gaps); mean yarn S ≥ 0.80 at 10 ms (water along the yarns from bottom crests 0.91 / 1.33 mm apart at
+  Kpar: half the distance in 1.5 / 3.3 ms by the 1D similarity, slower through the crimp staircase at Kperp). Below 0.80: the yarns
+  need the gap water to fill through the thickness, so in this model the gap wetting controls the fabric uptake. Within 10 % of
+  `horizB_t40`: the yarns are fed through the crests in both and the gaps do not matter for the yarns.
+- Z7 uptake at 10 ms: `horizB_t40` 130–175 g/m² (yarns 57–60 at S 0.95–0.99, gaps 75–113); `horizB_t85` 45–90 g/m² (yarns 48–60
+  at S 0.80–0.99, gaps ≤ 30). Everything full: 211.
+Analysis: `tools/horizUptake.py <copy> --layers` (written 2026-11-13; on R3b it reproduces study 2f's uptake, bath air and fastest
+cell at every write), `tools/zLayers.py <copy>`.
+
+### Results: `horizB_t40` (job 3124) and `horizB_t85` (job 3125), analysed 2026-11-13
+Copies `~/PDM_results/REV_pipeline_horizB_t40`, `REV_pipeline_horizB_t85`; `tools/horizUptake.py --layers`; bath and top fluxes (fastest cell
+per region, water in the air rows, `phi` and `alphaPhi0.wetting` on `top`, bath air per row) by a scratch script.
+- **Run:** both to 10 ms, no stopGuard, no restart; 6,404 / 6,175 s on 8 mini03 cores. dt at the Coats limit only at the start
+  (median 5.1e-7 / 5.6e-7 s in the first ms), then at the capillary-wave limit 1.49e-6 s (`coatsTimeStep` `dtCap`) from ~4 / ~2 ms:
+  2–3× cheaper than predicted. α ≤ 1.00005; |imbalance| ≤ 7e-17 / 1.1e-17 m³. Fastest free fabric cell ≤ 2.0 / 2.3 m/s from 0.8 / 0.6 ms
+  (air cells).
+- **Uptake** (water above the bath surface minus its initial value, g/m²; gap fill = mean α of the free box cells):
+
+| t [ms] | θ 40°: uptake (yarns / gaps) | yarn S | gap fill | θ 85°: uptake (yarns / gaps) | yarn S | gap fill |
+|---|---|---|---|---|---|---|
+| 0.2 | 38.9 (9.7 / 29.2) | 0.21 | 0.19 | 27.0 (6.4 / 20.6) | 0.16 | 0.14 |
+| 0.4 | 100.6 (26.5 / 74.2) | 0.47 | 0.49 | 73.7 (17.4 / 56.2) | 0.33 | 0.37 |
+| 1 | 153.7 (52.7 / 101.0) | 0.87 | 0.67 | 110.8 (44.9 / 65.9) | 0.75 | 0.44 |
+| 2 | 164.1 (56.2 / 107.7) | 0.93 | 0.71 | 126.5 (55.3 / 71.2) | 0.91 | 0.47 |
+| 5 | 178.6 (57.9 / 119.1) | 0.95 | 0.79 | 132.0 (57.5 / 74.4) | 0.95 | 0.49 |
+| 10 | 187.8 (58.7 / 125.3) | 0.96 | 0.83 | 133.3 (58.3 / 74.9) | 0.96 | 0.50 |
+
+  Everything full: 212 g/m² (yarns 65.3 + free box cells 151.3 − 4.3 initial; the capacities above, 64.8 / 150.0, used the box area of
+  `rev_domain.json`, these the mesh's cells, 0.8 % larger).
+- **Gaps per z layer** (free cells α > 0.5): θ 40° layers 5–14 ≥ 98 % from 1 ms, 15 at 90 → 100 % (1 → 2 ms), 16 at 10 / 46 / 90 / 99 %
+  (1 / 2 / 3 / 5 ms), 17 at 0 / 22 / 53 / 87 % (1 / 5 / 7 / 10 ms, still rising), 18 ≤ 1 %. θ 85° layers 5–9 ≥ 96 %, 10–11 88–93 %, 12 at
+  1 / 13 / 41 % (1 / 3 / 10 ms, still rising), 13–18 ≤ 1 %. At θ 85° the gap water peaks at 0.6 ms (73 g/m²), drops to 66 by 1 ms while
+  the yarns take it, and refills to 75 by 10 ms.
+- **Yarns:** at 1 ms S 0.95 (bottom layer) → 0.47 (top) at θ 40°, 0.93 → 0.08 at θ 85°; 0.92–0.96 / 0.87–0.94 in every layer from 2
+  ms; 0.96 at 10 ms in both, still creeping up. Yarn water θ 85° / θ 40°: 0.66 / 0.78 / 0.85 / 0.98 / 0.99 at 0.2 / 0.6 / 1 / 2 / 10 ms.
+- **Against R3b** (scalar K 1e-11, θ 40°): the gaps fill alike or faster with the Gebart K (fill 0.19 / 0.49 against 0.10 / 0.38 at 0.2 /
+  0.4 ms; ~0.55 against 0.53 at 0.5 ms, between writes), the yarns hold ~0.6× (≈ 33 against 56 g/m² at 0.5 ms); yarn S 0.90 at ~1.25 ms
+  against 0.45 ms: ×2.8, near K/Kpar (2.4), far from K/Kperp (10.9).
+- **Bath (artefact of the J inlet):** bath air 1,918 / 1,246 cell volumes at 0.2 ms (the start sag), 155 / 163 at 0.4 ms, then 548 / 892 /
+  1,923 / 2,561 at 1 / 2 / 5 / 10 ms at θ 40° (still growing, ~100 per ms at the end) and 324 / 390 / 716 / 796 at θ 85° (levelling off).
+  At 10 ms 72 / 76 % of it sits in the two bottom bath rows, next to the J inlet, whose cells hover at α ≈ 0.5 (J's closure threshold);
+  bath cells up to 3.1 m/s (θ 40°, air-rich). The 747 bath cells under the crests stay water (744–747) at every write. Where the air
+  enters the bath (no air passes J): not measured.
+- **Top (artefact of the open top):** water out through `top` 2.5 / 50 / 540 cell volumes at 2 / 5 / 10 ms at θ 40° (134 per ms at
+  9–10 ms, accelerating while the gap water reaches layers 16–17; 540 ≈ 0.9 g/m²), 142 by 10 ms at θ 85° (from 2.2 ms, slowing). It
+  leaves as a mist: water in the five air rows 141 / 959 / 2,251 cell volumes at 2 / 5 / 10 ms at θ 40° (≈ 3.7 g/m² at 10 ms; max α
+  0.05 / 0.15 / 0.29 in the first air row), 97 % of the outflow through faces whose cell has α < 0.01; air in the air rows at up to 1.8 m/s
+  (224 cells above 1 m/s at 10 ms) over a fabric taking a mean 1.5 mm/s. At θ 85° the top of the fabric stays dry; its mist (first air
+  row 96 cell volumes at 3 ms, max α 0.49; 35 at 10 ms) comes while the top yarn crests wet (2–4 ms; from the timing, not checked).
+- **Scoring:**
+  - Z1: 10 ms without stopGuard, α, imbalance: pass. Water out through the top ≤ 10: fails (540 / 142, the mist above). dt 4–9e-7 s at the
+    Coats limit throughout: fails (capillary-wave limit 1.49e-6 s from 2–4 ms), so 1.7–1.8 h instead of 3–6 h.
+  - Z2: crest bath cells ≥ 700 of 747: pass (744–747). Bath air ≤ 3,000: pass (2,561 / 796 at most); ≤ 200 from 2 ms: fails (892 → 2,561 /
+    390 → 796).
+  - Z3: pass (S 0.90 at ~1.25 ms, 0.964 at 10 ms).
+  - Z4: ≥ 54 % at 0.5 ms: pass only by interpolation (no write at 0.5 ms: 49 % at 0.4, 62 % at 0.6 ms); faster than R3b, as reasoned:
+    pass. Layers 5–13 ≥ 90 %: pass. Layers 17–18 < 20 %: fails for 17 (87 %, still rising), passes for 18 (1 %).
+  - Z5: fails both parts (θ 85° gap water 0.62–0.76 × θ 40°'s to 5 ms; layers 9–11 at 93–98 % at 10 ms), and the failure case (the gaps
+    fill as at 40°) does not occur either: the gaps fill the lower half and stop.
+  - Z6: pass (yarn water below θ 40°'s at every write; S 0.957 at 10 ms); within 10 % of θ 40° from 1.4 ms on (0.85 / 0.90 at 1 / 1.2
+    ms).
+  - Z7: fails, above both ranges (187.8 against 130–175, 133.3 against 45–90 g/m²): the gap water was underestimated in both cases.
+- **Reading:**
+  - θ acts (by construction of this pair) on the gaps only, and decides how far above the narrowest layer they fill: at 40° up to the
+    valleys between the top crests, still rising at 10 ms; at 85° up to the narrowest layer (layer 11, 21 % free) and slowly into the one
+    above. Hypothesis, not tested: the contact line pins where the pores widen above the narrowest layer (an edge is passed where the wall
+    turns away by less than 90° − θ: 50° at 40°, 5° at 85°). Not the yarns: they are the same in both.
+  - The gap water is most of the uptake (67 % at 40°, 56 % at 85° at 10 ms): for a through-thickness test θ and the shape of the space
+    between the yarns (here TexGen's) count most; K and pc set the yarn part (~58 g/m²) and its time (~1–2 ms here). A less wettable fibre
+    would also lower the yarn pc (∝ cosθ): not in this pair (user, 2026-11-12).
+  - Gebart against scalar K: only the yarns slow down (×2.8 to S 0.90), close to the along-yarn K ratio. Interpretation, not tested:
+    the yarns fill from the gap water around them and along their axis, not through the thickness at Kperp.
+  - Both artefacts sit at the boundaries (J inlet, open top), ≤ 2 % of the uptake at 10 ms but still growing at 40°: to deal with before
+    longer runs (not decided).
+
 ### Horizontal: smoke test failed (2026-11-09), case on hold (superseded, see above)
 
 Laptop, 4 cores (scratch copy). **600-step test: stopGuard at step 350, t = 31 µs** (dt 8.8e-15 s), α ≤ 1.0001, budget closed.
@@ -414,7 +559,8 @@ Laptop, check a case before submitting (scratch copy of the whole folder, so the
 test: `maxSteps` in `system/controlDict`, `N 4` in `caseSetup`, `LOG_DIR=<scratch>/logs ./run`.
 
 Cluster (mini03), after commit, push and `git pull` (solver `4bb5d2e`, already there): check the load (`squeue`,
-`sinfo -o "%n %C"`), then in each case folder `sbatch job.slurm` (`tensorA`, `tensorB`: 8 cores; `horizontal`: 16). The
+`sinfo -o "%n %C"`), then in each case folder `sbatch job.slurm` (`tensorA`, `tensorB`, `twillA`, `horizB_t40`, `horizB_t85`, `vertical`: 8 cores;
+`horizontal`: 16). The
 job builds the case (`./Allpre`, ~20 s), checks the cell counts against the laptop build, runs, reconstructs. Restart
 after a crash: `sbatch job_restart.slurm` (never `job.slurm` on a run in progress: its `Allpre` deletes the results; it
 continues by itself if `processor0/` exists).
@@ -422,7 +568,9 @@ continues by itself if `processor0/` exists).
 Fetch: `rsync -avz --exclude 'processor*' --exclude 'dynamicCode' msinegre@mini03.polito.it:PDM_repo_perso/REV_pipeline/cases/<case>/ ~/PDM_results/REV_pipeline_<case>/`,
 then point the includes at this folder's tools (paraFoam and postProcess need them):
 `sed -i 's#"\.\./\.\./\.\./tools/#"/home/martin_sng/PDM_repo_perso/REV_pipeline/tools/#' ~/PDM_results/REV_pipeline_<case>/system/controlDict`.
-Analysis: `tools/compare3068.py <copy>` (tensor cases), `tools/check.py <copy>`, `tools/zLayers.py <copy>` (horizontal).
+Analysis: `tools/compare3068.py <copy>` (tensor cases), `tools/check.py <copy>`, `tools/horizUptake.py <copy> --layers` and
+`tools/zLayers.py <copy>` (horizontal);
+`twillA` against `tensorA`: a script that reads each run on its own mesh is still to write (`compareTensor.py` assumes one mesh).
 
 ## Pipeline: the main script (planned, not written)
 
@@ -431,8 +579,8 @@ One input file per REV, one command. Steps and what exists for each:
    with the inputs in its first lines, run in the TexGen GUI. Needs a TexGen Python callable from the pipeline (open
    point, see below).
 2. REV box: `geometry/inspect_stl.py` (+ the half-spacing shift for a mid-gap bath).
-3. Case folder from a reference (`cases/tensorA` for vertical wicking, `cases/horizontal` for the through-thickness
-   set-up): copy, then the dictionaries filled from the inputs (yarn K or Gebart inputs, pc0, m, θ, end time, cores).
+3. Case folder from a reference (`cases/vertical` for vertical wicking: `tensorA` with the N2c bath, since 2026-11-13;
+   `cases/horizontal` for the through-thickness set-up, J off since 2026-11-13): copy, then the dictionaries filled from the inputs (yarn K or Gebart inputs, pc0, m, θ, end time, cores).
 4. Mesh and fields: `tools/build_fields.py`, `tools/initFields.py` (what `Allpre` does).
 5. Checks: checkMesh, cell counts, periodicity, a short smoke test.
 6. Launch: `./run` on the laptop, or `job.slurm` written for the cluster (the submission itself stays a manual `sbatch`).

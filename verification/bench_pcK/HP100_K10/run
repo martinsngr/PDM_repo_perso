@@ -1,0 +1,5 @@
+#!/bin/bash
+# HP100_K10: pc0 500000 Pa, K 1e-12 m2, dt 1e-08 s, end 2e-05 s, hybridPorousInterFoam_b0c0f67
+cd "$(dirname "$0")"
+. ../../runTools.sh
+runTmpLog log.HP100_K10 hybridPorousInterFoam_b0c0f67

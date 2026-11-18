@@ -198,7 +198,74 @@ cell volumes at 3 / 10 / 20 / 30 ms; porous water 1.065 × job 3068 at 2–5 ms,
   Both side by side on 8 cores each (~29 h) answer both questions at once.
 - **Runs (decided with the user 2026-11-11): both, side by side on mini03, 8 cores each.** The smoke tests above ran on 4
   cores; the 8-core decomposition was not rerun locally (job 3068 ran this mesh on 8 cores; `N2c_full` only adds the
-  `bathWall` patch). Job numbers: to add at the submission.
+  `bathWall` patch). **Submitted 2026-11-11 ~11:58 (user): job 3119 (`N2_full`) and job 3120 (`N2c_full`), 8 cores and 16G
+  each, next to another user's 20-core job (36 of 46 CPUs: expect the loaded-node end of the estimate).**
+
+## Results of the full-length runs (jobs 3119, 3120, analysed 2026-11-13; copies `~/PDM_results/study2g_N2_full`, `study2g_N2c_full`)
+Tools: `../../REV_pipeline/tools/compare3068.py <copy>` (against job 3068), `bathRegions.py <copy> 0.001 0.003 0.01 0.02 0.03`,
+`../study2d_gapRise/connected.py <copy>`; `0/C` written on the copies (`postProcess -func writeCellCentres -time 0`).
+- **Run:** both to 30 ms, no stopGuard, no restart; 137,882 / 138,984 s on 8 cores (38.3 / 38.6 h: 4,600 s per simulated ms, 1.34 × job
+  3068's 3,440 with the node full, 46 of 46 CPUs, as the tensor runs). dt median 1.23–1.25e-7 s from 1 ms (1.16e-7 at 25–30 ms), Coats
+  limit. α in [−5e-20, 1.0001] at the writes. Imbalance −8.6e-18 m³ from the start (one-time), −9.0e-18 at 30 ms in `N2_full`.
+  Fastest free box cell at the writes 9.6 / 14.4 m/s at 0.5 ms (the start transient, as `N2_noJfix`), ≤ 2.4 m/s from 1.5 ms (`N2_full`),
+  ≤ 2.1 m/s from 1.5 ms and ≤ 1.1 m/s from 11.5 ms (`N2c_full`).
+
+| t [ms] | `N2_full`: front / porous water × 3068 / gap water / first row / lost | `N2c_full`: the same | job 3068: front / gap water / lost |
+|---|---|---|---|
+| 1 | 0.985 / 1.034 / 1,749 / 762 / 7.8 | 0.965 / 1.010 / 1,226 / 549 / 18.1 | 0.985 / 179 / 2.7 |
+| 3 | 1.326 / 1.064 / 2,608 / 762 / 25.5 | 1.306 / 1.043 / 1,802 / 580 / 24.5 | 1.306 / 83 / 3.0 |
+| 5 | 1.566 / 1.072 / 3,929 / 912 / 96 | 1.546 / 1.047 / 2,187 / 601 / 46 | 1.526 / 84 / 3.5 |
+| 10 | 2.028 / 1.111 / 7,052 / 944 / 855 | 1.987 / 1.060 / 3,048 / 706 / 106 | 1.947 / 81 / 4.6 |
+| 20 | 2.649 / 1.108 / 7,378 / 944 / 4,210 | 2.609 / 1.082 / 5,944 / 759 / 755 | 2.549 / 91 / 7.6 |
+| 30 | 2.990 / 1.099 / 7,552 / 944 / 8,608 | 2.990 / 1.081 / 6,096 / 760 / 1,782 | 2.990 / 98 / 11.1 |
+
+  (Front: y-yarns, mm, closed end 2.990 mm; gap water: free box cells, cell volumes; first row: first-row free cells at α > 0.5 of 944,
+  of which 182 stand on `bathWall` in `N2c_full`; lost: through top/bottom, cell volumes.)
+- **`N2_full`:** = `N2_noJfix` to 3 ms (porous water 1.034 / 1.054 / 1.061 / 1.064 × job 3068 at 1 / 1.5 / 2 / 3 ms against 1.027 / 1.046 /
+  1.055 / 1.059; front one row ahead at 2.5–3 ms as there; 762 of 944). Then the outermost layers flood: first row 765 / 815 / 875 / 912 /
+  944 at 3.5 / 4 / 4.5 / 5 / 5.5 ms (`Bbox_full`: 8 ms). Lost through top/bottom 8,608 cell volumes by 30 ms = 22 % of the bath inflow
+  (3.16e-10 m³), still accelerating (400 per ms at 20 ms, 630 at 30 ms; `Bbox_full` 59,426); padding water 210 / 306 / 487 at 10 / 20 /
+  30 ms. Per layer from 10 ms: inflow through every layer, return flow through layers 5, 13 and 14 (−40 to −80 per ms each).
+- **`N2c_full`:** outcome (a) at 3 ms: all 182 first-row cells of layers 4 and 15 air-rich, layers 4 + 15 take 1,016 of the 2,036 cell
+  volumes per ms of gross inflow (50 %), 24.5 lost. Not predicted: layers 4 and 15 then fill (air-rich first-row cells 182 / 56 / 3 / 2 at
+  3 / 10 / 20 / 30 ms; 700 of the 762 inlet first-row cells water from 9.5 ms, 760 from 20 ms), yet keep taking about half the gross
+  inflow (404 of 846 per ms at 20 ms, 403 of 812 at 30 ms; out −11 to −24); the first-row cells on `bathWall` (layers 3 and 16) stay air.
+  Lost 1,782 cell volumes by 30 ms = 5.7 % of the bath inflow (2.50e-10 m³), still growing (~110 per ms at the end); padding water 18 / 79
+  / 93 at 10 / 20 / 30 ms.
+- **Gap water** (`connected.py`, free cells α > 0.5 connected to the bath): `N2c_full` 1,369 / 2,730 / 5,998 / 6,193 cells at 3 / 10 / 20 /
+  30 ms, top 0.424 / 0.544 / 0.825 / 0.825 mm (bath plane 0.333 mm), rows ≥ 50 % water up to 0.363 / 0.383 / 0.484 / 0.504 mm;
+  `N2_full` 2,203 / 7,266 / 7,579 / 7,880 cells, top 0.444 / 0.805 / 0.825 / 0.825 mm, rows ≥ 50 % up to 0.504 mm from 10 ms. Both tops
+  stop at 0.825 mm from 20 ms (the opening above crossing yarn 6 at 0.84 mm, as S10). **The gap water stays within 0.5 mm of the
+  waterline** (rows ≥ 50 % within 0.17 mm) while the y-yarn front reaches the closed end: 17 % (`N2c_full`) and 20 % (`N2_full`) of the
+  fabric water at 30 ms (job 3068: 0.4 %). Isolated pockets 36–67 cells up to 0.74–0.85 mm.
+- **Yarns:** porous water × job 3068 1.043 / 1.060 / 1.082 / 1.081 at 3 / 10 / 20 / 30 ms (`N2c_full`), 1.064 / 1.111 / 1.108 / 1.099
+  (`N2_full`). Front fits (2–10 / 2–20 / 2–25 ms): `N2c_full` 14.92 / 15.12 / 15.04, `N2_full` 15.56 / 15.67 / 15.57 mm/√s, job 3068 14.36 /
+  14.44 / 14.15; REV/1D 0.83–0.84 and 0.86–0.87 against 0.80; closed end at 26.0 / 25.0 ms (28.0). The front lead over job 3068 grows
+  (`N2c_full` +0.02 / +0.04 / +0.06 / +0.10 mm at 5 / 10 / 20 / 24.5 ms): a rate effect, not the constant offset of `B_full` (0.24 mm).
+- **Scoring:**
+  - Both: 30 ms without stopGuard, α ≥ −1e-3, dt 1.2–1.3e-7 s at the Coats limit: pass.
+  - `N2_full`: = `N2_noJfix` to 3 ms: pass. Outer layers flood (as `Bbox_full`, earlier: 3.5–5.5 ms): pass; lost ≥ 1,000 by 20 ms: pass
+    (4,210); padding > 100 from 10–15 ms: pass (from 7 ms). Porous water 1.06–1.12 × from 3 ms: pass. Fit 2–20 ms 14.5–15.5 mm/√s: fails
+    by 1 % (15.67). Closed end 25–28 ms: pass (25.0).
+  - `N2c_full` at the bath: ≥ 700 of the 762 first-row cells water from 0.5 ms: fails (580 to 3 ms: the air-rich cells of layers 4 and 15,
+    i.e. outcome (a) itself; 700 from 9.5 ms); all 307 of the band: pass except 300 at 1 ms. Outcome (a): pass on all three criteria;
+    (b): fails (lost 25 by 3 ms, 1,782 by 30 ms).
+  - `N2c_full` yarns: porous water 1.03–1.08 × from 3 ms: pass to 17 ms, 1.081–1.083 after (at the edge). Fit 14.4–15.2 mm/√s: pass
+    (15.12). Closed end 26–28 ms: pass (26.0).
+- **Reading:**
+  - The α `fixedValue` 1 bath holds for 30 ms on the full REV: stable, the gaps at the waterline wet throughout (the band 307 of 307 from
+    1.5 ms). Closing the bath faces of the two outermost box layers moves the circulation one layer in, as expected; those layers then
+    fill (~9–20 ms) and the leak is 4.8× smaller than without the closure (5.7 against 22 % of the inflow by 30 ms), but not stopped.
+  - What wet waterline gaps add: +8 % yarn water from 18 ms (`N2c_full`; +10–11 % in `N2_full`, which also has the flooded outer layers),
+    front +5 % (`N2c_full`) / +9 % (`N2_full`) in k, i.e. +10 / +18 % in a weave factor w ∝ k². Not separated: how much of `N2c_full`'s
+    gain comes from its circulation (its leak and its gain are both smaller than `N2_full`'s).
+  - In vertical wicking the gap water is a waterline term: it stays within 0.5 mm of the bath (the opening above crossing yarn 6 stops
+    it, as S10) and holds 17–20 % of the fabric water at 30 ms, while the yarns carry the front. Not known: whether it rises further
+    once the yarn flux drops (minutes, beyond these runs).
+  - **Decided with the user 2026-11-13: the `N2c_full` bath for the vertical REV runs, accepting its leak** (reason and consequences in
+    `../../REV_pipeline/README.md`, Cases). New vertical cases start from `../../REV_pipeline/cases/vertical`, whose `Allpre` applies this
+    bath with `../../REV_pipeline/tools/closeBath.sh` (the outermost box layers read from the mesh instead of `closeZ 3,16`; rebuilds
+    `N2c_full`'s mesh and initial fields byte for byte, K apart). This script stays as the record of jobs 3119/3120.
 
 ## Commands
 Build on the cluster: commit, push, `git pull` on mini03, then in each case folder `sbatch job.slurm` (4 cores each, ~3–4 h
