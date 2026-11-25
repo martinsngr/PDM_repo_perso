@@ -5,16 +5,24 @@ Working notes, loaded for the whole repo:
 @NOTES_solver.md
 
 ## Layout
-- `REV_pipeline/`: the REV runs from 2026-11-09 on, self-contained (`geometry/`, `tools/`, `cases/`); target: one main
+- `REV_pipeline/`: the REV runs from 2026-11-09 on (`geometry/`, `tools/`, `cases/`); target: one main
   script from the REV inputs to the launched run (its `README.md`).
-- `meshing_strat_trial/`: fabric REV work up to 2026-11-09. Self-contained: `2D_bench/` (thick-wall slit bench),
+- **`REV_pipeline/tools/` is the single copy of the shared tools** (function objects `coatsTimeStep`, `waterBudget`,
+  `liquidBalance`, `stopGuard`, `dsLocator`, `pOpenAir`, `runTools.sh`, `initFields.py`, scripts). Every other `tools`
+  folder and `runTools.sh` in the repo is a symlink to it (2026-11-20, user): change a tool there only, keeping the old
+  code paths bit-identical (regression), and never while cluster jobs use it.
+- `parametrization/`: yarn inputs computed from the yarn geometry (`NOTES_parametrization.md`); `poreMorphology/`: pc(S) by
+  pore morphology with PoreSpy (Maier et al. 2025), code written by the user (since 2026-11-23).
+- `meshing_strat_trial/`: fabric REV work up to 2026-11-09: `2D_bench/` (thick-wall slit bench),
   `REV/` (geometry, mesh, fields and solver case in one folder), `slit_test/`, `2D_bench_strip/` (first bench,
-  archive), `tools/` (shared scripts, function objects, `runTools.sh`).
+  archive), `tools/` (symlink to `REV_pipeline/tools`).
 - `trialWicking/`: 1D column and single-yarn cases. Reference work: read it when needed, don't add new work there.
 - `verification/`: all verification evidence (paper tutorials, 1D similarity, benches) and `PLAN.md` (planned
   studies, their rules: predictions before runs, one recorded solver version per study, stop after each study).
 - `NOTES_cases.md` (cases) and `NOTES_solver.md` (solver): update them after each piece of work, measured results
   kept apart from hypotheses. `NOTES_figures.md`: figures for the thesis (what each shows, data, script, status).
+  `NOTES_experimental.md`: what the model needs from the tests; `NOTES_parametrization.md`: yarn pc(S), K and kr from the
+  yarn geometry (Maier et al. 2025, PoreSpy).
 
 ## Solver
 - `hybridPorousInterFoam`, OpenFOAM 9, source `~/OpenFOAM/martin_sng-9/run/hybridPorousInterFoam/OpenFoamV8`, branch
@@ -32,7 +40,8 @@ Working notes, loaded for the whole repo:
   `LOG_DIR=$PWD/logs`. If a run is killed the full log is still in `/tmp`. Hand-run tests log to /tmp or the scratchpad.
 - **Cluster (mini01, OF9 at /opt/OpenFOAM-9): `sbatch job.slurm` only**, never `./run` or a solver directly there.
 - **Python:** `.venv/bin/python` at the repo root (numpy, trimesh, matplotlib). `meshing_strat_trial/REV/build_fields.py`
-  needs trimesh, `meshing_strat_trial/tools/initFields.py` numpy only.
+  needs trimesh, `meshing_strat_trial/tools/initFields.py` numpy only. PoreSpy (pore morphology, `NOTES_parametrization.md`):
+  `~/venvs/porespy/bin/python` (Python 3.12 from the deadsnakes PPA, PoreSpy 3.3.0), kept apart from `.venv`.
 
 ## Editing and git
 - Keep changes minimal, justified and traceable; list every change to case dictionaries.

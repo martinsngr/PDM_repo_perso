@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      alpha.wetting;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Maier et al. 2025 (Table 3): initial S 0.01 everywhere, S 0.99 at the bottom (their
+// Dirichlet condition: with air at 0 Pa (0/p) the water at the inlet is at -pc(0.99)).
+// alpha.wettingmax 1 (constant/transportProperties), so alpha = their S.
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform 0.01;
+
+boundaryField
+{
+    // their Dirichlet condition S(0) = 0.99, fixed. Not inletOutlet (template): on a
+    // column dry at the start the inlet face has no flux, takes the cell value 0.01
+    // (kr ~ 1e-6) and water never enters (checked 2026-11-20: nothing wicked in
+    // 2110 s). With J the inlet flux is water only whatever alpha there.
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 0.99;
+    }
+    // zeroGradient, not fixed (../../waterOnlyReservoir/1D_waterOnly): a fixed
+    // alpha here lets the capillary flux draw water in through the top face
+    outlet
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

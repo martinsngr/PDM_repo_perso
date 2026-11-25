@@ -1,5 +1,6 @@
 # Shared helpers for the run scripts of the wicking cases.
-# Source from a case folder:  . ../tools/runTools.sh
+# Source from a case folder: . <path>/runTools.sh (REV_pipeline/tools/runTools.sh; verification/runTools.sh,
+# trialWicking/runTools.sh and meshing_strat_trial/tools are symlinks to it)
 
 # runTmpLog <logName> <command...>
 #

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Remove the mesh and the results; keeps 0/, constant/ dictionaries and system/.
+cd "${0%/*}" || exit 1
+for d in *; do
+    case "$d" in
+        0) ;;
+        *[!0-9.e+-]*) ;;
+        *) [ -d "$d" ] && rm -rf "$d" ;;
+    esac
+done
+rm -rf constant/polyMesh dynamicCode postProcessing log.* waterBudget.csv

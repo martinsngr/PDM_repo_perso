@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Maier et al. 2025 (Textile Res. J. 95, 937), f128 yarns with PEG 400: their inputs
+// (Tables 1, 2, 4; ../README.md). Their model is Richards (no air); the air here only
+// has to leave through the open top.
+
+phases (wetting nonWetting);
+
+// PEG 400: mu 0.0948 Pa.s, rho 1120 kg/m3 (Table 2): nu = mu/rho
+wetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 8.464286e-05;
+    rho             [1 -3 0 0 0 0 0] 1120;
+}
+
+// air (not given by them): mu 1.8e-5 Pa.s, rho 1.2 kg/m3
+nonWetting
+{
+    transportModel  Newtonian;
+    nu              [0 2 -1 0 0 0 0] 1.5e-05;
+    rho             [1 -3 0 0 0 0 0] 1.2;
+}
+
+// PEG-air (Table 2); only used in solid-free cells (eps > 0.99): none here
+sigma            [1 0 -2 0 0 0 0]  0.0412;
+
+activateCapillarity     1;
+
+// Darcy faces: K/dx^2 = 1.1e-10/(0.5 mm)^2 = 4.4e-4 (4K: 1.8e-3), every face is a Darcy face
+darcyFaceMaxDa  0.1;
+
+// Their S runs from 0 to 1 (no residual saturation): Se = S
+alpha.wettingmin           alpha.wettingmin [0  0  0 0 0 0 0] 0;
+alpha.wettingmax           alpha.wettingmax [0  0  0 0 0 0 0] 1;
+
+// Mualem kr (their eq. 10) = the library's VanGenuchten kr, and Van Genuchten pc
+// (their eq. 9). Both models read VanGenuchtenCoeffs, so kr and pc share m, as in
+// their model.
+relativePermeabilityModel  VanGenuchten;
+capillarityModel           VanGenuchten;
+
+// Their Table 4 (f128, PEG): alpha 0.000605 1/Pa -> pc0 = 1/alpha = 1652.89 Pa;
+// n 4.48 -> m = 1 - 1/n = 0.7767857. Changing pc0, m or alpha.wettingmaxpc
+// changes the inlet and outlet p (0/p reads them).
+VanGenuchtenCoeffs
+{
+    alpha.wettingminpc alpha.wettingminpc [0 0 0 0 0 0 0] 0;
+    alpha.wettingmaxpc alpha.wettingmaxpc [0 0 0 0 0 0 0] 1;
+    pc0 pc0 [1 -1 -2 0 0 0 0] 1652.892562;
+    m 0.7767857;
+}
+
+// Change J: the inlet passes water only. With alpha 0.99 on the inlet and air at
+// 0 Pa (0/p) the inlet water is at -pc(0.99) = -627 Pa: their condition S(0) = 0.99
+// (../../waterOnlyReservoir/1D_waterOnly, the same inlet).
+waterOnlyPatches (inlet);
+
+// ************************************************************************* //

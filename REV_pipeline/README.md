@@ -46,7 +46,13 @@ Where the tools come from (copied 2026-11-09; the originals stay where they were
   `--zpad N` the N layers below the box are the bath side, no `inletPad`). Checked: with job 3068's options it writes
   job 3068's `blockMeshDict`, eps, K, fYarn and yarnID byte for byte.
 - `initFields.py`, `runTools.sh` and the four function objects: `meshing_strat_trial/tools/`, unchanged (the
-  `coatsTimeStep` with the tensor branch of change T, `7593c42`).
+  `coatsTimeStep` with the tensor branch of change T, `7593c42`). Since 2026-11-20 `coatsTimeStep` follows
+  `relativePermeabilityModel` (Brooks–Corey as before, or Van Genuchten / Mualem) and stops on another kr model, a pc model
+  other than Van Genuchten or kr end points ≠ 1 (`verification/maier1D/README.md`: Brooks–Corey path bit-identical, 2000
+  steps; Mualem branch against a Python recomputation, 1e-15). **Since 2026-11-20 (user) `tools/` is the repo's single copy:
+  `meshing_strat_trial/tools`, the verification studies' `tools` and `verification/runTools.sh`, `trialWicking/runTools.sh`
+  are symlinks to it** (`pOpenAir`, `revGeometry.py`, `dsLocator` moved in; 2D bench to 2 ms bit-identical with the old
+  `meshing_strat_trial` tool; `NOTES_cases.md`, 2026-11-20).
 - `check.py`: `meshing_strat_trial/REV_midbath/check.py`; `compare3068.py`: `verification/study2e_bathLayer/`;
   `analyseCut.py`: `verification/study2c_nearSaturation/`; `zLayers.py`: `verification/study2d_gapRise/` (the last two
   import `analyseCut.py` from this folder now). Geometry files: `meshing_strat_trial/REV/` and `REV_midbath/`.

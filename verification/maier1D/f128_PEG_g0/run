@@ -1,0 +1,10 @@
+#!/bin/sh
+# Maier et al. 2025, f128 PEG, 1D column (../README.md). Builds the mesh on the first call,
+# then runs the solver (log outside the workspace: runTmpLog, every 100th step with LOG_EVERY).
+# A second call continues from the latest write (startFrom latestTime); ./clean starts over.
+# Solver: HPIF (default: the installed hybridPorousInterFoam, 4bb5d2e).
+cd "${0%/*}" || exit 1
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+. ../../runTools.sh
+[ -d constant/polyMesh ] || runApplication blockMesh
+LOG_EVERY=${LOG_EVERY:-100} runTmpLog log.hybridPorousInterFoam ${HPIF:-hybridPorousInterFoam}

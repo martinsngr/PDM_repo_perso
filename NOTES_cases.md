@@ -1,8 +1,9 @@
 # Wicking cases — 1D, single yarn, fabric REV
 
 Setups, results and open work of the cases in `trialWicking/` (1D column and single yarn, impesFoam and
-hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-13.
-Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues).
+hybridPorousInterFoam) and `meshing_strat_trial/` (fabric REV, 2D bench, slit tests). Last updated 2026-11-20.
+Companion files: `NOTES_solver.md` (solver changes A–I, model, verification, open solver issues), `NOTES_parametrization.md`
+(yarn pc(S), K and kr from the yarn geometry).
 (Before 2026-10-13: `trialWicking/NOTES.md` and `meshing_strat_trial/NOTES.md`; day-by-day record in git history.)
 **Start a new session at "Next steps".**
 
@@ -26,8 +27,8 @@ Companion file: `NOTES_solver.md` (solver changes A–I, model, verification, op
 | `meshing_strat_trial/2D_bench_strip/` | First 2D bench (strip between open free layers), archive: `variants/` (debugging runs, referees R1–R3, `makeVariant.sh`, `ADD=` option) and figures; template of `slit_test/makeSlit.py` |
 | `meshing_strat_trial/slit_test/` | Slit capillary-rise tests: `makeSlit.py` (`--walls real/porous`, `--nw`, `--w`, `--K`, `--theta`, `--dx`, `--add`), `slitReport.py`, `benchSlit.py`, `interFoamSlit.sh`, `figures/`, `old_runs/`. Run folders: `S0_*` real walls, `P_*` current porous-wall set, `IF_*` stock interFoam; `B_/H_/HF_/I_/J_/N_/R_/V_` intermediate |
 | `verification/` (repo root) | All verification: paper tutorials, 1D similarity solution, ddtCorr bench, inlet test (moved from `trialWicking/verification/` 2026-10-13; results in `NOTES_solver.md`), and **`PLAN.md`: the planned studies 1–3** |
-| `meshing_strat_trial/tools/` | `runTools.sh`, `initFields.py`, `pOpenAir` (coded open-patch p BC of the 2D bench and slit cases; `REV/` and `REV_lowpc/` use `totalPressure` since 2026-10-27), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
-| `REV_pipeline/` (repo root) | **The REV runs from 2026-11-09 on, self-contained:** `geometry/` (`funge.py`, the STL, the REV boxes), `tools/` (copies of every script and function object the cases use; `build_fields.py` with `--stl`/`--domain` and `--wick-axis z`), `cases/` (templates since 2026-11-13: `vertical` with the N2c bath, `horizontal` without J; run records: `tensorA`, `tensorB`, `twillA`, `anisoA*`, `horizB_t40/t85`). Target: one main script from the REV inputs to the launched run (its `README.md`) |
+| `meshing_strat_trial/tools/` | **symlink to `REV_pipeline/tools` since 2026-11-20** (one copy of the tools for the whole repo). Contents: `runTools.sh`, `initFields.py`, `pOpenAir` (coded open-patch p BC of the 2D bench and slit cases; `REV/` and `REV_lowpc/` use `totalPressure` since 2026-10-27), function objects `coatsTimeStep`, `liquidBalance`, `waterBudget`, `stopGuard` |
+| `REV_pipeline/` (repo root) | **The REV runs from 2026-11-09 on, self-contained:** `geometry/` (`funge.py`, the STL, the REV boxes), `tools/` (since 2026-11-20 the repo's single copy of every script and function object; every other `tools` folder and `runTools.sh` is a symlink to it; `build_fields.py` with `--stl`/`--domain` and `--wick-axis z`), `cases/` (templates since 2026-11-13: `vertical` with the N2c bath, `horizontal` without J; run records: `tensorA`, `tensorB`, `twillA`, `anisoA*`, `horizB_t40/t85`). Target: one main script from the REV inputs to the launched run (its `README.md`) |
 
 ## Common setup and rules
 
@@ -718,6 +719,10 @@ No demonstrated solver for **spontaneous** wicking in a dual-scale medium (porou
 - Pore-scale / pore network for yarns (Empa/ETH: Carmeliet, Fischer; Du et al. 2025): yarn wicking shows filling bursts.
 - Single-scale Richards (porousMultiphaseFoam / impesFoam, Horgue; Maier et al. 2025; Masoodi & Pillai); LCM dual-scale
   sink models (Pillai).
+- **Search of 2026-11-20 (Consensus, abstracts; list with DOIs in `NOTES_parametrization.md`):** Stokes free flow + Richards
+  with multirate time stepping (Rybak et al. 2015); Navier–Stokes with a phase field in the channels + two-phase Darcy in the
+  tows, BJS condition (Li et al. 2022, resin infusion: the structure closest to ours); Stokes–Brinkman with a capillary pressure
+  drop at a level-set front (He et al. 2021). Still none for spontaneous wicking with Richards yarns and VOF gaps.
 
 ## Next steps
 **Plan to the first yarn characterization (~2026-11-20; agreed with the user 2026-10-30), in this order:** (1) read REV_lowpc + L and `REV_gapflow` (done 2026-11-02); (2) tensor K, solver change and the 6 checks
@@ -913,6 +918,43 @@ the full-length runs) and `REV_pipeline/README.md` (Horizontal with the Gebart K
   (`NOTES_solver.md`, Open issues, kr/pc models outside the solver); a pc with a bounded dry end (study 2f) is not in the library
   (Van Genuchten and Brooks–Corey diverge as S → 0); water and air kr end points share one keyword.
 
+**2026-11-20: yarn parametrization route started, new file `NOTES_parametrization.md`.** Maier et al. 2025 (Textile Res. J., shared
+by the user): pc(S) of a yarn from pore morphology (PoreSpy) at the fibre diameter, fibre fraction and θ, K from Gebart, kr Mualem;
+predictive for PET yarns (2 of 3 well), nothing fitted to the wicking test. Discussed: the solver's yarn equations are Richards plus an
+air phase (Richards is the limit μ_air → 0; checked against the 1D Richards similarity solution, the air costs ~2.5 % of the uptake);
+Richards in the yarns, or interFoam + Richards as two mesh regions, set aside; keep the frozen solver (Claude's assessment) and put
+the effort into the inputs and the validation tests. Next (user): read the PoreSpy documentation first, then a script for our yarn
+(not written; what it needs and the checks, among them the 2D curvature factor of `capillary_transform`, are in the new file);
+PoreSpy 3.3 needs Python ≥ 3.11, the repo `.venv` has 3.10 (separate environment). The solver on Maier's 1D case (their inputs,
+0.5 mm cells) is cheap: 0.5–1.3 million steps, under ~1 h on the laptop (estimate, not run; needs `coatsTimeStep` adapted for
+Mualem kr, or impesFoam as is). **Later the same day (user): f128 PEG with their inlet, curves digitised by the user,
+`coatsTimeStep` to take other kr models:** `verification/maier1D/` (case `f128_PEG`, replica `richards1D.py`, predictions in its
+README); `REV_pipeline/tools/coatsTimeStep` extended to the Mualem kr by Claude (user's choice; Brooks–Corey path
+bit-identical); inlet α `fixedValue 0.99`; the f128 run (11:27–12:56, 1.07 million steps) reproduces the replica with
+gravity (uptake within 1.7 %, S 0.1 front +3 % at 50 s, under one cell); their published curves are reproduced (all four,
+0.35–0.48 mm, fronts traced by `readFronts.py` in the evening: the first by-eye readings were off by up to 2.3 mm) only with
+gravity × 0.35 and K × 0.73–1.21 per case, not with the paper's inputs; likely cause (hypothesis): their eq. 8 coded as
+printed, k_rel instead of ∂k_rel/∂S, which reproduces three figures within 0.2–0.4 mm with full gravity, f48 only to 1.4 mm
+(study README `fitFigures.py`, `NOTES_parametrization.md`). Mean-saturation panels (user's question, evening): their simulated
+ones confirm gravity × 0.35; the measured ones grow faster than √t (window starting 3.5 mm above the bath, profiles filling in)
+and do not test gravity. Their measured fronts with the correct gravity term need an effective pc 1.3–5× Table 4's for the
+finer yarns (f128 1.3–2, f256 2–5), while f48 is fitted by no pc scale (sharp front): the published agreement of the finer
+yarns rests on the gravity slip partly cancelling a pc too low for them (hypothesis, study README). The g = 0 twin
+`f128_PEG_g0` (15:26–17:24) reproduces the replica without gravity within 1.8 % in uptake (S 0.1 front within one cell): the
+pure-porous path verified with Van Genuchten / Mualem, with and without gravity. Still open: the 0.25 mm run, the other cases. **Tools consolidated (user, the same day):
+`REV_pipeline/tools` is the single copy** (`pOpenAir`, `revGeometry.py` from `meshing_strat_trial/tools`, `dsLocator` from
+study 2c moved in); `meshing_strat_trial/tools`, the `tools` of `verification/` standardOpenBC, study2c, study2d, study2e,
+tensorK, waterOnlyReservoir, and `verification/runTools.sh`, `trialWicking/runTools.sh` are symlinks to it; new symlinks
+where archived runs had lost their `../../tools` (`slit_test/old_runs`, `2D_bench_strip/variants/old_variants`,
+`verification/solver_failures/cases/{slit,strip}`, `verification/parallel_H/runs`). Before, only `coatsTimeStep` differed
+(three versions, pre-T in the verification copies, T in `meshing_strat_trial`, T + kr models in `REV_pipeline`); the other
+function objects were byte-identical. Checked: all 1,439 tool includes of the repo resolve to `REV_pipeline/tools`; the 2D
+bench to 2 ms (8,491 steps) with the old `meshing_strat_trial` tool and with the single copy: Coats line, dt and fields
+identical. The 36 inline Coats copies in old 1D and bench controlDicts are left as they are (records of those runs).
+Uncommitted: `verification/maier1D/`, `REV_pipeline/tools/` (`coatsTimeStep`, `runTools.sh` header, new files), the
+symlinks above, `REV_pipeline/README.md`, `NOTES_parametrization.md`, these
+notes, `NOTES_solver.md`, `NOTES_experimental.md`, `CLAUDE.md`.
+
 **Plan for 2026-11-10 (agreed with the user 2026-11-09 evening; item 1 done 2026-11-10, item 2 replaced by the Gebart pair of 2026-11-12).**
 1. **Fetch and compare the four mini03 runs** (all expected done by the morning): `tensorA` job 3107, `tensorB` job 3108,
    `anisoA` job 3109, `anisoA_mu100` job 3110 (`REV_pipeline/cases/`). Fetch each with
@@ -1098,7 +1140,8 @@ committed); REV geometry facts measured (above); REV decisions put to the user (
 
 ## Pitfalls met
 - **`Courant Number` in the log covers all cells, free and porous** (stock `CourantNo.H`: 0.5·Σ|φ|/V·dt, no cell filter; checked 2026-11-02): the "free Courant" of these notes is that number. Co·Δx/dt gives the fastest cell anywhere, not where it is; at the writes analysed so far (jobs 3059, 3063, 3065) the fastest cell was a free one.
-- **Don't pull a change of `tools/` onto a cluster while runs use it** (risk, not tested): `system/controlDict` includes `tools/<functionObject>` with `runTimeModifiable yes`, and a coded function object that recompiles inside
+- **Don't pull a change of `tools/` onto a cluster while runs use it** (since 2026-11-20 every `tools` folder is the one
+  `REV_pipeline/tools`, so a change reaches every case) (risk, not tested): `system/controlDict` includes `tools/<functionObject>` with `runTimeModifiable yes`, and a coded function object that recompiles inside
   `mpirun` aborts (`MPI_ERR_TRUNCATE`). The tensor K change touches `tools/coatsTimeStep`: on mini03 only once jobs 3067 and `REV_midbath` have ended (both ended 2026-11-03).
 - **Check the standard OpenFOAM BCs before coding one** (lesson of 2026-10-27, `verification/standardOpenBC`): the
   REV's coded `pOpenAir` re-implemented `totalPressure` on its free faces (bit-identical), and its yarn-face branch

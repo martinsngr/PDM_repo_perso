@@ -19,6 +19,13 @@
   memory each step; setDeltaT.H then grows dt by at most 1.2x per step.
   change solver T: gravity part of the Coats CFL to use K along gravity, not K itself (for a tensor K, g.K.g instead of K)
   capillarry part already uses K along the face normal, so no change needed there
+  kr models (2026-11-20, verification/maier1D): the kr law follows
+  relativePermeabilityModel: BrooksAndCorey (kra = (1-Se)^n, krb = Se^n, the
+  original lines) or VanGenuchten (Mualem, the library's krVanGenuchten:
+  kra = (1-Se)^0.5 (1-Se^(1/m))^(2m), krb = Se^0.5 (1-(1-Se^(1/m))^m)^2, m
+  from VanGenuchtenCoeffs as the library). Fatal error for another kr model,
+  for a pc model other than VanGenuchten (dpc/dS below) and for kr end points
+  (kralpha.wettingmax) other than 1.
 \*---------------------------------------------------------------------------*/
 
 type            coded;
@@ -84,8 +91,32 @@ codeExecute
         dimensionedScalar(tp.lookup("alpha.wettingmin")).value();
     const scalar Smax =
         dimensionedScalar(tp.lookup("alpha.wettingmax")).value();
-    const scalar nkr =
-        readScalar(tp.subDict("BrooksAndCoreyCoeffs").lookup("n"));
+    // kr law of the solver (relativePermeabilityModel): Brooks-Corey or Van
+    // Genuchten (Mualem); the pc law must be Van Genuchten (dpcdS below)
+    const word krLaw(tp.lookup("relativePermeabilityModel"));
+    const word pcLaw(tp.lookup("capillarityModel"));
+    if (pcLaw != "VanGenuchten")
+    {
+        FatalErrorInFunction
+            << "coatsTimeStep: capillarityModel " << pcLaw
+            << " not implemented (VanGenuchten only)" << exit(FatalError);
+    }
+    if (krLaw != "BrooksAndCorey" && krLaw != "VanGenuchten")
+    {
+        FatalErrorInFunction
+            << "coatsTimeStep: relativePermeabilityModel " << krLaw
+            << " not implemented (BrooksAndCorey, VanGenuchten)"
+            << exit(FatalError);
+    }
+    const bool vgKr = (krLaw == "VanGenuchten");
+    const dictionary& krCoeffs = tp.subDict(krLaw + "Coeffs");
+    if (mag(krCoeffs.lookupOrDefault<scalar>("kralpha.wettingmax", 1) - 1) > small)
+    {
+        FatalErrorInFunction
+            << "coatsTimeStep: kr end points other than 1 not implemented"
+            << exit(FatalError);
+    }
+    const scalar nkr = vgKr ? 0 : readScalar(krCoeffs.lookup("n"));
     const dictionary& vg = tp.subDict("VanGenuchtenCoeffs");
     const scalar pc0 = dimensionedScalar(vg.lookup("pc0")).value();
     const scalar m = readScalar(vg.lookup("m"));
@@ -141,10 +172,35 @@ codeExecute
         }
         const scalar Se =
             min(max((alpha[i] - Smin)/(Smax - Smin), 1e-4), 1 - 1e-4);
-        const scalar kra = pow(1 - Se, nkr);
-        const scalar krb = pow(Se, nkr);
-        const scalar dkra = -nkr*pow(1 - Se, nkr - 1)/(Smax - Smin);
-        const scalar dkrb = nkr*pow(Se, nkr - 1)/(Smax - Smin);
+        scalar kra, krb, dkra, dkrb;
+        if (!vgKr)
+        {
+            kra = pow(1 - Se, nkr);
+            krb = pow(Se, nkr);
+            dkra = -nkr*pow(1 - Se, nkr - 1)/(Smax - Smin);
+            dkrb = nkr*pow(Se, nkr - 1)/(Smax - Smin);
+        }
+        else
+        {
+            // Mualem / Van Genuchten, X = Se^(1/m), Y = 1 - X; derivatives
+            // with respect to Se (as porousMultiphaseFoam's krVanGenuchten;
+            // the hybrid library's dkrbdS has an integer 1/2), then 1/(Smax - Smin)
+            const scalar X = pow(Se, 1/m);
+            const scalar Y = 1 - X;
+            const scalar Ym = pow(Y, m);
+            kra = sqrt(1 - Se)*pow(Y, 2*m);
+            krb = sqrt(Se)*sqr(1 - Ym);
+            dkra =
+                (
+                  - 0.5*pow(Y, 2*m)/sqrt(1 - Se)
+                  - 2*sqrt(1 - Se)*pow(Y, 2*m - 1)*X/Se
+                )/(Smax - Smin);
+            dkrb =
+                (
+                    0.5*sqr(1 - Ym)/sqrt(Se)
+                  + 2*(1 - Ym)*pow(Y, m - 1)*X/sqrt(Se)
+                )/(Smax - Smin);
+        }
         const scalar den = Mmu*sqr(kra) + 2*kra*krb + sqr(krb)/Mmu;
         const scalar Sepc =
             min

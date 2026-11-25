@@ -1,7 +1,7 @@
 # hybridPorousInterFoam — changes, model and verification
 
 What was changed in the solver, why (condensed evidence), what the modified model is, how it was verified and what
-is still open. Last updated 2026-11-18. Companion file: `NOTES_cases.md` (the cases, setups, results).
+is still open. Last updated 2026-11-20. Companion file: `NOTES_cases.md` (the cases, setups, results).
 Precise per-change specification (code, keywords, checks): `CHANGES_of9-port.md` in the solver repo; the code of each
 change: `git show <commit>` there (patch files: `git format-patch be54696..of9-port`); face-flux debug tooling
 `meshing_strat_trial/2D_bench_strip/debug_faceDump/`. (Before 2026-10-13 this content was spread over
@@ -92,7 +92,9 @@ The paper's solver (Carrillo, Bourg & Soulaine 2020) is a micro-continuum (Darcy
 equation everywhere, porous drag, a smeared `Solid` transition, no capillary term on porous/free faces. With B + G + H
 + F′ + I it becomes a **sharp-interface coupling of two-phase Darcy flow (yarns) and VOF Navier–Stokes (gaps)**, on one
 mesh with one pressure equation and one α field:
-- inside the yarns (B): two-phase Darcy flux (impesFoam-like), no Brinkman momentum;
+- inside the yarns (B): two-phase Darcy flux (impesFoam-like), no Brinkman momentum; this is Richards' equation plus an air
+  phase (Richards is the limit μ_air → 0: in 1D the air costs ~2.5 % of the uptake, Verification; code mapping in
+  `NOTES_parametrization.md`, 2026-11-20);
 - at the yarn surface: mass = Darcy flux with harmonic K; normal stress = continuity of the phase pressures (G, Mosthaf
   et al. 2011 type); tangential = no-slip relative to the porous velocity (I, Beavers–Joseph slip neglected); wetting =
   contact angle as a wall condition (H); velocity of the adjacent gap cells consistent with the face flux (F′);
@@ -664,7 +666,14 @@ Solver behaviour:
   dkr/dS and dpc/dS taken from the solver's models. Same formulas in the analysis scripts (`verification/analyseWicking1D.py`,
   `wicking1DPressures.py`, `study2d_gapRise/satGap.py`). Upstream, both libraries (porousMultiphaseFoam and the hybrid
   copy, `krBrooksAndCorey.C`) read kramax and krbmax from the same keyword `kr<S>max`: water and air end points cannot
-  differ.
+  differ. Maier et al. 2025 (`NOTES_parametrization.md`, 2026-11-20): their Mualem kr is `krVanGenuchten`
+  (`krVanGenuchten.H:132`) and their Van Genuchten pc is `pcVanGenuchten` with pc0 = 1/α, m = 1 − 1/n: their laws go in by
+  keywords. **Since 2026-11-20 `REV_pipeline/tools/coatsTimeStep` follows `relativePermeabilityModel` (Brooks–Corey or Van
+  Genuchten / Mualem) and stops on another kr model, a pc model other than Van Genuchten or kr end points ≠ 1**
+  (`verification/maier1D/README.md`, checks there; every `tools` folder is that copy since 2026-11-20); still Brooks–Corey
+  only: the 36 inline copies in old 1D and bench controlDicts and the analysis scripts. The library's `dkrbdS` of `krVanGenuchten.H:140` has an
+  integer division (`1/m_-1/2`: exponent 1/m instead of 1/m − 1/2; porousMultiphaseFoam's copy has `-0.5`): unused by the
+  solver (no dkr/dS anywhere outside the library), wrong only if copied (found 2026-11-20).
 
 Model questions (raised by an independent review, 2026-10-13; answers so far in brackets):
 - Counter-current flow across yarn/gap faces (air out, water in): check for sign-flipping face fluxes or alternating

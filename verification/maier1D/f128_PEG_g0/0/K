@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      K;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Gebart (their eq. 11) along the fibres, c = 57 as they state, with the fibre RADIUS
+// 5.85 um (diameter 11.7 um, Table 1) and porosity 0.84: 8 r^2/57 * phi^3/(1 - phi)^2.
+// Their R_f is called a diameter; with the diameter K would be 4x: 4.448205e-10
+// (variant to run: ../README.md).
+
+dimensions      [0 2 0 0 0 0 0];
+
+internalField   uniform 1.112051e-10;
+
+boundaryField
+{
+    inlet
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

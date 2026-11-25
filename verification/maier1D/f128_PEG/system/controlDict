@@ -1,0 +1,90 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  9
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Maier et al. 2025, f128 PEG: 3000 s, writes every 50 s (their profile times
+// 50, 100, 300, 600, ..., 3000 s are all writes). startFrom latestTime: ./run
+// continues an interrupted run.
+
+application     hybridPorousInterFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         3000;
+
+deltaT          1e-06;
+
+writeControl    adjustableRunTime;
+
+writeInterval   50;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+
+maxCo           0.75;
+
+maxAlphaCo      1;
+
+// overwritten every step by coatsTimeStep (Coats CFL, dSmax)
+maxDeltaT       1;
+
+CoatsMaxCo      0.5;
+
+dSmax           0.01;
+
+maxDeltaTCoats  10;
+
+minDeltaTCoats  0;
+
+// stopGuard: end the run if dt collapses
+minDeltaTStop   1e-12;
+
+functions
+{
+    // Coats CFL and dSmax time step (needs the Van Genuchten / Mualem kr branch:
+    // ../README.md)
+    coatsTimeStep
+    {
+        #include "../../../../REV_pipeline/tools/coatsTimeStep"
+    }
+    waterBudget
+    {
+        #include "../../../../REV_pipeline/tools/waterBudget"
+    }
+    stopGuard
+    {
+        #include "../../../../REV_pipeline/tools/stopGuard"
+    }
+}
+
+// ************************************************************************* //

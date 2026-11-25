@@ -18,12 +18,21 @@ Model limits to keep in mind when fitting: the solver offers pc Van Genuchten, B
 Genuchten; `tools/coatsTimeStep` assumes Brooks–Corey kr + Van Genuchten pc (another law needs it changed); a pc bounded at the dry end
 is not in the library (both laws diverge as S → 0); water and air kr end points share one keyword.
 
+Computed route (2026-11-20): pc(S) from pore morphology at the measured fibre diameter, V_f and θ, with Gebart K and Mualem kr
+(Maier et al. 2025): `NOTES_parametrization.md`. Its inputs to measure first: θ of water on PET, V_f of the yarn inside the fabric,
+fibre diameter and cross-section shape. V_f, diameter and shape come together from one yarn cross-section taken from the fabric
+(resin embedding, grinding, microscope, fibre centres by image processing: the procedure of Fibers 13 (2025) 48 on Maier's yarns,
+added 2026-11-24); the fibre centres also feed `rev_curve` directly, so pc(S) of the real arrangement can be compared with the
+random packing at the same V_f. θ is not in the image: still a separate measurement.
+
 ## Fabric (REV geometry)
 - Weave, ends and picks per cm, yarn width and thickness in the fabric, crimp, fabric thickness, areal mass (the `funge.py` / TexGen
   inputs; check the TexGen gaps against the real fabric, µCT if available: the gaps carry most of the through-thickness uptake).
 - The same yarn in several weaves and densities (the planned comparison).
 
 ## Validation tests (not used for calibration)
+- Yarn-bundle wicking with water (Maier et al. 2025's set-up: 20 yarns in a silanised glass capillary, backlight imaging): checks
+  the computed pc(S) and K of the yarn before the fabric tests.
 - Vertical strip wicking: front height and uptake mass against time per fabric width, up to equilibrium (minutes to hours, gravity).
 - Through-thickness absorption (fabric laid on water): uptake per area against time, from ms if possible, and at the end.
 - Weighing at long times: total water against the capacities of the REV (plain weave: yarns full 65 g/m², everything full ~212 g/m²),
